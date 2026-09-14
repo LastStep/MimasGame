@@ -1,0 +1,14 @@
+{
+  "name": "Mimas.Client.Audio",
+  "rootNamespace": "Mimas.Client.Audio",
+  "references": [],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

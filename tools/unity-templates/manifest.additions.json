@@ -1,0 +1,16 @@
+{
+  "_comment": "Merge these into MimasClient/Packages/manifest.json 'dependencies' after creating the project from the Universal 3D template. Versions verified for 6000.4 on 2026-09-14; let Package Manager resolve if one is unavailable.",
+  "dependencies": {
+    "com.mimas.core": "file:../../shared/Mimas.Core",
+    "com.unity.cinemachine": "3.1.7",
+    "com.unity.inputsystem": "1.19.0",
+    "com.unity.addressables": "2.9.1",
+    "com.unity.nuget.newtonsoft-json": "3.2.2",
+    "com.unity.test-framework": "1.6.0"
+  },
+  "_later": {
+    "com.unity.pipeline": "added by `unity pipeline install --project-path MimasClient`",
+    "com.fmod.fmod-for-unity-2-03": "import from Asset Store (FMOD for Unity 2.03.x)",
+    "NativeWebSocket": "https://github.com/endel/NativeWebSocket.git#upm  (add via Package Manager > git URL)"
+  }
+}

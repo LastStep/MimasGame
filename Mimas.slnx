@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/shared/">
+    <Project Path="shared/Mimas.Core.Build/Mimas.Core.csproj" />
+    <Project Path="shared/Mimas.Core.Tests/Mimas.Core.Tests.csproj" />
+  </Folder>
+  <Folder Name="/server/">
+    <Project Path="server/Mimas.Server/Mimas.Server.csproj" />
+  </Folder>
+</Solution>

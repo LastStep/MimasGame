@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <RootNamespace>Mimas.Core</RootNamespace>
+    <AssemblyName>Mimas.Core</AssemblyName>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Same sources Unity compiles via the local package. Keep bin/obj here, not in the package folder. -->
+    <Compile Include="../Mimas.Core/Runtime/**/*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Unity ships Json.NET 13.0.x via com.unity.nuget.newtonsoft-json; keep the same major here. -->
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+</Project>

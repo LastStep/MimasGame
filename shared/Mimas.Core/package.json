@@ -1,0 +1,8 @@
+{
+  "name": "com.mimas.core",
+  "version": "0.1.0",
+  "displayName": "Mimas Core",
+  "description": "Pure C# rules engine for Mimas (shared with the server). No UnityEngine references.",
+  "unity": "6000.0",
+  "author": { "name": "Rohan Yadav" }
+}

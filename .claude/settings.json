@@ -1,0 +1,49 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dotnet build *)",
+      "Bash(dotnet test *)",
+      "Bash(dotnet run *)",
+      "Bash(dotnet format *)",
+      "Bash(unity status *)",
+      "Bash(unity command *)",
+      "Bash(unity test *)",
+      "Bash(unity build *)",
+      "Bash(unity pipeline *)",
+      "Bash(unity projects verify *)",
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
+    ],
+    "deny": [
+      "Write(**/*.meta)",
+      "Edit(**/*.meta)",
+      "Write(**/MimasClient/ProjectSettings/**)",
+      "Edit(**/MimasClient/ProjectSettings/**)",
+      "Edit(**/packages-lock.json)",
+      "Read(**/MimasClient/Library/**)",
+      "Bash(git push --force *)",
+      "Bash(git push -f *)",
+      "Bash(git reset --hard *)"
+    ]
+  },
+  "env": {
+    "MCP_TOOL_TIMEOUT": "180000"
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -NoProfile -File \"${CLAUDE_PROJECT_DIR}/.claude/hooks/guard-unity-files.ps1\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "timeControls": [
+    {
+      "id": "1+0",
+      "name": "Bullet",
+      "baseMs": 60000,
+      "incrementMs": 0,
+      "turnCapMs": 20000
+    },
+    {
+      "id": "3+2",
+      "name": "Blitz",
+      "baseMs": 180000,
+      "incrementMs": 2000,
+      "turnCapMs": 45000
+    },
+    {
+      "id": "10+0",
+      "name": "Rapid",
+      "baseMs": 600000,
+      "incrementMs": 0,
+      "turnCapMs": 90000
+    }
+  ]
+}

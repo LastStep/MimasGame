@@ -1,0 +1,14 @@
+{
+  "name": "Mimas.Client.Editor",
+  "rootNamespace": "Mimas.Client.Editor",
+  "references": ["Mimas.Core", "Mimas.Client.Presentation"],
+  "includePlatforms": ["Editor"],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

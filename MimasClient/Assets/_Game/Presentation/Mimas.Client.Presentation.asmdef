@@ -1,0 +1,14 @@
+{
+  "name": "Mimas.Client.Presentation",
+  "rootNamespace": "Mimas.Client.Presentation",
+  "references": ["Mimas.Core", "Unity.Cinemachine", "Unity.InputSystem"],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

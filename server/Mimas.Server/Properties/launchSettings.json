@@ -1,0 +1,13 @@
+{
+  "profiles": {
+    "Mimas.Server": {
+      "commandName": "Project",
+      "launchBrowser": false,
+      "applicationUrl": "http://localhost:7777",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "MIMAS_PORT": "7777"
+      }
+    }
+  }
+}

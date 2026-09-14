@@ -1,0 +1,90 @@
+# Line endings
+* text=auto eol=lf
+*.cs text diff=csharp
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Unity YAML: keep as text; merge with UnityYAMLMerge (run `unity vcs merge-setup` once per clone)
+*.meta         text -diff merge=unityyamlmerge
+*.unity        text -diff merge=unityyamlmerge
+*.prefab       text -diff merge=unityyamlmerge
+*.asset        text -diff merge=unityyamlmerge
+*.mat          text -diff merge=unityyamlmerge
+*.anim         text -diff merge=unityyamlmerge
+*.controller   text -diff merge=unityyamlmerge
+*.overrideController text -diff merge=unityyamlmerge
+*.physicMaterial text -diff merge=unityyamlmerge
+*.physicsMaterial2D text -diff merge=unityyamlmerge
+*.playable     text -diff merge=unityyamlmerge
+*.mask         text -diff merge=unityyamlmerge
+*.brush        text -diff merge=unityyamlmerge
+*.flare        text -diff merge=unityyamlmerge
+*.fontsettings text -diff merge=unityyamlmerge
+*.guiskin      text -diff merge=unityyamlmerge
+*.giparams     text -diff merge=unityyamlmerge
+*.renderTexture text -diff merge=unityyamlmerge
+*.spriteatlas  text -diff merge=unityyamlmerge
+*.terrainlayer text -diff merge=unityyamlmerge
+*.mixer        text -diff merge=unityyamlmerge
+*.shadervariants text -diff merge=unityyamlmerge
+*.preset       text -diff merge=unityyamlmerge
+*.asmdef text
+*.asmref text
+*.uxml text
+*.uss text
+*.shader text
+*.shadergraph text
+*.hlsl text
+*.cginc text
+*.json text
+
+# Lighting data is binary even under Force Text
+**/LightingData.asset filter=lfs diff=lfs merge=lfs -text
+
+# ---- Git LFS: binaries ----
+# Images
+*.png filter=lfs diff=lfs merge=lfs -text
+*.jpg filter=lfs diff=lfs merge=lfs -text
+*.jpeg filter=lfs diff=lfs merge=lfs -text
+*.tga filter=lfs diff=lfs merge=lfs -text
+*.psd filter=lfs diff=lfs merge=lfs -text
+*.psb filter=lfs diff=lfs merge=lfs -text
+*.exr filter=lfs diff=lfs merge=lfs -text
+*.hdr filter=lfs diff=lfs merge=lfs -text
+*.tif filter=lfs diff=lfs merge=lfs -text
+*.tiff filter=lfs diff=lfs merge=lfs -text
+*.gif filter=lfs diff=lfs merge=lfs -text
+# Audio (FMOD banks too)
+*.wav filter=lfs diff=lfs merge=lfs -text
+*.mp3 filter=lfs diff=lfs merge=lfs -text
+*.ogg filter=lfs diff=lfs merge=lfs -text
+*.aif filter=lfs diff=lfs merge=lfs -text
+*.aiff filter=lfs diff=lfs merge=lfs -text
+*.flac filter=lfs diff=lfs merge=lfs -text
+*.bank filter=lfs diff=lfs merge=lfs -text
+# Video
+*.mp4 filter=lfs diff=lfs merge=lfs -text
+*.mov filter=lfs diff=lfs merge=lfs -text
+*.webm filter=lfs diff=lfs merge=lfs -text
+# 3D / animation
+*.fbx filter=lfs diff=lfs merge=lfs -text
+*.FBX filter=lfs diff=lfs merge=lfs -text
+*.obj filter=lfs diff=lfs merge=lfs -text
+*.blend filter=lfs diff=lfs merge=lfs -text
+*.glb filter=lfs diff=lfs merge=lfs -text
+*.gltf filter=lfs diff=lfs merge=lfs -text
+*.abc filter=lfs diff=lfs merge=lfs -text
+# Fonts / native / packages
+*.ttf filter=lfs diff=lfs merge=lfs -text
+*.otf filter=lfs diff=lfs merge=lfs -text
+*.dll filter=lfs diff=lfs merge=lfs -text
+*.so filter=lfs diff=lfs merge=lfs -text
+*.dylib filter=lfs diff=lfs merge=lfs -text
+*.a filter=lfs diff=lfs merge=lfs -text
+*.aar filter=lfs diff=lfs merge=lfs -text
+*.jar filter=lfs diff=lfs merge=lfs -text
+*.unitypackage filter=lfs diff=lfs merge=lfs -text
+*.bytes filter=lfs diff=lfs merge=lfs -text
+*.cubemap filter=lfs diff=lfs merge=lfs -text
+*.zip filter=lfs diff=lfs merge=lfs -text

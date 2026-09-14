@@ -1,0 +1,14 @@
+{
+  "name": "Mimas.Client.UI",
+  "rootNamespace": "Mimas.Client.UI",
+  "references": ["Mimas.Core", "Mimas.Client.Presentation"],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

@@ -1,0 +1,5 @@
+<!-- Copy to MimasClient/Assets/link.xml. Keeps reflection-based JSON types alive under Managed Stripping = High. -->
+<linker>
+  <assembly fullname="Newtonsoft.Json" preserve="all" />
+  <assembly fullname="Mimas.Core" preserve="all" />
+</linker>
