@@ -1,7 +1,12 @@
 {
   "name": "Mimas.Client.Presentation",
   "rootNamespace": "Mimas.Client.Presentation",
-  "references": ["Mimas.Core", "Unity.Cinemachine", "Unity.InputSystem"],
+  "references": [
+    "Mimas.Core",
+    "Unity.Cinemachine",
+    "Unity.InputSystem",
+    "Mimas.Client.Content"
+  ],
   "includePlatforms": [],
   "excludePlatforms": [],
   "allowUnsafeCode": false,
