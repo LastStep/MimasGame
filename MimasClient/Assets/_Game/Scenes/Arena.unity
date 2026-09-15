@@ -163,13 +163,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 912485700047b9342a6c11cc77ec6a08, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Mimas.Client.Presentation::Mimas.Client.Presentation.SkeletonMatchController
+  _settings: {fileID: 11400000, guid: 721b5c47979f08a4d81c72274aab054b, type: 2}
   _content: {fileID: 1995155106}
   _board: {fileID: 1420187337}
   _input: {fileID: 974342029}
   _unit: {fileID: 971986041}
   _opponent: {fileID: 396881483}
-  _playerClassId: mage
-  _opponentClassId: mage
   _playback:
     SecondsPerTile: 0.35
     LeapSeconds: 0.55
@@ -931,6 +930,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Mimas.Client.Presentation::Mimas.Client.Presentation.BoardView
   _content: {fileID: 1995155106}
   _mapId: arena-4
+  _settings: {fileID: 11400000, guid: 721b5c47979f08a4d81c72274aab054b, type: 2}
   _tileSize: 1
   _tileMaterial: {fileID: 2100000, guid: 70a9afd3916572d47a9ac6c460c46654, type: 2}
   _tileLayer: -1
@@ -947,6 +947,80 @@ MonoBehaviour:
   _heightUnit: 0.45
   _minPrismHeight: 0.05
   _heightTintPerUnit: 0.12
+--- !u!1 &1832508621
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1832508622}
+  - component: {fileID: 1832508624}
+  - component: {fileID: 1832508623}
+  m_Layer: 0
+  m_Name: HUD
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1832508622
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1832508621}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1832508623
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1832508621}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f2ce808b0417af549aed166b652fac3a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Mimas.Client.UI::Mimas.Client.UI.MatchHudView
+  _sourceBehaviour: {fileID: 265037148}
+  _boardInput: {fileID: 974342029}
+  _icons:
+  - {fileID: 21300000, guid: 66b1ce1282fa2304cb51c8a1781b4080, type: 3}
+  - {fileID: 21300000, guid: c44bca5df0d52a34d9196d1338fff4ad, type: 3}
+  - {fileID: 21300000, guid: c2e97a0b13efe0747a5233dd186d7c3d, type: 3}
+--- !u!114 &1832508624
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1832508621}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 19102, guid: 0000000000000000e000000000000000, type: 0}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.dll::UnityEngine.UIElements.UIDocument
+  m_PanelSettings: {fileID: 11400000, guid: 8ea3fbd3fed3a494c83e9703e58dcb67, type: 2}
+  m_ParentUI: {fileID: 0}
+  sourceAsset: {fileID: 9197481963319205126, guid: 81e258eee103e3f44a17d0ec2168f35e, type: 3}
+  m_SortingOrder: 0
+  m_Position: 0
+  m_WorldSpaceSizeMode: 1
+  m_WorldSpaceWidth: 1920
+  m_WorldSpaceHeight: 1080
+  m_PivotReferenceSize: 0
+  m_Pivot: 0
+  m_WorldSpaceCollider: {fileID: 0}
 --- !u!1 &1995155104
 GameObject:
   m_ObjectHideFlags: 0
@@ -1040,3 +1114,4 @@ SceneRoots:
   - {fileID: 2092343558}
   - {fileID: 396881482}
   - {fileID: 1995155105}
+  - {fileID: 1832508622}

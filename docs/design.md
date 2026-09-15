@@ -37,7 +37,7 @@ A browser-based 1v1 turn-based tactics duel on hex maps — think a BG3 fight di
 
 | Question | Options | Status |
 |---|---|---|
-| Alternating turns vs simultaneous turns | (a) alternating, chess-like; (b) simultaneous planning + resolution; (c) initiative-based | **Pinned** — decide before M1 rules design |
+| Alternating turns vs simultaneous turns | (a) alternating, chess-like; (b) simultaneous planning + resolution; (c) initiative-based | **Decided: alternating** (ADR-015). Per-turn cap from the time control; reaching it with no action = skip; End Turn passes early |
 | Map shapes | Ring of polygons; game board of polygons | Hex chosen; shapes are data (any set of hex coordinates), so both are possible |
 | How many units per player? | 1 hero; or hero + summons | Undecided |
 | Action economy | Move + action per turn (BG3-style); action points | Undecided |

@@ -1,0 +1,399 @@
+/* Match HUD. Minimal chrome, four anchored panels; everything else is board. */
+
+:root {
+    --hud-panel: rgba(12, 14, 20, 0.78);
+    --hud-panel-solid: rgba(12, 14, 20, 0.94);
+    --hud-edge: rgba(255, 255, 255, 0.08);
+    --hud-text: rgb(240, 242, 246);
+    --hud-text-dim: rgba(240, 242, 246, 0.6);
+    --hud-text-faint: rgba(240, 242, 246, 0.35);
+    --hud-accent: rgb(120, 200, 255);
+    --hud-accent-soft: rgba(120, 200, 255, 0.16);
+    --hud-rope: rgb(255, 140, 60);
+    --hud-ember: rgb(255, 232, 140);
+    --hud-theirs: rgb(255, 176, 120);
+    --hud-end: rgb(196, 74, 52);
+    --hud-end-hover: rgb(226, 94, 68);
+}
+
+.hud-root {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+}
+
+/* ---- turn panel ------------------------------------------------------------------------------ */
+
+.turn-panel {
+    position: absolute;
+    top: 16px;
+    left: 50%;
+    translate: -50% 0;
+    min-width: 240px;
+    padding: 10px 22px 10px 22px;
+    align-items: center;
+    background-color: var(--hud-panel);
+    border-radius: 12px;
+    border-width: 1px;
+    border-color: var(--hud-edge);
+}
+
+.turn-owner {
+    color: var(--hud-text);
+    font-size: 14px;
+    letter-spacing: 3px;
+    -unity-font-style: bold;
+    margin: 0;
+    padding: 0;
+}
+
+.turn-panel--theirs .turn-owner {
+    color: var(--hud-theirs);
+}
+
+/* The rope: hidden until the last seconds, then burns from full width to nothing. */
+.rope {
+    width: 100%;
+    height: 14px;
+    margin-top: 8px;
+    justify-content: center;
+    display: none;
+}
+
+.rope--visible {
+    display: flex;
+}
+
+.rope-track {
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background-color: rgba(255, 255, 255, 0.1);
+    overflow: hidden;
+}
+
+.rope-fill {
+    height: 100%;
+    width: 100%;
+    background-color: var(--hud-rope);
+}
+
+.rope-ember {
+    position: absolute;
+    top: 0;
+    left: 100%;
+    width: 14px;
+    height: 14px;
+    translate: -50% 0;
+    border-radius: 7px;
+    background-color: var(--hud-ember);
+}
+
+/* ---- examine --------------------------------------------------------------------------------- */
+
+.examine {
+    position: absolute;
+    left: 24px;
+    top: 50%;
+    translate: 0 -50%;
+    width: 300px;
+    padding: 14px 16px 16px 16px;
+    background-color: var(--hud-panel-solid);
+    border-radius: 14px;
+    border-width: 1px;
+    border-color: var(--hud-edge);
+    display: none;
+}
+
+.examine--visible {
+    display: flex;
+}
+
+.examine-header {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.examine-titles {
+    flex-shrink: 1;
+}
+
+.examine-title {
+    color: var(--hud-text);
+    font-size: 20px;
+    -unity-font-style: bold;
+    margin: 0;
+    padding: 0;
+}
+
+.examine-subtitle {
+    color: var(--hud-accent);
+    font-size: 11px;
+    letter-spacing: 2px;
+    -unity-font-style: bold;
+    margin: 2px 0 0 0;
+    padding: 0;
+}
+
+.examine--theirs .examine-subtitle {
+    color: var(--hud-theirs);
+}
+
+.examine-close {
+    width: 26px;
+    height: 26px;
+    margin: 0;
+    padding: 0;
+    border-width: 0;
+    border-radius: 13px;
+    background-color: rgba(255, 255, 255, 0.08);
+    color: var(--hud-text-dim);
+    font-size: 12px;
+    -unity-text-align: middle-center;
+}
+
+.examine-close:hover {
+    background-color: rgba(255, 255, 255, 0.16);
+    color: var(--hud-text);
+}
+
+.examine-description {
+    color: var(--hud-text-dim);
+    font-size: 12px;
+    white-space: normal;
+    margin: 10px 0 0 0;
+    padding: 0;
+}
+
+.examine-caption {
+    color: var(--hud-text-faint);
+    font-size: 10px;
+    letter-spacing: 3px;
+    -unity-font-style: bold;
+    margin: 14px 0 6px 0;
+    padding: 0;
+}
+
+.examine-abilities {
+    flex-direction: column;
+}
+
+.examine-entry {
+    flex-direction: row;
+    align-items: center;
+    padding: 6px 8px;
+    margin: 2px 0;
+    border-radius: 8px;
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.examine-entry--hidden {
+    opacity: 0.55;
+}
+
+.examine-entry-icon {
+    width: 26px;
+    height: 26px;
+    margin-right: 10px;
+    -unity-background-scale-mode: scale-to-fit;
+    justify-content: center;
+    align-items: center;
+}
+
+.examine-entry-glyph {
+    color: var(--hud-text);
+    font-size: 15px;
+    -unity-font-style: bold;
+    margin: 0;
+    padding: 0;
+}
+
+.examine-entry-text {
+    flex-shrink: 1;
+}
+
+.examine-entry-name {
+    color: var(--hud-text);
+    font-size: 13px;
+    -unity-font-style: bold;
+    margin: 0;
+    padding: 0;
+}
+
+.examine-entry--hidden .examine-entry-name {
+    -unity-font-style: italic;
+}
+
+.examine-entry-desc {
+    color: var(--hud-text-dim);
+    font-size: 11px;
+    white-space: normal;
+    margin: 1px 0 0 0;
+    padding: 0;
+}
+
+/* ---- action bar ------------------------------------------------------------------------------ */
+
+.action-bar {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    translate: -50% 0;
+    flex-direction: row;
+    align-items: flex-end;
+    padding: 6px 8px 8px 8px;
+    background-color: var(--hud-panel);
+    border-radius: 16px;
+    border-width: 1px;
+    border-color: var(--hud-edge);
+}
+
+.action-group {
+    flex-direction: column;
+    align-items: center;
+    padding: 0 6px;
+}
+
+.action-group-caption {
+    color: var(--hud-text-faint);
+    font-size: 9px;
+    letter-spacing: 3px;
+    -unity-font-style: bold;
+    margin: 0 0 5px 0;
+    padding: 0;
+}
+
+.action-group-row {
+    flex-direction: row;
+}
+
+.action-group-divider {
+    width: 1px;
+    height: 56px;
+    margin: 0 2px 4px 2px;
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.action-slot {
+    width: 60px;
+    height: 60px;
+    margin: 0 3px;
+    border-radius: 12px;
+    border-width: 2px;
+    border-color: rgba(0, 0, 0, 0);
+    background-color: rgba(255, 255, 255, 0.06);
+    justify-content: center;
+    align-items: center;
+    transition-property: background-color, border-color, scale;
+    transition-duration: 0.1s;
+}
+
+.action-slot:hover {
+    background-color: rgba(255, 255, 255, 0.13);
+    scale: 1.05 1.05;
+}
+
+.action-slot--active {
+    border-color: var(--hud-accent);
+    background-color: var(--hud-accent-soft);
+}
+
+.action-slot--disabled {
+    opacity: 0.35;
+}
+
+.action-slot--disabled:hover {
+    background-color: rgba(255, 255, 255, 0.06);
+    scale: 1 1;
+}
+
+.action-icon {
+    width: 38px;
+    height: 38px;
+    -unity-background-scale-mode: scale-to-fit;
+}
+
+.action-glyph {
+    color: var(--hud-text);
+    font-size: 26px;
+    -unity-font-style: bold;
+    margin: 0;
+    padding: 0;
+}
+
+/* ---- tooltip --------------------------------------------------------------------------------- */
+
+.tooltip {
+    position: absolute;
+    bottom: 118px;
+    left: 50%;
+    translate: -50% 0;
+    max-width: 340px;
+    padding: 8px 12px;
+    background-color: var(--hud-panel-solid);
+    border-radius: 8px;
+    border-width: 1px;
+    border-color: var(--hud-edge);
+    display: none;
+}
+
+.tooltip--visible {
+    display: flex;
+}
+
+.tooltip-title {
+    color: var(--hud-text);
+    font-size: 14px;
+    -unity-font-style: bold;
+    margin: 0;
+    padding: 0;
+}
+
+.tooltip-body {
+    color: var(--hud-text-dim);
+    font-size: 12px;
+    white-space: normal;
+    margin: 4px 0 0 0;
+    padding: 0;
+}
+
+/* ---- end turn -------------------------------------------------------------------------------- */
+
+.end-turn {
+    position: absolute;
+    right: 24px;
+    bottom: 24px;
+    margin: 0;
+    padding: 14px 28px;
+    align-items: center;
+    background-color: var(--hud-end);
+    border-radius: 12px;
+    border-width: 0;
+    transition-property: background-color, scale;
+    transition-duration: 0.1s;
+}
+
+.end-turn:hover {
+    background-color: var(--hud-end-hover);
+    scale: 1.03 1.03;
+}
+
+.end-turn:active {
+    scale: 0.97 0.97;
+}
+
+.end-turn:disabled {
+    opacity: 0.3;
+}
+
+.end-turn-label {
+    color: var(--hud-text);
+    font-size: 16px;
+    letter-spacing: 2px;
+    -unity-font-style: bold;
+    margin: 0;
+    padding: 0;
+}

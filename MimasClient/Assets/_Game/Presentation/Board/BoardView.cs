@@ -24,8 +24,11 @@ namespace Mimas.Client.Presentation
         [Tooltip("Where the catalogue comes from. The board never touches JSON itself.")]
         [SerializeField] private ContentBootstrap _content;
 
-        [Tooltip("Id of the map to build (maps/*.json). Match setup will drive this later.")]
+        [Tooltip("Id of the map to build (maps/*.json). Overridden by the MatchSettings asset when one is set.")]
         [SerializeField] private string _mapId = "arena-4";
+
+        [Tooltip("Optional. When set and its MapId is not empty, that map is built instead of the id above.")]
+        [SerializeField] private MatchSettings _settings;
 
         [Header("Layout")]
         [Tooltip("Hex circumradius in world units (centre to corner).")]
@@ -130,10 +133,11 @@ namespace Mimas.Client.Presentation
                 return;
             }
 
+            string mapId = _settings != null && !string.IsNullOrEmpty(_settings.MapId) ? _settings.MapId : _mapId;
             MapData mapData;
-            if (!catalog.Maps.TryGet(_mapId, out mapData))
+            if (!catalog.Maps.TryGet(mapId, out mapData))
             {
-                Debug.LogError("[BoardView] Unknown map id '" + _mapId + "'. Loaded maps: " + string.Join(", ", MapIds(catalog)), this);
+                Debug.LogError("[BoardView] Unknown map id '" + mapId + "'. Loaded maps: " + string.Join(", ", MapIds(catalog)), this);
                 return;
             }
 

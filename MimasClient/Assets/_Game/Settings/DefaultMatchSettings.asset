@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0263434e1ee45b4d9fe2d4152db97a1, type: 3}
+  m_Name: DefaultMatchSettings
+  m_EditorClassIdentifier: Mimas.Client.Presentation::Mimas.Client.Presentation.MatchSettings
+  MapId: arena-4
+  PlayerClassId: warrior
+  OpponentClassId: mage
+  TimeControlId: 3+2
+  TurnSecondsOverride: 30
+  RopeSeconds: 10
+  IdleTurnSeconds: 7
+  OpponentThinkSeconds: 1.5

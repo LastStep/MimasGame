@@ -1,0 +1,43 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" xsi="http://www.w3.org/2001/XMLSchema-instance" engine="UnityEngine.UIElements" editor="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
+    <Style src="MatchHud.uss" />
+    <ui:VisualElement name="hud-root" class="hud-root" picking-mode="Ignore">
+
+        <!-- Top centre: whose turn. No numbers; a rope burns down for the last seconds (ADR-015). -->
+        <ui:VisualElement name="turn-panel" class="turn-panel">
+            <ui:Label name="turn-owner" class="turn-owner" text="YOUR TURN" />
+            <ui:VisualElement name="rope" class="rope" picking-mode="Ignore">
+                <ui:VisualElement name="rope-track" class="rope-track" picking-mode="Ignore">
+                    <ui:VisualElement name="rope-fill" class="rope-fill" picking-mode="Ignore" />
+                </ui:VisualElement>
+                <ui:VisualElement name="rope-ember" class="rope-ember" picking-mode="Ignore" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- Left: examine panel for the clicked unit. -->
+        <ui:VisualElement name="examine" class="examine">
+            <ui:VisualElement class="examine-header">
+                <ui:VisualElement class="examine-titles" picking-mode="Ignore">
+                    <ui:Label name="examine-title" class="examine-title" text="Warrior" />
+                    <ui:Label name="examine-subtitle" class="examine-subtitle" text="Your unit" />
+                </ui:VisualElement>
+                <ui:Button name="examine-close" class="examine-close" text="✕" />
+            </ui:VisualElement>
+            <ui:Label name="examine-description" class="examine-description" text="Sturdy melee fighter." />
+            <ui:Label class="examine-caption" text="ABILITIES" />
+            <ui:VisualElement name="examine-abilities" class="examine-abilities" />
+        </ui:VisualElement>
+
+        <!-- Bottom centre: one section per category, filled at runtime from IMatchHudSource. -->
+        <ui:VisualElement name="tooltip" class="tooltip" picking-mode="Ignore">
+            <ui:Label name="tooltip-title" class="tooltip-title" text="Move" />
+            <ui:Label name="tooltip-body" class="tooltip-body" text="Walk to an adjacent tile." />
+        </ui:VisualElement>
+        <ui:VisualElement name="action-bar" class="action-bar" />
+
+        <!-- Bottom right: pass the turn early. -->
+        <ui:Button name="end-turn" class="end-turn">
+            <ui:Label name="end-turn-label" class="end-turn-label" text="END TURN" picking-mode="Ignore" />
+        </ui:Button>
+
+    </ui:VisualElement>
+</ui:UXML>

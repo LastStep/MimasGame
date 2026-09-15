@@ -22,6 +22,7 @@ namespace Mimas.Client.Presentation
         [SerializeField] private Camera _camera;
 
         private TileView _hovered;
+        private Func<Vector2, bool> _pointerBlocker;
 
         /// <summary>Left click. Carries null when the click landed off the board.</summary>
         public event Action<TileView> TileClicked;
@@ -38,6 +39,16 @@ namespace Mimas.Client.Presentation
         /// <summary>The camera the rays are cast from.</summary>
         public Camera ActiveCamera => _camera;
 
+        /// <summary>
+        /// Lets an overlay (the HUD) claim the pointer: while the predicate returns true for the current
+        /// screen position no tile is hovered or clicked. Pass null to clear. Presentation cannot reference
+        /// the UI assembly, so the overlay installs itself here rather than the other way round.
+        /// </summary>
+        public void SetPointerBlocker(Func<Vector2, bool> isBlocked)
+        {
+            _pointerBlocker = isBlocked;
+        }
+
         private void Awake()
         {
             if (_camera == null) _camera = Camera.main;
@@ -48,6 +59,7 @@ namespace Mimas.Client.Presentation
             TileClicked = null;
             TileHovered = null;
             RightClicked = null;
+            _pointerBlocker = null;
         }
 
         private void Update()
@@ -61,7 +73,9 @@ namespace Mimas.Client.Presentation
                 if (_camera == null) return;
             }
 
-            TileView tile = RaycastTile(mouse.position.ReadValue());
+            Vector2 screenPosition = mouse.position.ReadValue();
+            Func<Vector2, bool> blocker = _pointerBlocker;
+            TileView tile = blocker != null && blocker(screenPosition) ? null : RaycastTile(screenPosition);
 
             if (tile != _hovered)
             {
@@ -69,6 +83,9 @@ namespace Mimas.Client.Presentation
                 Action<TileView> hovered = TileHovered;
                 if (hovered != null) hovered(tile);
             }
+
+            // A press on the overlay is the overlay's; the board must not also read it as "clicked off the board".
+            if (tile == null && blocker != null && blocker(screenPosition)) return;
 
             if (mouse.leftButton.wasPressedThisFrame)
             {

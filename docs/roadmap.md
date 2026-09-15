@@ -20,7 +20,16 @@ match loop; it is deleted once these exist, in this order:
    `MovePlan.EnteredTiles` and runs tile-effect `OnEnter` hooks (interrupt ends the move).
 2. Client match session seam (local `MatchState` now, WebSocket later), event player, unit view registry.
 3. Board interaction controller that emits commands through the session.
-4. Turn structure (needs PIN-001), HUD (UI Toolkit) for ability selection, random bot via `Enumerate`.
+4. Turn structure (alternating, ADR-015), random bot via `Enumerate`.
+
+The UI Toolkit HUD (sectioned action bar, turn rope, examine panel, End Turn) landed ahead of 1–3 on
+15 Sep 2026, bound to `IMatchHudSource` (`Presentation/Match/`). `SkeletonMatchController` implements
+it with a local fake turn cycle driven by `Assets/_Game/Settings/DefaultMatchSettings.asset`; the real
+session replaces that implementation and the HUD stays as is.
+
+Next session (planned 15 Sep 2026): unit health points and base stats on `classes/*.json` (schema in
+`docs/data.md`), a first attack ability type (`"type": "attack"`, category `weapon`) with targeting and
+damage resolved in Core, and the HUD's WEAPONS section lighting up from real data. Win by kill follows.
 
 ## Baselines
 
@@ -31,3 +40,4 @@ match loop; it is deleted once these exist, in this order:
 | Core test count / runtime | 24 / 0.07 s | 14 Sep 2026 |
 | Core test count / runtime | 110 / 0.05 s (movement: walk / jump / teleport resolvers, integer hex lines) | 15 Sep 2026 |
 | Core test count / runtime | 131 / 0.05 s (+ content catalogue, classes, hash parity) | 15 Sep 2026 |
+| Core test count / runtime | 137 / 0.06 s (+ ability icon and category fields) | 15 Sep 2026 |
