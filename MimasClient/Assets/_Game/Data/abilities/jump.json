@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "id": "jump",
+  "name": "Jump",
+  "type": "movement",
+  "description": "Leap straight to a tile up to two hexes away. Blocked if the landing tile or anything under the arc rises more than jumpHeight above where you stand.",
+  "movement": {
+    "mode": "jump",
+    "range": 2,
+    "jumpHeight": 1
+  }
+}

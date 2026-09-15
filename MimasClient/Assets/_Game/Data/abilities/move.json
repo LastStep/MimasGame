@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "id": "move",
+  "name": "Move",
+  "type": "movement",
+  "description": "Walk to an adjacent tile. The default movement every unit has.",
+  "movement": {
+    "mode": "walk",
+    "range": 1,
+    "maxClimb": 1
+  }
+}
