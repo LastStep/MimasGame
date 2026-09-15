@@ -15,8 +15,15 @@ MonoBehaviour:
   MapId: arena-4
   PlayerClassId: warrior
   OpponentClassId: mage
+  PlayerModifierIds: []
+  OpponentModifierIds:
+  - ward-of-feathers
+  - stone-skin
+  Seed: 1
+  FirstPlayer: 0
   TimeControlId: 3+2
   TurnSecondsOverride: 30
   RopeSeconds: 10
   IdleTurnSeconds: 7
   OpponentThinkSeconds: 1.5
+  HitPauseSeconds: 0.7

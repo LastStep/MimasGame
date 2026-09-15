@@ -2,6 +2,21 @@
     <Style src="MatchHud.uss" />
     <ui:VisualElement name="hud-root" class="hud-root" picking-mode="Ignore">
 
+        <!-- Under everything: one floating tag per unit (hp bar, number, passives), anchored to the world each frame. -->
+        <ui:VisualElement name="unit-layer" class="unit-layer" picking-mode="Ignore" />
+
+        <!-- Attack preview: line items anchored above the hovered target. -->
+        <ui:VisualElement name="preview" class="preview" picking-mode="Ignore">
+            <ui:VisualElement class="preview-header" picking-mode="Ignore">
+                <ui:Label name="preview-title" class="preview-title" text="Fire Bolt" picking-mode="Ignore" />
+                <ui:Label name="preview-total" class="preview-total" text="11" picking-mode="Ignore" />
+            </ui:VisualElement>
+            <ui:VisualElement name="preview-lines" class="preview-lines" picking-mode="Ignore" />
+        </ui:VisualElement>
+
+        <!-- Damage flyovers spawn here. -->
+        <ui:VisualElement name="fly-layer" class="fly-layer" picking-mode="Ignore" />
+
         <!-- Top centre: whose turn. No numbers; a rope burns down for the last seconds (ADR-015). -->
         <ui:VisualElement name="turn-panel" class="turn-panel">
             <ui:Label name="turn-owner" class="turn-owner" text="YOUR TURN" />
@@ -13,6 +28,9 @@
             </ui:VisualElement>
         </ui:VisualElement>
 
+        <!-- Centre: match result. -->
+        <ui:Label name="banner" class="banner" text="VICTORY" picking-mode="Ignore" />
+
         <!-- Left: examine panel for the clicked unit. -->
         <ui:VisualElement name="examine" class="examine">
             <ui:VisualElement class="examine-header">
@@ -22,12 +40,15 @@
                 </ui:VisualElement>
                 <ui:Button name="examine-close" class="examine-close" text="✕" />
             </ui:VisualElement>
+            <ui:Label name="examine-stats" class="examine-stats" text="HP 20 / 20   ·   AP 3 / 3" />
             <ui:Label name="examine-description" class="examine-description" text="Sturdy melee fighter." />
             <ui:Label class="examine-caption" text="ABILITIES" />
             <ui:VisualElement name="examine-abilities" class="examine-abilities" />
+            <ui:Label name="examine-modifiers-caption" class="examine-caption" text="PASSIVES" />
+            <ui:VisualElement name="examine-modifiers" class="examine-abilities" />
         </ui:VisualElement>
 
-        <!-- Bottom centre: one section per category, filled at runtime from IMatchHudSource. -->
+        <!-- Bottom centre: action points, then one section per category, filled at runtime from IMatchHudSource. -->
         <ui:VisualElement name="tooltip" class="tooltip" picking-mode="Ignore">
             <ui:Label name="tooltip-title" class="tooltip-title" text="Move" />
             <ui:Label name="tooltip-body" class="tooltip-body" text="Walk to an adjacent tile." />

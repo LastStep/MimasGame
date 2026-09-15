@@ -3,7 +3,7 @@
 | M | Goal | Done when | Status |
 |---|---|---|---|
 | M0 | Setup | Empty Web build loads in browser; `dotnet test` green; Unity CLI + Claude Code connected; server `/ws` echoes ping | in progress |
-| M1 | Core loop, offline | Hex map from JSON, 1 unit each, move + basic attack, turn order, win by kill; playable vs a random bot in the Editor; Core has ≥ 50 tests | |
+| M1 | Core loop, offline | Hex map from JSON, 1 unit each, move + basic attack, turn order, win by kill; playable vs a random bot in the Editor; Core has ≥ 50 tests | **done 15 Sep 2026** |
 | M2 | Online | Same match over WebSocket via `Mimas.Server`; guest auth; matchmaking queue; chess clocks; reconnect | |
 | M3 | Depth | 3 classes, abilities with hidden/reveal, modifiers, tile effects (pickups, terrain), boon draft, best-of-3 series across 3 maps | |
 | M4 | Presentation | Cinemachine tilted/top-down toggle, UI Toolkit HUD + examine mode, Shuriken VFX, FMOD music/SFX, low-poly characters with animations | |
@@ -12,24 +12,29 @@
 ## M1 progress (15 Sep 2026)
 
 Done: movement rules (walk / jump / teleport resolvers, height, terrain cost tables, integer hex lines),
-content catalogue (all JSON loaded once, linked, hashed; classes with ability ids), client board with
-heights and move playback, server loads the same content. The `SkeletonMatchController` still fakes the
-match loop; it is deleted once these exist, in this order:
+content catalogue (all JSON loaded once, linked, hashed), client board with heights and move playback,
+server loads the same content, and, in the second 15 Sep session (ADR-016..019):
 
-1. `MatchState` + `Command`s (`MoveCommand`, end turn) + `MatchEvent`s + a movement executor that walks
-   `MovePlan.EnteredTiles` and runs tile-effect `OnEnter` hooks (interrupt ends the move).
-2. Client match session seam (local `MatchState` now, WebSocket later), event player, unit view registry.
-3. Board interaction controller that emits commands through the session.
-4. Turn structure (alternating, ADR-015), random bot via `Enumerate`.
+- Rules: `rules.json`, class `stats` (hp, ap, power/defense per damage type), ability `cost`, `attack`
+  abilities (range band, line of sight always), `modifiers/*.json` (trigger + conditions + flat damage,
+  public or hidden), `DamageCalculator` with one code path for the knowledge-limited preview and the full
+  resolution, `MatchState` (`Validate` / `Apply` / `EnumerateLegal`), AP turns, reveal events, win by
+  elimination, `PlayerView` + `EventFilter`, `RandomBot`. 169 Core tests, including random-bot games with
+  invariants and a same-seed determinism check.
+- Client: `LocalMatchSession` (hosts `MatchState` + bot, plays filtered events, board interaction for
+  moves and attacks, fake clock with timeout-as-command) replaced `SkeletonMatchController`; HUD package D
+  (ADR-019): unit hp tags that fade until relevant, AP dots with hover reservation, cost numerals, attack
+  preview tooltip with a "?" row, damage flyover naming the revealed passive, passive markers, examine
+  panel with hp/ap/passives, result banner. `DefaultMatchSettings.asset` gives the bot two hidden passives
+  so the reveal path is visible in normal play.
 
-The UI Toolkit HUD (sectioned action bar, turn rope, examine panel, End Turn) landed ahead of 1–3 on
-15 Sep 2026, bound to `IMatchHudSource` (`Presentation/Match/`). `SkeletonMatchController` implements
-it with a local fake turn cycle driven by `Assets/_Game/Settings/DefaultMatchSettings.asset`; the real
-session replaces that implementation and the HUD stays as is.
+Not done / deferred: tile-effect `OnEnter` hooks (no tile effects exist yet; the `effect` field now names a
+combat modifier), an attack animation (flyover + hp change only), boons (M3), the network session (M2).
 
-Next session (planned 15 Sep 2026): unit health points and base stats on `classes/*.json` (schema in
-`docs/data.md`), a first attack ability type (`"type": "attack"`, category `weapon`) with targeting and
-damage resolved in Core, and the HUD's WEAPONS section lighting up from real data. Win by kill follows.
+Next: M2 (WebSocket rooms, guest auth, matchmaking, server-side clocks that submit
+`EndTurnCommand(Timeout)`, reconnect via `PlayerView` resync). Before that, a short balance pass on the
+shipped numbers (warrior 20 hp / mage 16 hp, jab 1 AP 2 dmg, strike 2 AP 5 dmg, fire bolt 2 AP 6 dmg) by
+letting two random bots play a few hundred seeded games.
 
 ## Baselines
 
@@ -41,3 +46,4 @@ damage resolved in Core, and the HUD's WEAPONS section lighting up from real dat
 | Core test count / runtime | 110 / 0.05 s (movement: walk / jump / teleport resolvers, integer hex lines) | 15 Sep 2026 |
 | Core test count / runtime | 131 / 0.05 s (+ content catalogue, classes, hash parity) | 15 Sep 2026 |
 | Core test count / runtime | 137 / 0.06 s (+ ability icon and category fields) | 15 Sep 2026 |
+| Core test count / runtime | 169 / 0.26 s (+ stats, attacks, modifiers, match state, bot games) | 15 Sep 2026 |

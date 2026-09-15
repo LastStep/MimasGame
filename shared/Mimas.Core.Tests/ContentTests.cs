@@ -41,7 +41,7 @@ namespace Mimas.Core.Tests
             var catalog = ContentFixtures.RepoCatalog();
             Assert.True(catalog.Terrains.Count >= 2);
             Assert.Equal(new[] { "fire-bolt", "jab", "jump", "move", "strike", "teleport" }, catalog.Abilities.All.Select(a => a.Id).ToArray());
-            Assert.Equal(new[] { "high-ground", "ward-of-feathers" }, catalog.Modifiers.All.Select(m => m.Id).ToArray());
+            Assert.Equal(new[] { "high-ground", "stone-skin", "ward-of-feathers" }, catalog.Modifiers.All.Select(m => m.Id).ToArray());
             Assert.Equal(new[] { "melee", "ranged", "magic" }, catalog.Rules.DamageTypes);
             Assert.Equal(new[] { "mage", "warrior" }, catalog.Classes.All.Select(c => c.Id).ToArray());
             Assert.Contains("arena-4", catalog.Maps.All.Select(m => m.Id));

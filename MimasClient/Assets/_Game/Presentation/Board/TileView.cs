@@ -20,11 +20,13 @@ namespace Mimas.Client.Presentation
         [Header("Highlight tints")]
         [SerializeField] private Color _reachableTint = new Color(0.26f, 0.68f, 1f, 1f);
         [SerializeField] private Color _pathPreviewTint = new Color(1f, 0.64f, 0.18f, 1f);
+        [SerializeField] private Color _targetableTint = new Color(1f, 0.32f, 0.28f, 1f);
         [SerializeField] private Color _hoveredTint = new Color(1f, 0.96f, 0.62f, 1f);
 
         [Header("Blend strength towards the tint")]
         [Range(0f, 1f)] [SerializeField] private float _reachableBlend = 0.45f;
         [Range(0f, 1f)] [SerializeField] private float _pathPreviewBlend = 0.70f;
+        [Range(0f, 1f)] [SerializeField] private float _targetableBlend = 0.55f;
         [Range(0f, 1f)] [SerializeField] private float _hoveredBlend = 0.85f;
 
         [Header("Runtime (set by BoardView)")]
@@ -92,6 +94,7 @@ namespace Mimas.Client.Presentation
             switch (Highlight)
             {
                 case TileHighlight.Reachable: return Color.Lerp(_baseColor, _reachableTint, _reachableBlend);
+                case TileHighlight.Targetable: return Color.Lerp(_baseColor, _targetableTint, _targetableBlend);
                 case TileHighlight.PathPreview: return Color.Lerp(_baseColor, _pathPreviewTint, _pathPreviewBlend);
                 case TileHighlight.Hovered: return Color.Lerp(_baseColor, _hoveredTint, _hoveredBlend);
                 default: return _baseColor;

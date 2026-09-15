@@ -24,6 +24,7 @@ MonoBehaviour:
   - maps/arena-4.json
   - maps/board-3.json
   - modifiers/high-ground.json
+  - modifiers/stone-skin.json
   - modifiers/ward-of-feathers.json
   - rules.json
   - terrains.json
@@ -40,6 +41,7 @@ MonoBehaviour:
   - {fileID: 4900000, guid: d43b726c8f8016947b6e59ea45620fb8, type: 3}
   - {fileID: 4900000, guid: 58043282de934db4d94f35a99a95874d, type: 3}
   - {fileID: 4900000, guid: fcc495a46bc6ccf43aff5b3aa6a49856, type: 3}
+  - {fileID: 4900000, guid: 1dd4e3a0dcac5b24c8f8175a4ba6785d, type: 3}
   - {fileID: 4900000, guid: fbbd76ac38686654c86b972bae9e8ec8, type: 3}
   - {fileID: 4900000, guid: f244600802610df489159c1852396c81, type: 3}
   - {fileID: 4900000, guid: 7eab6eae56baca5489a2f7880b0976ba, type: 3}

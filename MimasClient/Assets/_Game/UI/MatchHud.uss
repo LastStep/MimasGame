@@ -14,6 +14,262 @@
     --hud-theirs: rgb(255, 176, 120);
     --hud-end: rgb(196, 74, 52);
     --hud-end-hover: rgb(226, 94, 68);
+    --hud-hp: rgb(120, 230, 120);
+    --hud-hp-ghost: rgb(255, 110, 90);
+    --hud-hp-empty: rgba(255, 255, 255, 0.15);
+    --hud-ap: rgb(120, 200, 255);
+    --hud-ap-reserved: rgb(255, 110, 90);
+    --hud-ap-empty: rgba(255, 255, 255, 0.12);
+    --hud-plus: rgb(150, 230, 150);
+    --hud-minus: rgb(255, 120, 100);
+    --hud-unknown: rgb(255, 200, 90);
+    --hud-fly: rgb(255, 236, 120);
+}
+
+/* ---- unit overlays --------------------------------------------------------------------------- */
+
+.unit-layer {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+}
+
+.unit-tag {
+    position: absolute;
+    width: 64px;
+    translate: -50% -100%;
+    flex-direction: column;
+    align-items: center;
+    opacity: 0.5;
+    transition-property: opacity;
+    transition-duration: 0.15s;
+}
+
+.unit-tag--emphasised {
+    opacity: 1;
+}
+
+.unit-tag--dead {
+    display: none;
+}
+
+.unit-bar {
+    flex-direction: row;
+    width: 100%;
+    height: 6px;
+}
+
+.unit-seg {
+    flex-grow: 1;
+    height: 6px;
+    margin-right: 2px;
+    border-radius: 1px;
+    background-color: var(--hud-hp);
+}
+
+.unit-seg--empty {
+    background-color: var(--hud-hp-empty);
+}
+
+.unit-seg--ghost {
+    background-color: var(--hud-hp-ghost);
+}
+
+.unit-tag--theirs .unit-seg {
+    background-color: rgb(255, 176, 120);
+}
+
+.unit-tag--theirs .unit-seg--empty {
+    background-color: var(--hud-hp-empty);
+}
+
+.unit-tag--theirs .unit-seg--ghost {
+    background-color: var(--hud-hp-ghost);
+}
+
+.unit-number {
+    color: var(--hud-text);
+    font-size: 11px;
+    -unity-font-style: bold;
+    margin: 3px 0 0 0;
+    padding: 0;
+    text-shadow: 0 1px 3px rgb(0, 0, 0);
+}
+
+.unit-number--ghost {
+    color: var(--hud-hp-ghost);
+}
+
+.unit-markers {
+    flex-direction: row;
+    margin-top: 2px;
+}
+
+.unit-marker {
+    width: 12px;
+    height: 12px;
+    margin: 0 1px;
+    border-radius: 6px;
+    background-color: var(--hud-unknown);
+    border-width: 1px;
+    border-color: rgba(0, 0, 0, 0.5);
+    justify-content: center;
+    align-items: center;
+    -unity-background-scale-mode: scale-to-fit;
+}
+
+.unit-marker-glyph {
+    color: rgb(20, 16, 8);
+    font-size: 8px;
+    -unity-font-style: bold;
+    margin: 0;
+    padding: 0;
+}
+
+/* ---- attack preview -------------------------------------------------------------------------- */
+
+.preview {
+    position: absolute;
+    width: 210px;
+    translate: -50% -100%;
+    padding: 8px 10px;
+    background-color: var(--hud-panel-solid);
+    border-radius: 8px;
+    border-width: 1px;
+    border-color: var(--hud-edge);
+    display: none;
+}
+
+.preview--visible {
+    display: flex;
+}
+
+.preview-header {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 4px;
+}
+
+.preview-title {
+    color: var(--hud-text);
+    font-size: 13px;
+    -unity-font-style: bold;
+    margin: 0;
+    padding: 0;
+}
+
+.preview-total {
+    color: var(--hud-fly);
+    font-size: 17px;
+    -unity-font-style: bold;
+    margin: 0;
+    padding: 0;
+}
+
+.preview-lines {
+    flex-direction: column;
+}
+
+.preview-line {
+    flex-direction: row;
+    justify-content: space-between;
+    padding: 1px 0;
+}
+
+.preview-line-label {
+    color: var(--hud-text-dim);
+    font-size: 12px;
+    margin: 0;
+    padding: 0;
+}
+
+.preview-line-amount {
+    color: var(--hud-text);
+    font-size: 12px;
+    -unity-font-style: bold;
+    margin: 0;
+    padding: 0;
+}
+
+.preview-line--plus .preview-line-amount {
+    color: var(--hud-plus);
+}
+
+.preview-line--minus .preview-line-amount {
+    color: var(--hud-minus);
+}
+
+.preview-line--unknown .preview-line-label {
+    color: var(--hud-unknown);
+}
+
+.preview-line--unknown .preview-line-amount {
+    color: var(--hud-unknown);
+}
+
+/* ---- flyovers -------------------------------------------------------------------------------- */
+
+.fly-layer {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+}
+
+.fly {
+    position: absolute;
+    translate: -50% -100%;
+    align-items: center;
+}
+
+.fly-headline {
+    color: var(--hud-fly);
+    font-size: 26px;
+    -unity-font-style: bold;
+    margin: 0;
+    padding: 0;
+    text-shadow: 0 2px 6px rgb(0, 0, 0);
+}
+
+.fly-detail {
+    color: var(--hud-theirs);
+    font-size: 11px;
+    letter-spacing: 1px;
+    -unity-font-style: bold;
+    margin: 2px 0 0 0;
+    padding: 0;
+    text-shadow: 0 1px 3px rgb(0, 0, 0);
+}
+
+/* ---- banner ---------------------------------------------------------------------------------- */
+
+.banner {
+    position: absolute;
+    top: 38%;
+    left: 50%;
+    translate: -50% -50%;
+    padding: 18px 48px;
+    background-color: var(--hud-panel-solid);
+    border-radius: 16px;
+    border-width: 1px;
+    border-color: var(--hud-edge);
+    color: var(--hud-text);
+    font-size: 34px;
+    letter-spacing: 8px;
+    -unity-font-style: bold;
+    display: none;
+}
+
+.banner--visible {
+    display: flex;
+}
+
+.banner--lost {
+    color: var(--hud-theirs);
 }
 
 .hud-root {
@@ -160,11 +416,19 @@
     color: var(--hud-text);
 }
 
+.examine-stats {
+    color: var(--hud-text);
+    font-size: 12px;
+    -unity-font-style: bold;
+    margin: 8px 0 0 0;
+    padding: 0;
+}
+
 .examine-description {
     color: var(--hud-text-dim);
     font-size: 12px;
     white-space: normal;
-    margin: 10px 0 0 0;
+    margin: 6px 0 0 0;
     padding: 0;
 }
 
@@ -308,6 +572,51 @@
 .action-slot--disabled:hover {
     background-color: rgba(255, 255, 255, 0.06);
     scale: 1 1;
+}
+
+.action-slot--unaffordable {
+    opacity: 0.45;
+}
+
+.action-cost {
+    position: absolute;
+    right: 5px;
+    bottom: 3px;
+    color: var(--hud-text-dim);
+    font-size: 11px;
+    -unity-font-style: bold;
+    margin: 0;
+    padding: 0;
+}
+
+.action-slot--unaffordable .action-cost {
+    color: var(--hud-ap-reserved);
+}
+
+.ap-row {
+    flex-direction: row;
+    align-items: center;
+    height: 60px;
+}
+
+.ap-dot {
+    width: 12px;
+    height: 12px;
+    margin: 0 3px;
+    border-radius: 6px;
+    background-color: var(--hud-ap);
+    border-width: 1px;
+    border-color: rgba(0, 0, 0, 0.4);
+    transition-property: background-color;
+    transition-duration: 0.1s;
+}
+
+.ap-dot--empty {
+    background-color: var(--hud-ap-empty);
+}
+
+.ap-dot--reserved {
+    background-color: var(--hud-ap-reserved);
 }
 
 .action-icon {

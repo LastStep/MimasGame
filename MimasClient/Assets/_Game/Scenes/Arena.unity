@@ -119,61 +119,6 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
---- !u!1 &265037146
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 265037147}
-  - component: {fileID: 265037148}
-  m_Layer: 0
-  m_Name: Match
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &265037147
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 265037146}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &265037148
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 265037146}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 912485700047b9342a6c11cc77ec6a08, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Mimas.Client.Presentation::Mimas.Client.Presentation.SkeletonMatchController
-  _settings: {fileID: 11400000, guid: 721b5c47979f08a4d81c72274aab054b, type: 2}
-  _content: {fileID: 1995155106}
-  _board: {fileID: 1420187337}
-  _input: {fileID: 974342029}
-  _unit: {fileID: 971986041}
-  _opponent: {fileID: 396881483}
-  _playback:
-    SecondsPerTile: 0.35
-    LeapSeconds: 0.55
-    LeapApex: 1.2
-    BlinkSeconds: 0.3
 --- !u!1 &356942281
 GameObject:
   m_ObjectHideFlags: 0
@@ -845,8 +790,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1412345781}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.4226183, y: 0, z: 0, w: 0.9063078}
-  m_LocalPosition: {x: 0, y: 16.1, z: -13.5}
+  m_LocalRotation: {x: 0.7071068, y: 0, z: 0, w: 0.7071068}
+  m_LocalPosition: {x: 0, y: 21, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -947,6 +892,62 @@ MonoBehaviour:
   _heightUnit: 0.45
   _minPrismHeight: 0.05
   _heightTintPerUnit: 0.12
+--- !u!1 &1597182828
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1597182829}
+  - component: {fileID: 1597182830}
+  m_Layer: 0
+  m_Name: Session
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1597182829
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1597182828}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1597182830
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1597182828}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a0bd66d7b1fad7f44b3867717fac0700, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Mimas.Client.Presentation::Mimas.Client.Presentation.LocalMatchSession
+  _settings: {fileID: 11400000, guid: 721b5c47979f08a4d81c72274aab054b, type: 2}
+  _content: {fileID: 1995155106}
+  _board: {fileID: 1420187337}
+  _input: {fileID: 974342029}
+  _unit: {fileID: 971986041}
+  _opponent: {fileID: 396881483}
+  _playback:
+    SecondsPerTile: 0.35
+    LeapSeconds: 0.55
+    LeapApex: 1.2
+    BlinkSeconds: 0.3
+  _overlayHeight: 1.35
 --- !u!1 &1832508621
 GameObject:
   m_ObjectHideFlags: 0
@@ -992,7 +993,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f2ce808b0417af549aed166b652fac3a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Mimas.Client.UI::Mimas.Client.UI.MatchHudView
-  _sourceBehaviour: {fileID: 265037148}
+  _sourceBehaviour: {fileID: 1597182830}
   _boardInput: {fileID: 974342029}
   _icons:
   - {fileID: 21300000, guid: 66b1ce1282fa2304cb51c8a1781b4080, type: 3}
@@ -1110,8 +1111,8 @@ SceneRoots:
   - {fileID: 1420187336}
   - {fileID: 974342028}
   - {fileID: 971986040}
-  - {fileID: 265037147}
   - {fileID: 2092343558}
   - {fileID: 396881482}
   - {fileID: 1995155105}
   - {fileID: 1832508622}
+  - {fileID: 1597182829}

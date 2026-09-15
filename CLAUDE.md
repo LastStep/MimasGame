@@ -37,7 +37,7 @@ dotnet run --project server/Mimas.Server       # http://localhost:7777/health, w
 # Unity (needs `unity` CLI on PATH, `unity auth login` done once)
 unity status --format json                     # is an Editor connected? state must be "ready"
 unity command                                  # list live-editor commands
-unity command get_console_logs                 # ALWAYS check after touching Unity code
+unity command console                          # ALWAYS check after touching Unity code (there is no get_console_logs)
 unity command editor_play / editor_stop
 unity test MimasClient --mode EditMode --report-format junit --output artifacts/editmode.xml --timeout 600
 unity build MimasClient --profile "Web Release" --output-path Build/Web   # exit 8 from `unity test` = tests failed, do not retry
@@ -49,6 +49,7 @@ unity build MimasClient --profile "Web Release" --output-path Build/Web   # exit
 2. Stop Play Mode before editing C#.
 3. Never run two Editor commands concurrently. On timeout: wait 10 s, retry once, then ask.
 4. After scene/prefab changes via commands, `unity command save_scene`.
+5. New or changed files on disk are not seen by the Editor until `unity command menu --path "Assets/Refresh"`; then poll `recompile_status` until `completed`.
 
 ## Conventions
 

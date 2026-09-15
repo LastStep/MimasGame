@@ -67,6 +67,7 @@ namespace Mimas.Client.Presentation
         private readonly Dictionary<Hex, TileView> _tileViews = new Dictionary<Hex, TileView>();
         private readonly List<Mesh> _generatedMeshes = new List<Mesh>();
         private readonly HashSet<Hex> _reachable = new HashSet<Hex>();
+        private readonly HashSet<Hex> _targets = new HashSet<Hex>();
         private readonly HashSet<Hex> _path = new HashSet<Hex>();
 
         private bool _hasHovered;
@@ -216,14 +217,28 @@ namespace Mimas.Client.Presentation
             return Map != null && Map.Contains(hex);
         }
 
-        /// <summary>Marks a set of hexes as in-range. Clears any active path preview.</summary>
+        /// <summary>Marks a set of hexes as in-range. Clears targets and any active path preview.</summary>
         public void HighlightReachable(IReadOnlyCollection<Hex> hexes)
         {
             _reachable.Clear();
+            _targets.Clear();
             _path.Clear();
             if (hexes != null)
             {
                 foreach (Hex h in hexes) _reachable.Add(h);
+            }
+            Repaint();
+        }
+
+        /// <summary>Marks the tiles holding legal targets for an armed attack. Clears the reachable set and any path preview.</summary>
+        public void HighlightTargets(IReadOnlyCollection<Hex> hexes)
+        {
+            _reachable.Clear();
+            _targets.Clear();
+            _path.Clear();
+            if (hexes != null)
+            {
+                foreach (Hex h in hexes) _targets.Add(h);
             }
             Repaint();
         }
@@ -256,10 +271,11 @@ namespace Mimas.Client.Presentation
             Repaint();
         }
 
-        /// <summary>Drops the reachable set, the path preview and the hover mark.</summary>
+        /// <summary>Drops the reachable set, the targets, the path preview and the hover mark.</summary>
         public void ClearHighlights()
         {
             _reachable.Clear();
+            _targets.Clear();
             _path.Clear();
             _hasHovered = false;
             Repaint();
@@ -329,6 +345,7 @@ namespace Mimas.Client.Presentation
                 TileHighlight state;
                 if (_hasHovered && hex == _hovered) state = TileHighlight.Hovered;
                 else if (_path.Contains(hex)) state = TileHighlight.PathPreview;
+                else if (_targets.Contains(hex)) state = TileHighlight.Targetable;
                 else if (_reachable.Contains(hex)) state = TileHighlight.Reachable;
                 else state = TileHighlight.None;
 
