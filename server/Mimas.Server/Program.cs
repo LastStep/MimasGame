@@ -1,5 +1,6 @@
 using System.Net.WebSockets;
 using System.Text;
+using Mimas.Core.Content;
 using Mimas.Core.Geometry;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -11,14 +12,39 @@ using Newtonsoft.Json.Linq;
 var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.ConfigureKestrel(o => o.ListenAnyIP(int.Parse(Environment.GetEnvironmentVariable("MIMAS_PORT") ?? "7777")));
 
+// Content is loaded once, before anything can serve, from the same JSON folder the client ships.
+// MIMAS_DATA_PATH overrides the default (the Data/ folder copied next to the binary by the csproj).
+var dataPath = Environment.GetEnvironmentVariable("MIMAS_DATA_PATH") ?? Path.Combine(AppContext.BaseDirectory, "Data");
+ContentCatalog catalog;
+try
+{
+    catalog = ContentCatalog.Load(ContentFiles.FromDirectory(dataPath));
+}
+catch (Exception e) when (e is ContentLoadException || e is DirectoryNotFoundException)
+{
+    Console.Error.WriteLine("Refusing to start: " + e.Message);
+    return 1;
+}
+builder.Services.AddSingleton(catalog);
+
 var app = builder.Build();
 app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.FromSeconds(20) });
+app.Logger.LogInformation("content loaded from {Path}: {Files} files, hash {Hash}", dataPath, catalog.Files.Count, catalog.Hash);
 
 app.MapGet("/health", () => Results.Ok(new
 {
     ok = true,
     service = "mimas-server",
     coreCheck = Hex.Distance(new Hex(-3, 0), new Hex(3, 0)),   // proves Core is linked (== 6)
+    content = new
+    {
+        hash = catalog.Hash,
+        files = catalog.Files.Count,
+        abilities = catalog.Abilities.Count,
+        classes = catalog.Classes.Count,
+        maps = catalog.Maps.Count,
+        terrains = catalog.Terrains.Count,
+    },
     utc = DateTime.UtcNow,
 }));
 
@@ -72,3 +98,4 @@ app.Map("/ws", async context =>
 });
 
 app.Run();
+return 0;

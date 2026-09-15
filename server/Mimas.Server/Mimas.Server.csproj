@@ -12,6 +12,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The Unity data folder is the single source of truth for content. Linked in, copied next to the
+         binary as Data/**, so the server loads byte-identical files to the client (verified by hash). -->
+    <Content Include="../../MimasClient/Assets/_Game/Data/**/*.json"
+             Link="Data/%(RecursiveDir)%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
 

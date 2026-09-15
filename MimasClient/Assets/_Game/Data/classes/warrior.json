@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "id": "warrior",
+  "name": "Warrior",
+  "description": "Sturdy melee fighter. Walks and leaps.",
+  "abilities": ["move", "jump"]
+}

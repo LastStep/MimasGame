@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "id": "mage",
+  "name": "Mage",
+  "description": "Fragile caster. Walks and blinks.",
+  "abilities": ["move", "teleport"]
+}

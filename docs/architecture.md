@@ -28,7 +28,9 @@
 | `Turns` | Turn/phase state machine (mode to be decided: alternating vs simultaneous) |
 | `Boons` | Draft offers and application |
 | `Match` | `MatchState` (full truth), `Command` (player intent), `Event` (what happened), `PlayerView` (what one player is allowed to see) |
-| `Data` | JSON loading of classes/abilities/boons/maps into immutable definition objects |
+| `Data` | JSON parsers for terrains, maps, abilities, classes, time controls into immutable definition objects |
+| `Content` | `ContentCatalog`: loads the whole data folder from `(path, text)` pairs, links cross references, sorted `DefinitionTable<T>`s, content hash for client/server parity |
+| `Movement` | `MovementDef` (data) + one `IMovementResolver` per geometry (walk / jump / teleport) behind a string-keyed registry; `MovePlan` = path to animate + tiles entered |
 | `Rng` | Seeded deterministic RNG (xoshiro/PCG) |
 
 Design rule: **Commands in, Events out.** `MatchState.Apply(Command) → IReadOnlyList<Event>`; the client animates Events; the server filters Events per player before sending.
@@ -60,7 +62,7 @@ One process hosts many rooms (`Dictionary<MatchId, Room>`); a 1v1 turn-based roo
 | Networking | NativeWebSocket (jslib on WebGL) + Newtonsoft JSON |
 | Assets | Addressables (LZ4) for anything not needed at first frame |
 
-Folder layout: `Assets/_Game/{Presentation,UI,Audio,Data,Art,Scenes,Editor,Tests}` each with an `.asmdef`. Core comes in as local package `com.mimas.core` from `../../shared/Mimas.Core` (see `Packages/manifest.json`).
+Folder layout: `Assets/_Game/{Content,Presentation,UI,Audio,Data,Art,Scenes,Editor,Tests}` each with an `.asmdef`. Core comes in as local package `com.mimas.core` from `../../shared/Mimas.Core` (see `Packages/manifest.json`). `Content` holds the generated `GameDataManifest` asset and `ContentBootstrap`, the one place the client loads JSON; `Presentation` depends on it and on Core only.
 
 ## Determinism contract
 
