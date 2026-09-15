@@ -2,7 +2,7 @@
 
 Legend: **[R]** Rohan does it by hand · **[CC]** Claude Code does it · **[✓]** done.
 
-_Status 14 Sep 2026: A1–A2, A4, B1–B4 done. Next: A3 (git), C1–C7, B5–B8, D1–D3._
+_Status 14 Sep 2026: A1–A4, B1–B7, C1–C6, D1–D2 done (platform is Web; first build 12.5 MB Brotli). Next: B8 (FMOD), D3 (deploy + measure load time), optional C7–C8._
 
 ## A. Repo
 
@@ -22,8 +22,8 @@ _Status 14 Sep 2026: A1–A2, A4, B1–B4 done. Next: A3 (git), C1–C7, B5–B8
 | B3 | `manifest.json`: added com.mimas.core (local), Cinemachine 3.1.7, Addressables 2.9.1, Newtonsoft 3.2.2, NativeWebSocket (git); removed visualscripting, timeline, collab-proxy, multiplayer.center, ai.navigation, ide.rider (web build size). Unity resolves on next open | [✓] |
 | B4 | `Assets/link.xml`, `Assets/_Game/**` tree with 6 asmdefs, `Editor/WebBuild.cs`, EditMode smoke test, starter data (`Data/maps/board-3.json`, `ring-3.json`, `timecontrols.json`). Open Unity → check Console is clean → run Window > General > Test Runner (EditMode) → 2 tests green | [✓] then [R] verify |
 | B5 | Force Text serialization verified (`m_SerializationMode: 2`); visible meta files present | [✓] |
-| B6 | Switch platform to **Web**. Player Settings per `hosting.md` + `research/unity-web-build.md` §2: already default: Brotli, Decompression Fallback off, Data Caching on, threads off. Still to set: **Name Files As Hashes on, Run In Background on, Managed Stripping High, IL2CPP "Faster (smaller) builds", Exceptions None, Initial Memory 128 MB** | [R] (or [CC] via `unity command set_project_settings` once CLI is connected) |
-| B7 | Create a Build Profile "Web Release" | [R] |
+| B6 | Switch platform to **Web**. Player Settings per `hosting.md` + `research/unity-web-build.md` §2: Brotli, Decompression Fallback off, Data Caching on, threads off, Name Files As Hashes on, Run In Background on, Managed Stripping High, IL2CPP "Faster (smaller) builds", Exceptions None, Initial Memory 128 MB — all set via live Editor 14 Sep 2026 | [✓] |
+| B7 | Build Profile "Web Release" created at `Assets/Settings/Build Profiles/Web Release.asset` (via BuildProfile API) | [✓] |
 | B8 | Import FMOD for Unity 2.03 from the Asset Store; link your FMOD Studio project (`E:\FMOD Projects\…`); set banks to load in a loading scene | [R] |
 
 ## C. AI tooling
@@ -43,6 +43,6 @@ _Status 14 Sep 2026: A1–A2, A4, B1–B4 done. Next: A3 (git), C1–C7, B5–B8
 
 | # | Step | Who |
 |---|---|---|
-| D1 | `unity build MimasClient --profile "Web Release" --output-path Build/Web` | [CC] |
-| D2 | Record compressed size (expect ≈ 9 MB for an empty URP scene) and load time in `docs/roadmap.md` | [CC] |
+| D1 | Web build via "Web Release" profile → `MimasClient/Build/Web` (Succeeded, 0 errors, ~5 min) | [✓] |
+| D2 | Compressed size recorded in `docs/roadmap.md`: **12.5 MB** (wasm.br 7.9 + data.br 4.5; above the 8.74 MB empty-project reference — extra packages + SampleScene assets). Load time: measure after D3 | [✓] |
 | D3 | Deploy to VPS with `tools/deploy/nginx-mimas.conf`; verify `wss://…/ws` echoes `ping`→`pong` from the browser | [R] |
