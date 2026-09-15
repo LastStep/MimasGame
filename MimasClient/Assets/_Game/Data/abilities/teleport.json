@@ -3,6 +3,7 @@
   "id": "teleport",
   "name": "Teleport",
   "type": "movement",
+  "icon": "teleport",
   "description": "Blink to any free tile within three hexes that you can see. Height does not matter, but solid or taller tiles in between block the sight line.",
   "movement": {
     "mode": "teleport",

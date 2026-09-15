@@ -80,6 +80,7 @@ not enforce this yet; `Arena4_HeightsAreRotationallySymmetric` in the tests does
   "name": "Jump",
   "type": "movement",
   "description": "Leap straight to a tile up to two hexes away.",
+  "icon": "jump",
   "movement": {
     "mode": "jump",
     "range": 2,
@@ -91,6 +92,14 @@ not enforce this yet; `Arena4_HeightsAreRotationallySymmetric` in the tests does
   }
 }
 ```
+
+Fields shared by every ability type: `id`, `type` (required); `name` (defaults to `id`), `description`,
+`icon` and `category` (optional). `icon` is a presentation key the client resolves to a sprite
+(`Art/UI/Icons/`); Core stores it untouched and a blank string reads as absent. The HUD falls back to the
+first letter of `name` when no sprite matches, so a missing icon is never a load error. `category` is the
+HUD group: `movement`, `weapon` or `spell` (`AbilityCategories`). Movement abilities are always
+`movement` (declaring anything else is a load error); every other type must declare one. Rules never
+read it; it only decides which section of the action bar an ability sits in.
 
 | Field | Required | Meaning |
 |---|---|---|

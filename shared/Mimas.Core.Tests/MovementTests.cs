@@ -170,6 +170,51 @@ namespace Mimas.Core.Tests
         }
 
         [Fact]
+        public void FromJson_IconField_IsExposedUntouched()
+        {
+            const string json = @"{ ""version"": 1, ""id"": ""fly"", ""type"": ""movement"", ""icon"": ""wings"",
+                ""movement"": { ""mode"": ""walk"", ""range"": 3 } }";
+            Assert.Equal("wings", MovementDef.FromJson(json).Icon);
+        }
+
+        [Fact]
+        public void FromJson_MissingOrBlankIcon_IsNull()
+        {
+            const string none = @"{ ""version"": 1, ""id"": ""a"", ""type"": ""movement"", ""movement"": { ""mode"": ""walk"", ""range"": 1 } }";
+            const string blank = @"{ ""version"": 1, ""id"": ""b"", ""type"": ""movement"", ""icon"": ""  "", ""movement"": { ""mode"": ""walk"", ""range"": 1 } }";
+            Assert.Null(MovementDef.FromJson(none).Icon);
+            Assert.Null(MovementDef.FromJson(blank).Icon);
+        }
+
+        [Fact]
+        public void FromJson_MovementWithoutCategory_IsCategoryMovement()
+        {
+            const string json = @"{ ""version"": 1, ""id"": ""a"", ""type"": ""movement"", ""movement"": { ""mode"": ""walk"", ""range"": 1 } }";
+            Assert.Equal(AbilityCategories.Movement, MovementDef.FromJson(json).Category);
+        }
+
+        [Fact]
+        public void FromJson_MovementWithExplicitMovementCategory_IsAccepted()
+        {
+            const string json = @"{ ""version"": 1, ""id"": ""a"", ""type"": ""movement"", ""category"": ""movement"", ""movement"": { ""mode"": ""walk"", ""range"": 1 } }";
+            Assert.Equal(AbilityCategories.Movement, MovementDef.FromJson(json).Category);
+        }
+
+        [Fact]
+        public void FromJson_MovementWithOtherCategory_ThrowsMapLoadException()
+        {
+            const string json = @"{ ""version"": 1, ""id"": ""a"", ""type"": ""movement"", ""category"": ""spell"", ""movement"": { ""mode"": ""walk"", ""range"": 1 } }";
+            Assert.Throws<MapLoadException>(() => MovementDef.FromJson(json));
+        }
+
+        [Fact]
+        public void FromJson_RepoAbilities_AllDeclareAnIcon()
+        {
+            foreach (string file in new[] { "move", "jump", "teleport" })
+                Assert.False(string.IsNullOrEmpty(MovementDef.FromJson(RepoData.Read("abilities/" + file + ".json")).Icon), file);
+        }
+
+        [Fact]
         public void FromJson_TerrainCostNull_MeansImpassable()
         {
             const string json = @"{ ""version"": 1, ""id"": ""fly"", ""type"": ""movement"",

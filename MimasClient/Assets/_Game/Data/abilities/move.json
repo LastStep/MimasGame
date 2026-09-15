@@ -3,6 +3,7 @@
   "id": "move",
   "name": "Move",
   "type": "movement",
+  "icon": "move",
   "description": "Walk to an adjacent tile. The default movement every unit has.",
   "movement": {
     "mode": "walk",

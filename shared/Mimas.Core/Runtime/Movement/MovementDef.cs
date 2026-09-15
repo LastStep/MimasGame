@@ -52,8 +52,9 @@ namespace Mimas.Core.Movement
             int maxClimb = 1, int jumpHeight = 1,
             bool ignoreHeight = false, bool requiresLineOfSight = false,
             Dictionary<string, int> terrainCosts = null,
-            string description = null)
-            : base(id, name, TypeMovement, description)
+            string description = null,
+            string icon = null)
+            : base(id, name, TypeMovement, description, icon)
         {
             Mode = mode ?? throw new ArgumentNullException(nameof(mode));
             if (range < 0) throw new ArgumentOutOfRangeException(nameof(range));
@@ -128,6 +129,10 @@ namespace Mimas.Core.Movement
             string where = $"ability '{id}'";
             string name = MapJson.OptionalString(root, "name", where) ?? id;
             string description = MapJson.OptionalString(root, "description", where);
+            string icon = MapJson.OptionalString(root, "icon", where);
+            string category = MapJson.OptionalString(root, "category", where);
+            if (category != null && category != AbilityCategories.Movement)
+                throw new MapLoadException($"{where} is a movement ability, so 'category' must be omitted or '{AbilityCategories.Movement}' (got '{category}').");
             string type = MapJson.RequireString(root, "type", where);
             if (!string.Equals(type, TypeMovement, StringComparison.Ordinal))
                 throw new MapLoadException($"{where} has type '{type}'; MovementDef only loads type '{TypeMovement}'.");
@@ -171,7 +176,7 @@ namespace Mimas.Core.Movement
                 }
             }
 
-            return new MovementDef(id, name, mode, range, maxClimb, jumpHeight, ignoreHeight, requiresLos, costs, description);
+            return new MovementDef(id, name, mode, range, maxClimb, jumpHeight, ignoreHeight, requiresLos, costs, description, icon);
         }
 
         private static bool OptionalBool(JObject obj, string field, bool fallback, string where)

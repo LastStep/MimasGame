@@ -172,7 +172,7 @@ namespace Mimas.Core.Tests
 
             // Reformat one file: different whitespace, CRLF, and key order must not change the hash.
             var reformatted = files.Select(f => f.Path == "abilities/move.json"
-                ? new ContentFile(f.Path, "{\r\n \"movement\": {\"maxClimb\":1,\"range\":1,\"mode\":\"walk\"},\r\n\"type\":\"movement\",\"description\":\"Walk to an adjacent tile. The default movement every unit has.\",\"name\":\"Move\",\"id\":\"move\",\"version\":1}")
+                ? new ContentFile(f.Path, "{\r\n \"movement\": {\"maxClimb\":1,\"range\":1,\"mode\":\"walk\"},\r\n\"type\":\"movement\",\"icon\":\"move\",\"description\":\"Walk to an adjacent tile. The default movement every unit has.\",\"name\":\"Move\",\"id\":\"move\",\"version\":1}")
                 : f).ToList();
             string c = ContentCatalog.Load(reformatted).Hash;
 
