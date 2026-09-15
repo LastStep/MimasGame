@@ -13,22 +13,34 @@ MonoBehaviour:
   m_Name: GameDataManifest
   m_EditorClassIdentifier: Mimas.Client.Content::Mimas.Client.Content.GameDataManifest
   _paths:
+  - abilities/fire-bolt.json
+  - abilities/jab.json
   - abilities/jump.json
   - abilities/move.json
+  - abilities/strike.json
   - abilities/teleport.json
   - classes/mage.json
   - classes/warrior.json
   - maps/arena-4.json
   - maps/board-3.json
+  - modifiers/high-ground.json
+  - modifiers/ward-of-feathers.json
+  - rules.json
   - terrains.json
   - timecontrols.json
   _files:
+  - {fileID: 4900000, guid: 10a70288140e96c4987d9b6a532f5604, type: 3}
+  - {fileID: 4900000, guid: 1e3f815a4338e4840ba442832f42687b, type: 3}
   - {fileID: 4900000, guid: a12469e7cf920c24d8fc068c1943ad6e, type: 3}
   - {fileID: 4900000, guid: fe64dbe470c66bb4593d0fef73593d5a, type: 3}
+  - {fileID: 4900000, guid: 741f23d2e4dcff84cba40dd8a7958afc, type: 3}
   - {fileID: 4900000, guid: 44e89ca4837e0f1429bd3ca58ba95561, type: 3}
   - {fileID: 4900000, guid: e596717e0448fd34a8dcd8d06a449929, type: 3}
   - {fileID: 4900000, guid: ac7b09d361dc9a949afa2154d2ded2fa, type: 3}
   - {fileID: 4900000, guid: d43b726c8f8016947b6e59ea45620fb8, type: 3}
   - {fileID: 4900000, guid: 58043282de934db4d94f35a99a95874d, type: 3}
+  - {fileID: 4900000, guid: fcc495a46bc6ccf43aff5b3aa6a49856, type: 3}
+  - {fileID: 4900000, guid: fbbd76ac38686654c86b972bae9e8ec8, type: 3}
+  - {fileID: 4900000, guid: f244600802610df489159c1852396c81, type: 3}
   - {fileID: 4900000, guid: 7eab6eae56baca5489a2f7880b0976ba, type: 3}
   - {fileID: 4900000, guid: dc3f90f08a1b13e41916c9e388ed1d42, type: 3}

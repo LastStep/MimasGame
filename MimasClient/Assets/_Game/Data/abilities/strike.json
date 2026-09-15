@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "id": "strike",
+  "name": "Strike",
+  "type": "attack",
+  "category": "weapon",
+  "icon": "strike",
+  "description": "A heavy melee blow against an adjacent enemy.",
+  "cost": 2,
+  "attack": {
+    "damage": 5,
+    "damageType": "melee",
+    "range": 1
+  }
+}

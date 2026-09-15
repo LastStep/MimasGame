@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "id": "fire-bolt",
+  "name": "Fire Bolt",
+  "type": "attack",
+  "category": "spell",
+  "icon": "fire-bolt",
+  "description": "Hurl a bolt of fire at an enemy up to three hexes away that you can see.",
+  "cost": 2,
+  "attack": {
+    "damage": 6,
+    "damageType": "magic",
+    "range": 3
+  },
+  "tags": ["fire"]
+}

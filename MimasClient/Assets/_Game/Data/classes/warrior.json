@@ -3,5 +3,15 @@
   "id": "warrior",
   "name": "Warrior",
   "description": "Sturdy melee fighter. Walks and leaps.",
-  "abilities": ["move", "jump"]
+  "abilities": ["move", "jump", "jab", "strike"],
+  "stats": {
+    "hp": 20,
+    "ap": 3,
+    "power.melee": 3,
+    "power.ranged": 0,
+    "power.magic": 0,
+    "defense.melee": 2,
+    "defense.ranged": 1,
+    "defense.magic": 1
+  }
 }

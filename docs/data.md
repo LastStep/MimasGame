@@ -7,12 +7,13 @@ Numbers are integers (no floats in rules).
 
 | File | Contents | Status |
 |---|---|---|
-| `terrains.json` | Terrain catalogue: `id`, `walkable`, `moveCost` | loaded |
+| `terrains.json` | Terrain catalogue: `id`, `walkable`, `moveCost`, `modifiers[]` | loaded |
+| `rules.json` | Match-wide rules: `damageTypes[]`, `globalModifiers[]` (height advantage lives here as data) | loaded |
 | `timecontrols.json` | `{ "version": 1, "timeControls": [ { "id": "3+2", "name", "baseMs", "incrementMs", "turnCapMs" } ] }` | loaded |
-| `abilities/*.json` | One ability per file; `type` picks the schema. `movement` is implemented; attacks etc. will add `targeting`, `cost`, `effects[]`, `hidden` | loaded |
-| `classes/*.json` | One class per file: `id`, `name`, `description`, `abilities` (ids). Base stats join with the unit model | loaded |
+| `abilities/*.json` | One ability per file; `type` picks the schema (`movement`, `attack`). Every ability has an AP `cost` (default 1) | loaded |
+| `classes/*.json` | One class per file: `id`, `name`, `description`, `abilities` (ids), `stats` (`hp`, `ap`, `power.<type>`, `defense.<type>`) | loaded |
 | `maps/*.json` | Map: name, hexes[] (`q,r,terrain,height,effect?`), spawns (`p1`,`p2`), symmetry type, ladder position | loaded |
-| `modifiers/*.json` | Status effects / passives: duration, stat deltas, triggers | not yet (folder must stay empty or the catalogue rejects it) |
+| `modifiers/*.json` | Flat damage modifiers: `trigger`, `when` conditions, `effect.damage`, `visibility`. Attached by terrains, map hexes (`effect`), `rules.globalModifiers` and (later) boons | loaded |
 | `boons/*.json` | Boon offers: tier, effects, exclusivity tags | not yet (same) |
 
 ## The content catalogue
@@ -21,12 +22,14 @@ Numbers are integers (no floats in rules).
 or throws one `ContentLoadException` listing **every** problem, each tagged with its file. It fails closed:
 an unrecognised file or folder is an error, never ignored.
 
-1. **Parse.** Each file is parsed on its own by path: `terrains.json`, `timecontrols.json`, `abilities/`,
-   `classes/`, `maps/`. Duplicate ids across files are reported with both file names.
+1. **Parse.** Each file is parsed on its own by path: `terrains.json`, `rules.json`, `timecontrols.json`,
+   `abilities/`, `classes/`, `maps/`, `modifiers/`. Duplicate ids across files are reported with both file names.
 2. **Link.** Class ability ids must exist; a class needs at least one movement ability; a movement's
-   `terrainCosts` keys must be real terrains; every map must pass `BuildTileMap` (symmetry, spawns,
+   `terrainCosts` keys must be real terrains; class stat keys, attack `damageType`s and modifier
+   `damageTypes` conditions must name a type in `rules.damageTypes`; terrain `modifiers`, map hex `effect`s
+   and `rules.globalModifiers` must be real modifiers; every map must pass `BuildTileMap` (symmetry, spawns,
    connectivity). So a map that would fail at match start fails at boot instead.
-3. **Tables.** `Abilities`, `Classes`, `Maps`, `TimeControls` are `DefinitionTable<T>`: sorted by ordinal id,
+3. **Tables.** `Abilities`, `Classes`, `Maps`, `TimeControls`, `Modifiers` are `DefinitionTable<T>`: sorted by ordinal id,
    `Get` / `TryGet` / `IndexOf` / `ByIndex`. Indices are stable small integers for wire encoding.
    `Terrains` is the existing `TerrainSet`; `Movements` is the movement subset; `GetMovement(id)`.
 4. **Hash.** `Hash` is SHA-256 over path + canonical JSON (sorted keys, no whitespace) of every file, in path
@@ -61,7 +64,112 @@ before any map — `MapData.BuildTileMap` needs it to resolve `Tile.Walkable`.
 ```
 
 `moveCost` is optional (defaults to 1 for walkable, 0 for unwalkable) and must not be negative. Ids must
-be unique and non-empty; the list must not be empty.
+be unique and non-empty; the list must not be empty. `modifiers` (optional) lists modifier ids a unit
+standing on the terrain carries for combat (see *Modifiers*); the catalogue rejects unknown ids.
+
+## Rules (`rules.json`, required)
+
+```json
+{ "version": 1, "damageTypes": ["melee", "ranged", "magic"], "globalModifiers": ["high-ground"] }
+```
+
+`damageTypes` are the damage lanes: every `power.<type>` / `defense.<type>` stat key, every attack's
+`damageType` and every modifier `damageTypes` condition must name one, so adding a lane is one line here.
+`globalModifiers` apply to every attack (height advantage is the shipped example); they are ordinary
+modifier ids.
+
+## Class stats (`classes/*.json`, `stats`)
+
+```json
+{
+  "version": 1, "id": "warrior", "name": "Warrior", "abilities": ["move", "jump", "jab", "strike"],
+  "stats": { "hp": 20, "ap": 3, "power.melee": 3, "defense.melee": 2, "defense.ranged": 1, "defense.magic": 1 }
+}
+```
+
+`stats` is required. `hp` (at least 1) and `ap` (0 or more, action points granted every turn) are required;
+every other key must be `power.<type>` or `defense.<type>`. Missing keys read as 0; unknown keys are load
+errors. Base stats are public knowledge (the class is visible), so the opponent's defense appears in your
+damage preview. See ADR-016 for the AP economy and ADR-017 for the damage formula.
+
+## Ability cost (every ability type)
+
+`cost` (optional, default 1, 0 or more) is the action points one use spends. An ability can be used as
+often as the unit's remaining AP allows; there is no per-turn use limit besides AP. Unspent AP is lost at
+end of turn.
+
+## Attack abilities (`abilities/*.json`, `"type": "attack"`)
+
+```json
+{
+  "version": 1, "id": "fire-bolt", "name": "Fire Bolt", "type": "attack", "category": "spell",
+  "icon": "fire-bolt", "cost": 2,
+  "attack": { "damage": 6, "damageType": "magic", "range": 3, "minRange": 1 },
+  "tags": ["fire"]
+}
+```
+
+| Field | Required | Meaning |
+|---|---|---|
+| `category` | yes | `weapon` or `spell` (never `movement`). HUD section only. |
+| `attack.damage` | yes, 0 or more | Flat base damage. |
+| `attack.damageType` | yes | One of `rules.damageTypes`; selects `power.<type>` and `defense.<type>` and is matched by modifiers. |
+| `attack.range` | yes, 1 or more | Maximum hex distance to the target. |
+| `attack.minRange` | no, default 1 | Minimum hex distance (`1..range`). |
+| `tags` | no | Free strings (elements, weapon kinds) for modifiers to match. Unique. |
+
+Targeting (Core, `Mimas.Core.Combat.AttackTargeting`): the target hex must hold a living enemy unit inside
+the range band, and the line of sight (`LineOfSight.IsClear`, the teleport rule) must be clear, always,
+even for melee. `Enumerate` and `Check` agree by construction.
+
+Damage (`Mimas.Core.Combat.DamageCalculator`):
+
+```
+damage = max(0, base + power.<type> - defense.<type> + sum of flat modifiers)
+```
+
+The result is a `DamageBreakdown`: a fixed-order list of signed lines (base, attacker power, target
+defense, then modifiers grouped attacker unit / attacker tile / globals for `dealDamage`, target unit /
+target tile / globals for `takeDamage`, each group sorted by id) plus the total. The same function computes
+the **preview** (`Knowledge.For(player)`: hidden enemy modifiers are dropped and counted in `UnknownCount`)
+and the **actual** result (`Knowledge.Full`). When an actual result contains a hidden line, the owner's
+opponent learns it (`ModifierRevealedEvent`) and it appears in every later preview.
+
+## Modifiers (`modifiers/*.json`)
+
+```json
+{
+  "version": 1, "id": "ward-of-feathers", "name": "Ward of Feathers",
+  "description": "Takes 4 less damage from ranged and magic attacks.",
+  "trigger": "takeDamage",
+  "when": { "damageTypes": ["ranged", "magic"] },
+  "effect": { "damage": -4 },
+  "visibility": "hidden"
+}
+```
+
+| Field | Required | Meaning |
+|---|---|---|
+| `trigger` | yes | `dealDamage` (consulted on the attacker's side: its unit, its tile, globals) or `takeDamage` (the target's side). |
+| `when` | no | All conditions must hold. `damageTypes[]` (attack type is one of), `tags[]` (attack has any of), `heightAdvantage` (attacker's tile is higher than the target's). Unknown keys are errors. |
+| `effect.damage` | yes, not 0 | Flat amount added to the damage. Only `damage` exists today; other keys are errors. |
+| `visibility` | no, default `public` | `hidden` modifiers are unknown to the opponent until they first change a result (boons). Tile and global modifiers should stay `public`. |
+| `icon` | no | Presentation key, like abilities. |
+
+Who owns a modifier is the attachment, never the file: a unit carries it (`Unit.ModifierIds`, granted by a
+boon or, for now, `MatchSetup.WithModifier`), a terrain grants it to whoever stands on it
+(`terrains.json` `modifiers`), a single map hex grants it (`maps/*.json` hex `effect`), or it applies to
+every attack (`rules.globalModifiers`). The same id twice on one unit does not stack.
+
+## Match flow (Core, `Mimas.Core.Match`)
+
+`MatchState(catalog, MatchSetup, seed)` builds the map, spawns one unit per player on `spawns.p1` / `p2`,
+then `Start()` begins turn 1. Commands: `MoveCommand`, `AttackCommand`, `EndTurnCommand` (reason
+`Player` or `Timeout`; the server submits the latter when the clock runs out, so replays need no clock).
+`Validate` is pure; `Apply` is the only mutator and returns `MatchEvent`s; `EnumerateLegal` lists every
+legal command (bots, highlights). Each turn refreshes the active player's units to `stats.ap`; a unit at 0
+hp is dead, stops occupying its tile, and a player with no living unit loses (`MatchEndedEvent`). Clients
+only ever see `MatchState.ViewFor(player)` (`PlayerView`) and events passed through `EventFilter`.
 
 ## Tile height (`maps/*.json`, `height`)
 

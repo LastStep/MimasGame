@@ -71,6 +71,39 @@ namespace Mimas.Core.Data
             return string.IsNullOrEmpty(value) ? null : value;
         }
 
+        /// <summary>A required array of non-empty, unique strings.</summary>
+        internal static List<string> RequireStringList(JObject obj, string field, string where)
+        {
+            var token = Require(obj, field, where);
+            return ParseStringList(token, field, where);
+        }
+
+        /// <summary>An optional array of non-empty, unique strings; empty when absent.</summary>
+        internal static List<string> OptionalStringList(JObject obj, string field, string where)
+        {
+            var token = obj[field];
+            if (token == null || token.Type == JTokenType.Null) return new List<string>();
+            return ParseStringList(token, field, where);
+        }
+
+        private static List<string> ParseStringList(JToken token, string field, string where)
+        {
+            if (!(token is JArray array))
+                throw new MapLoadException($"{where} field '{field}' must be an array of strings.");
+            var list = new List<string>(array.Count);
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < array.Count; i++)
+            {
+                if (array[i].Type != JTokenType.String || string.IsNullOrEmpty((string)array[i]))
+                    throw new MapLoadException($"{where} {field}[{i}] must be a non-empty string.");
+                string value = (string)array[i];
+                if (!seen.Add(value))
+                    throw new MapLoadException($"{where} {field} lists '{value}' twice.");
+                list.Add(value);
+            }
+            return list;
+        }
+
         internal static Hex RequireHex(JObject obj, string field, string where)
         {
             var token = Require(obj, field, where);

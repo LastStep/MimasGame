@@ -23,12 +23,12 @@
 | `Hex` | Axial/cube coordinate struct: distance, neighbours, rings, lines, rounding (Red Blob Games) |
 | `Grid` | `TileMap`: dictionary of `Hex → Tile`; tiles have terrain, height, effects, occupant. Any shape (ring, board) is just the set of hexes in the JSON map |
 | `Pathfinding` | BFS/Dijkstra for movement range per movement type (walk / jump / fly / teleport), A* for paths |
-| `Units` | Classes, stats, status effects, modifiers |
-| `Abilities` | Data-driven ability definitions; targeting; resolution into `Event`s |
-| `Turns` | Turn/phase state machine (mode to be decided: alternating vs simultaneous) |
-| `Boons` | Draft offers and application |
-| `Match` | `MatchState` (full truth), `Command` (player intent), `Event` (what happened), `PlayerView` (what one player is allowed to see) |
-| `Data` | JSON parsers for terrains, maps, abilities, classes, time controls into immutable definition objects |
+| `Units` | `Unit` (owner, class, position, hp, ap, ability ids, modifier ids), `UnitSet` (occupancy; dead units occupy nothing) |
+| `Combat` | `AttackTargeting` (range band + line of sight), `DamageCalculator` -> `DamageBreakdown` (fixed-order signed lines, floor 0), `Knowledge` (full vs one player's view: preview and actual share one code path) |
+| `Match` | `MatchState` (full truth; `Validate` pure, `Apply` sole mutator -> events, `EnumerateLegal`), `Command`s (move / attack / end turn incl. timeout), `MatchEvent`s, `PlayerView` (what one player may see), `EventFilter` (per-player event trimming), `MatchSetup` |
+| `Bots` | `IBot`, `RandomBot` (uniform over `EnumerateLegal`, own RNG) |
+| `Boons` | Draft offers and application (M3) |
+| `Data` | JSON parsers for terrains, rules, maps, abilities (movement, attack), classes + stat blocks, modifiers, time controls into immutable definition objects |
 | `Content` | `ContentCatalog`: loads the whole data folder from `(path, text)` pairs, links cross references, sorted `DefinitionTable<T>`s, content hash for client/server parity |
 | `Movement` | `MovementDef` (data) + one `IMovementResolver` per geometry (walk / jump / teleport) behind a string-keyed registry; `MovePlan` = path to animate + tiles entered |
 | `Rng` | Seeded deterministic RNG (xoshiro/PCG) |

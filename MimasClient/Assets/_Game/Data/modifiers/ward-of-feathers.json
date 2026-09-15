@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "id": "ward-of-feathers",
+  "name": "Ward of Feathers",
+  "description": "Takes 4 less damage from ranged and magic attacks. Hidden until it first changes a hit.",
+  "trigger": "takeDamage",
+  "when": { "damageTypes": ["ranged", "magic"] },
+  "effect": { "damage": -4 },
+  "visibility": "hidden"
+}

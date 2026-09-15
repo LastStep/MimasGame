@@ -8,17 +8,23 @@ namespace Mimas.Core.Data
     /// <summary>One terrain kind (see <c>terrains.json</c> in docs/data.md). Costs are integers — no floats in rules.</summary>
     public sealed class TerrainDef
     {
+        private readonly List<string> _modifierIds;
+
         public string Id { get; }
         public bool Walkable { get; }
 
         /// <summary>Steps consumed when entering this terrain. Defaults to 1; unwalkable terrain uses 0.</summary>
         public int MoveCost { get; }
 
-        public TerrainDef(string id, bool walkable, int moveCost = 1)
+        /// <summary>Modifiers a unit standing on this terrain carries (<c>modifiers/*.json</c> ids), authored order.</summary>
+        public IReadOnlyList<string> ModifierIds => _modifierIds;
+
+        public TerrainDef(string id, bool walkable, int moveCost = 1, List<string> modifierIds = null)
         {
             Id = id ?? throw new ArgumentNullException(nameof(id));
             Walkable = walkable;
             MoveCost = moveCost;
+            _modifierIds = modifierIds != null ? new List<string>(modifierIds) : new List<string>();
         }
     }
 
@@ -73,16 +79,18 @@ namespace Mimas.Core.Data
                 if (!(array[i] is JObject entry))
                     throw new MapLoadException($"terrains[{i}] is not an object.");
 
-                string id = MapJson.RequireString(entry, "id", $"terrains[{i}]");
+                string where = $"terrains[{i}]";
+                string id = MapJson.RequireString(entry, "id", where);
                 if (!seen.Add(id))
                     throw new MapLoadException($"Duplicate terrain id '{id}'.");
 
-                bool walkable = MapJson.RequireBool(entry, "walkable", $"terrains[{i}]");
-                int moveCost = MapJson.OptionalInt(entry, "moveCost", walkable ? 1 : 0, $"terrains[{i}]");
+                bool walkable = MapJson.RequireBool(entry, "walkable", where);
+                int moveCost = MapJson.OptionalInt(entry, "moveCost", walkable ? 1 : 0, where);
                 if (moveCost < 0)
-                    throw new MapLoadException($"terrains[{i}] ('{id}') has a negative moveCost.");
+                    throw new MapLoadException($"{where} ('{id}') has a negative moveCost.");
+                var modifiers = MapJson.OptionalStringList(entry, "modifiers", $"{where} ('{id}')");
 
-                terrains.Add(new TerrainDef(id, walkable, moveCost));
+                terrains.Add(new TerrainDef(id, walkable, moveCost, modifiers));
             }
 
             return new TerrainSet(terrains);

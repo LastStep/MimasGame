@@ -23,7 +23,7 @@ namespace Mimas.Core.Units
             for (int i = 0; i < _units.Count; i++)
             {
                 if (_units[i].Id == unit.Id) throw new InvalidOperationException($"Duplicate unit id {unit.Id}.");
-                if (_units[i].Position == unit.Position) throw new InvalidOperationException($"Tile {unit.Position} is already occupied.");
+                if (_units[i].IsAlive && _units[i].Position == unit.Position) throw new InvalidOperationException($"Tile {unit.Position} is already occupied.");
             }
             _units.Add(unit);
         }
@@ -55,11 +55,12 @@ namespace Mimas.Core.Units
             return TryGetUnitAt(hex, out unused);
         }
 
+        /// <summary>The living unit standing on <paramref name="hex"/>. Dead units keep their id but occupy nothing.</summary>
         public bool TryGetUnitAt(Hex hex, out Unit unit)
         {
             for (int i = 0; i < _units.Count; i++)
             {
-                if (_units[i].Position == hex)
+                if (_units[i].IsAlive && _units[i].Position == hex)
                 {
                     unit = _units[i];
                     return true;

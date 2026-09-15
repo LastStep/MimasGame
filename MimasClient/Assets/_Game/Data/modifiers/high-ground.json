@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "id": "high-ground",
+  "name": "High ground",
+  "description": "+2 damage when attacking from a tile higher than the target's.",
+  "trigger": "dealDamage",
+  "when": { "heightAdvantage": true },
+  "effect": { "damage": 2 },
+  "visibility": "public"
+}

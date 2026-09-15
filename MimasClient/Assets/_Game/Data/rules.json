@@ -1,0 +1,5 @@
+{
+  "version": 1,
+  "damageTypes": ["melee", "ranged", "magic"],
+  "globalModifiers": ["high-ground"]
+}

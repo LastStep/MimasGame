@@ -22,12 +22,15 @@ namespace Mimas.Core.Data
 
     /// <summary>
     /// Anything a unit can do, authored in <c>abilities/*.json</c>. The <c>type</c> field picks the concrete
-    /// subclass; today only <c>"movement"</c> exists. Attacks, buffs and the rest will add subclasses and a
-    /// line in <see cref="FromJson"/>, nothing else.
+    /// subclass (<c>movement</c>, <c>attack</c>). Every ability costs <see cref="Cost"/> action points per
+    /// use (default 1) and may be used as often as the unit's AP allows; AP is the only per-turn limit.
     /// </summary>
     public abstract class AbilityDef : IContentDef
     {
         public const string TypeMovement = "movement";
+        public const string TypeAttack = "attack";
+
+        public const int DefaultCost = 1;
 
         public string Id { get; }
         public string Name { get; }
@@ -45,13 +48,18 @@ namespace Mimas.Core.Data
         /// <summary>The <c>type</c> field: which subclass this is.</summary>
         public string Type { get; }
 
-        protected AbilityDef(string id, string name, string type, string description, string icon = null, string category = null)
+        /// <summary>Action points spent per use. 0 is allowed (free actions).</summary>
+        public int Cost { get; }
+
+        protected AbilityDef(string id, string name, string type, string description, string icon = null, string category = null, int cost = DefaultCost)
         {
             Id = id ?? throw new ArgumentNullException(nameof(id));
             Name = name ?? id;
             Type = type ?? throw new ArgumentNullException(nameof(type));
             Description = description;
             Icon = string.IsNullOrWhiteSpace(icon) ? null : icon;
+            if (cost < 0) throw new ArgumentOutOfRangeException(nameof(cost));
+            Cost = cost;
 
             if (type == TypeMovement)
             {
@@ -88,9 +96,19 @@ namespace Mimas.Core.Data
             {
                 case TypeMovement:
                     return MovementDef.FromJson(json);
+                case TypeAttack:
+                    return AttackDef.FromJson(json);
                 default:
-                    throw new MapLoadException($"ability '{id}' has unsupported type '{type}' (known: {TypeMovement}).");
+                    throw new MapLoadException($"ability '{id}' has unsupported type '{type}' (known: {TypeMovement}, {TypeAttack}).");
             }
+        }
+
+        /// <summary>The optional <c>cost</c> field: a non-negative integer, default <see cref="DefaultCost"/>.</summary>
+        internal static int ReadCost(JObject root, string where)
+        {
+            int cost = MapJson.OptionalInt(root, "cost", DefaultCost, where);
+            if (cost < 0) throw new MapLoadException($"{where} has a negative cost.");
+            return cost;
         }
     }
 }

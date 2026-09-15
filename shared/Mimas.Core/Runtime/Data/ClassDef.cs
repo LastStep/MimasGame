@@ -7,9 +7,10 @@ using Newtonsoft.Json.Linq;
 namespace Mimas.Core.Data
 {
     /// <summary>
-    /// A playable class from <c>classes/*.json</c>: what a fresh unit of this class starts with. Only the
-    /// ability list exists so far; base stats join when the unit model gets stats. Ability ids are strings
-    /// resolved against the catalogue at link time, so a class file can never reference a missing ability.
+    /// A playable class from <c>classes/*.json</c>: what a fresh unit of this class starts with — its
+    /// abilities and its base <see cref="Stats"/>. Ability ids are strings resolved against the catalogue
+    /// at link time, so a class file can never reference a missing ability; stat keys are checked against
+    /// <c>rules.json</c> the same way.
     /// </summary>
     public sealed class ClassDef : IContentDef
     {
@@ -22,12 +23,16 @@ namespace Mimas.Core.Data
         /// <summary>Starting ability ids in authored order, unique.</summary>
         public IReadOnlyList<string> AbilityIds => _abilityIds;
 
-        public ClassDef(string id, string name, string description, List<string> abilityIds)
+        /// <summary>Base stats: hp, ap and the power/defense lanes.</summary>
+        public StatBlock Stats { get; }
+
+        public ClassDef(string id, string name, string description, List<string> abilityIds, StatBlock stats)
         {
             Id = id ?? throw new ArgumentNullException(nameof(id));
             Name = name ?? id;
             Description = description;
             _abilityIds = abilityIds != null ? new List<string>(abilityIds) : new List<string>();
+            Stats = stats ?? throw new ArgumentNullException(nameof(stats));
         }
 
         public static ClassDef FromJson(string json)
@@ -67,7 +72,11 @@ namespace Mimas.Core.Data
                 ids.Add(abilityId);
             }
 
-            return new ClassDef(id, name, description, ids);
+            if (!(MapJson.Require(root, "stats", where) is JObject statsObj))
+                throw new MapLoadException($"{where} field 'stats' must be an object.");
+            StatBlock stats = StatBlock.FromJson(statsObj, where);
+
+            return new ClassDef(id, name, description, ids, stats);
         }
     }
 }

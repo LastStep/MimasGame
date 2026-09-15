@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "id": "jab",
+  "name": "Jab",
+  "type": "attack",
+  "category": "weapon",
+  "icon": "jab",
+  "description": "A quick, cheap melee hit against an adjacent enemy.",
+  "cost": 1,
+  "attack": {
+    "damage": 2,
+    "damageType": "melee",
+    "range": 1
+  }
+}

@@ -21,8 +21,9 @@ namespace Mimas.Core.Tests
         internal static List<ContentFile> Minimal() => new List<ContentFile>
         {
             new ContentFile("terrains.json", @"{ ""version"": 1, ""terrains"": [ { ""id"": ""grass"", ""walkable"": true } ] }"),
+            new ContentFile("rules.json", @"{ ""version"": 1, ""damageTypes"": [ ""melee"", ""ranged"", ""magic"" ] }"),
             new ContentFile("abilities/move.json", @"{ ""version"": 1, ""id"": ""move"", ""type"": ""movement"", ""movement"": { ""mode"": ""walk"", ""range"": 1 } }"),
-            new ContentFile("classes/scout.json", @"{ ""version"": 1, ""id"": ""scout"", ""abilities"": [ ""move"" ] }"),
+            new ContentFile("classes/scout.json", @"{ ""version"": 1, ""id"": ""scout"", ""abilities"": [ ""move"" ], ""stats"": { ""hp"": 10, ""ap"": 3 } }"),
         };
 
         internal static string ErrorsOf(List<ContentFile> files)
@@ -39,7 +40,9 @@ namespace Mimas.Core.Tests
         {
             var catalog = ContentFixtures.RepoCatalog();
             Assert.True(catalog.Terrains.Count >= 2);
-            Assert.Equal(new[] { "jump", "move", "teleport" }, catalog.Abilities.All.Select(a => a.Id).ToArray());
+            Assert.Equal(new[] { "fire-bolt", "jab", "jump", "move", "strike", "teleport" }, catalog.Abilities.All.Select(a => a.Id).ToArray());
+            Assert.Equal(new[] { "high-ground", "ward-of-feathers" }, catalog.Modifiers.All.Select(m => m.Id).ToArray());
+            Assert.Equal(new[] { "melee", "ranged", "magic" }, catalog.Rules.DamageTypes);
             Assert.Equal(new[] { "mage", "warrior" }, catalog.Classes.All.Select(c => c.Id).ToArray());
             Assert.Contains("arena-4", catalog.Maps.All.Select(m => m.Id));
             Assert.Equal(3, catalog.TimeControls.Count);
@@ -83,7 +86,7 @@ namespace Mimas.Core.Tests
         public void Load_ClassReferencingUnknownAbility_ErrorNamesTheClassFile()
         {
             var files = ContentFixtures.Minimal();
-            files.Add(new ContentFile("classes/broken.json", @"{ ""version"": 1, ""id"": ""broken"", ""abilities"": [ ""move"", ""fly"" ] }"));
+            files.Add(new ContentFile("classes/broken.json", @"{ ""version"": 1, ""id"": ""broken"", ""abilities"": [ ""move"", ""fly"" ], ""stats"": { ""hp"": 10, ""ap"": 3 } }"));
             string errors = ContentFixtures.ErrorsOf(files);
             Assert.Contains("classes/broken.json: class 'broken' references unknown ability 'fly'", errors);
         }
@@ -92,7 +95,7 @@ namespace Mimas.Core.Tests
         public void Load_ClassWithoutMovement_IsAnError()
         {
             var files = ContentFixtures.Minimal();
-            files.Add(new ContentFile("classes/statue.json", @"{ ""version"": 1, ""id"": ""statue"", ""abilities"": [] }"));
+            files.Add(new ContentFile("classes/statue.json", @"{ ""version"": 1, ""id"": ""statue"", ""abilities"": [], ""stats"": { ""hp"": 10, ""ap"": 3 } }"));
             Assert.Contains("class 'statue' has no movement ability", ContentFixtures.ErrorsOf(files));
         }
 
@@ -131,8 +134,8 @@ namespace Mimas.Core.Tests
         public void Load_CollectsEveryError_NotJustTheFirst()
         {
             var files = ContentFixtures.Minimal();
-            files.Add(new ContentFile("classes/a.json", @"{ ""version"": 1, ""id"": ""a"", ""abilities"": [ ""x"" ] }"));
-            files.Add(new ContentFile("classes/b.json", @"{ ""version"": 1, ""id"": ""b"", ""abilities"": [ ""y"" ] }"));
+            files.Add(new ContentFile("classes/a.json", @"{ ""version"": 1, ""id"": ""a"", ""abilities"": [ ""x"" ], ""stats"": { ""hp"": 10, ""ap"": 3 } }"));
+            files.Add(new ContentFile("classes/b.json", @"{ ""version"": 1, ""id"": ""b"", ""abilities"": [ ""y"" ], ""stats"": { ""hp"": 10, ""ap"": 3 } }"));
             files.Add(new ContentFile("readme.txt", "hello"));
             var e = Assert.Throws<ContentLoadException>(() => ContentCatalog.Load(files));
             Assert.True(e.Errors.Count >= 3, e.Message);
@@ -142,8 +145,8 @@ namespace Mimas.Core.Tests
         public void Load_UnsupportedAbilityType_IsAnError()
         {
             var files = ContentFixtures.Minimal();
-            files.Add(new ContentFile("abilities/fire-bolt.json", @"{ ""version"": 1, ""id"": ""fire-bolt"", ""type"": ""attack"" }"));
-            Assert.Contains("unsupported type 'attack'", ContentFixtures.ErrorsOf(files));
+            files.Add(new ContentFile("abilities/sing.json", @"{ ""version"": 1, ""id"": ""sing"", ""type"": ""song"" }"));
+            Assert.Contains("unsupported type 'song'", ContentFixtures.ErrorsOf(files));
         }
 
         [Fact]
@@ -208,7 +211,7 @@ namespace Mimas.Core.Tests
         [Fact]
         public void ClassDef_FromJson_DuplicateAbility_Throws()
         {
-            Assert.Throws<MapLoadException>(() => ClassDef.FromJson(@"{ ""version"": 1, ""id"": ""x"", ""abilities"": [ ""move"", ""move"" ] }"));
+            Assert.Throws<MapLoadException>(() => ClassDef.FromJson(@"{ ""version"": 1, ""id"": ""x"", ""abilities"": [ ""move"", ""move"" ], ""stats"": { ""hp"": 10, ""ap"": 3 } }"));
         }
 
         [Fact]
@@ -217,13 +220,13 @@ namespace Mimas.Core.Tests
             var catalog = ContentFixtures.RepoCatalog();
             var unit = new Unit(0, 0, Hex.Zero, catalog.Classes.Get("warrior"));
             Assert.Equal("warrior", unit.ClassId);
-            Assert.Equal(new[] { "move", "jump" }, unit.AbilityIds);
+            Assert.Equal(new[] { "move", "jump", "jab", "strike" }, unit.AbilityIds);
             Assert.True(unit.HasAbility("jump"));
             Assert.False(unit.HasAbility("teleport"));
 
             unit.AddAbility("teleport");
             unit.AddAbility("teleport");
-            Assert.Equal(new[] { "move", "jump", "teleport" }, unit.AbilityIds);
+            Assert.Equal(new[] { "move", "jump", "jab", "strike", "teleport" }, unit.AbilityIds);
             Assert.True(unit.RemoveAbility("jump"));
             Assert.False(unit.RemoveAbility("jump"));
         }
