@@ -82,6 +82,55 @@ namespace Mimas.Core.Grid
             return dist;
         }
 
+        /// <summary>
+        /// Shortest walkable path from <paramref name="start"/> to <paramref name="goal"/>, inclusive of both,
+        /// as a uniform-cost BFS over existing tiles. The start tile's own walkability is not required (a unit
+        /// may be standing on it); every later step must be walkable. Neighbours are expanded in
+        /// <see cref="Hex.Directions"/> order, so the chosen path is deterministic when several are equally short.
+        /// Returns null when either hex is off the map, the goal is unwalkable, or no path exists.
+        /// </summary>
+        public List<Hex> FindPath(Hex start, Hex goal)
+        {
+            if (!_tiles.ContainsKey(start)) return null;
+            Tile goalTile;
+            if (!_tiles.TryGetValue(goal, out goalTile) || !goalTile.Walkable) return null;
+            if (start == goal) return new List<Hex> { start };
+
+            var cameFrom = new Dictionary<Hex, Hex> { [start] = start };
+            var frontier = new Queue<Hex>();
+            frontier.Enqueue(start);
+            while (frontier.Count > 0)
+            {
+                var cur = frontier.Dequeue();
+                // Iterate directions in fixed order for determinism.
+                for (int i = 0; i < 6; i++)
+                {
+                    var next = cur.Neighbor(i);
+                    if (cameFrom.ContainsKey(next)) continue;
+                    Tile tile;
+                    if (!_tiles.TryGetValue(next, out tile) || !tile.Walkable) continue;
+                    cameFrom[next] = cur;
+                    if (next == goal) return Reconstruct(cameFrom, start, goal);
+                    frontier.Enqueue(next);
+                }
+            }
+            return null;
+        }
+
+        private static List<Hex> Reconstruct(Dictionary<Hex, Hex> cameFrom, Hex start, Hex goal)
+        {
+            var path = new List<Hex>();
+            var cur = goal;
+            while (cur != start)
+            {
+                path.Add(cur);
+                cur = cameFrom[cur];
+            }
+            path.Add(start);
+            path.Reverse();
+            return path;
+        }
+
         /// <summary>Checks that every tile has a counterpart under 180° rotation about the origin.</summary>
         public bool IsRotationallySymmetric()
         {

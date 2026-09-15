@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "terrains": [
+    {
+      "id": "grass",
+      "walkable": true,
+      "moveCost": 1
+    },
+    {
+      "id": "stone",
+      "walkable": false,
+      "moveCost": 0
+    }
+  ]
+}

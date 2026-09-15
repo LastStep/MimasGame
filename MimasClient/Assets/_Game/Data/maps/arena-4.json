@@ -1,0 +1,342 @@
+{
+  "version": 1,
+  "id": "arena-4",
+  "name": "Arena",
+  "description": "Radius-4 hex arena, 61 tiles with 12 stone pillars and a raised central plateau. Ladder map 3.",
+  "symmetry": "rotational-180",
+  "ladderPosition": 3,
+  "spawns": {
+    "p1": {
+      "q": -4,
+      "r": 0
+    },
+    "p2": {
+      "q": 4,
+      "r": 0
+    }
+  },
+  "hexes": [
+    {
+      "q": 0,
+      "r": 0,
+      "terrain": "grass",
+      "height": 2
+    },
+    {
+      "q": -1,
+      "r": 1,
+      "terrain": "grass"
+    },
+    {
+      "q": 0,
+      "r": 1,
+      "terrain": "grass"
+    },
+    {
+      "q": 1,
+      "r": 0,
+      "terrain": "grass",
+      "height": 2
+    },
+    {
+      "q": 1,
+      "r": -1,
+      "terrain": "grass"
+    },
+    {
+      "q": 0,
+      "r": -1,
+      "terrain": "grass"
+    },
+    {
+      "q": -1,
+      "r": 0,
+      "terrain": "grass",
+      "height": 2
+    },
+    {
+      "q": -2,
+      "r": 2,
+      "terrain": "grass"
+    },
+    {
+      "q": -1,
+      "r": 2,
+      "terrain": "grass"
+    },
+    {
+      "q": 0,
+      "r": 2,
+      "terrain": "stone",
+      "height": 2
+    },
+    {
+      "q": 1,
+      "r": 1,
+      "terrain": "stone",
+      "height": 2
+    },
+    {
+      "q": 2,
+      "r": 0,
+      "terrain": "grass",
+      "height": 1
+    },
+    {
+      "q": 2,
+      "r": -1,
+      "terrain": "stone",
+      "height": 2
+    },
+    {
+      "q": 2,
+      "r": -2,
+      "terrain": "grass"
+    },
+    {
+      "q": 1,
+      "r": -2,
+      "terrain": "grass"
+    },
+    {
+      "q": 0,
+      "r": -2,
+      "terrain": "stone",
+      "height": 2
+    },
+    {
+      "q": -1,
+      "r": -1,
+      "terrain": "stone",
+      "height": 2
+    },
+    {
+      "q": -2,
+      "r": 0,
+      "terrain": "grass",
+      "height": 1
+    },
+    {
+      "q": -2,
+      "r": 1,
+      "terrain": "stone",
+      "height": 2
+    },
+    {
+      "q": -3,
+      "r": 3,
+      "terrain": "grass"
+    },
+    {
+      "q": -2,
+      "r": 3,
+      "terrain": "grass"
+    },
+    {
+      "q": -1,
+      "r": 3,
+      "terrain": "grass"
+    },
+    {
+      "q": 0,
+      "r": 3,
+      "terrain": "grass"
+    },
+    {
+      "q": 1,
+      "r": 2,
+      "terrain": "grass"
+    },
+    {
+      "q": 2,
+      "r": 1,
+      "terrain": "grass"
+    },
+    {
+      "q": 3,
+      "r": 0,
+      "terrain": "stone",
+      "height": 1
+    },
+    {
+      "q": 3,
+      "r": -1,
+      "terrain": "grass"
+    },
+    {
+      "q": 3,
+      "r": -2,
+      "terrain": "grass"
+    },
+    {
+      "q": 3,
+      "r": -3,
+      "terrain": "grass"
+    },
+    {
+      "q": 2,
+      "r": -3,
+      "terrain": "grass"
+    },
+    {
+      "q": 1,
+      "r": -3,
+      "terrain": "grass"
+    },
+    {
+      "q": 0,
+      "r": -3,
+      "terrain": "grass"
+    },
+    {
+      "q": -1,
+      "r": -2,
+      "terrain": "grass"
+    },
+    {
+      "q": -2,
+      "r": -1,
+      "terrain": "grass"
+    },
+    {
+      "q": -3,
+      "r": 0,
+      "terrain": "stone",
+      "height": 1
+    },
+    {
+      "q": -3,
+      "r": 1,
+      "terrain": "grass"
+    },
+    {
+      "q": -3,
+      "r": 2,
+      "terrain": "grass"
+    },
+    {
+      "q": -4,
+      "r": 4,
+      "terrain": "grass"
+    },
+    {
+      "q": -3,
+      "r": 4,
+      "terrain": "grass"
+    },
+    {
+      "q": -2,
+      "r": 4,
+      "terrain": "grass"
+    },
+    {
+      "q": -1,
+      "r": 4,
+      "terrain": "stone",
+      "height": 1
+    },
+    {
+      "q": 0,
+      "r": 4,
+      "terrain": "grass"
+    },
+    {
+      "q": 1,
+      "r": 3,
+      "terrain": "grass"
+    },
+    {
+      "q": 2,
+      "r": 2,
+      "terrain": "stone",
+      "height": 1
+    },
+    {
+      "q": 3,
+      "r": 1,
+      "terrain": "grass"
+    },
+    {
+      "q": 4,
+      "r": 0,
+      "terrain": "grass"
+    },
+    {
+      "q": 4,
+      "r": -1,
+      "terrain": "grass"
+    },
+    {
+      "q": 4,
+      "r": -2,
+      "terrain": "grass"
+    },
+    {
+      "q": 4,
+      "r": -3,
+      "terrain": "grass"
+    },
+    {
+      "q": 4,
+      "r": -4,
+      "terrain": "grass"
+    },
+    {
+      "q": 3,
+      "r": -4,
+      "terrain": "grass"
+    },
+    {
+      "q": 2,
+      "r": -4,
+      "terrain": "grass"
+    },
+    {
+      "q": 1,
+      "r": -4,
+      "terrain": "stone",
+      "height": 1
+    },
+    {
+      "q": 0,
+      "r": -4,
+      "terrain": "grass"
+    },
+    {
+      "q": -1,
+      "r": -3,
+      "terrain": "grass"
+    },
+    {
+      "q": -2,
+      "r": -2,
+      "terrain": "stone",
+      "height": 1
+    },
+    {
+      "q": -3,
+      "r": -1,
+      "terrain": "grass"
+    },
+    {
+      "q": -4,
+      "r": 0,
+      "terrain": "grass"
+    },
+    {
+      "q": -4,
+      "r": 1,
+      "terrain": "grass"
+    },
+    {
+      "q": -4,
+      "r": 2,
+      "terrain": "grass"
+    },
+    {
+      "q": -4,
+      "r": 3,
+      "terrain": "grass"
+    }
+  ]
+}
