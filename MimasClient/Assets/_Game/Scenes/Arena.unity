@@ -846,6 +846,8 @@ GameObject:
   - component: {fileID: 1420187336}
   - component: {fileID: 1420187337}
   - component: {fileID: 1420187338}
+  - component: {fileID: 1420187339}
+  - component: {fileID: 1420187340}
   m_Layer: 0
   m_Name: Board
   m_TagString: Untagged
@@ -915,6 +917,42 @@ MonoBehaviour:
   _ringColor: {r: 1, g: 0.6902, b: 0.6588, a: 1}
   _lineHalfWidth: 0.05
   _dim: 0.55
+--- !u!114 &1420187339
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1420187335}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ab2a24b792a5a7148986f9d5a7f3ee19, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Mimas.Client.Presentation::Mimas.Client.Presentation.AimPreview
+  _clearColor: {r: 0.486, g: 1, b: 0.604, a: 1}
+  _blockedColor: {r: 1, g: 0.353, b: 0.29, a: 1}
+  _greyColor: {r: 0.604, g: 0.604, b: 0.604, a: 0.6}
+  _width: 0.06
+  _markerWidth: 0.05
+  _dashLength: 0.28
+  _ringRadius: 0.17
+  _markRadius: 0.17
+  _camera: {fileID: 0}
+--- !u!114 &1420187340
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1420187335}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4375cf2812a151c4ab5c3c57866728d2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Mimas.Client.Presentation::Mimas.Client.Presentation.ProjectilePlayback
+  _radius: 0.08
+  _weaponColor: {r: 0.949, g: 0.91, b: 0.784, a: 1}
+  _spellColor: {r: 0.549, g: 0.784, b: 1, a: 1}
 --- !u!1 &1597182828
 GameObject:
   m_ObjectHideFlags: 0
