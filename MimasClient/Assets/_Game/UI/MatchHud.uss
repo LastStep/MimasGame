@@ -441,6 +441,14 @@
     padding: 0;
 }
 
+.examine-group {
+    margin: 6px 0 2px 0;
+    font-size: 10px;
+    letter-spacing: 1px;
+    -unity-font-style: bold;
+    color: var(--hud-text-faint);
+}
+
 .examine-abilities {
     flex-direction: column;
 }

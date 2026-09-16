@@ -264,7 +264,8 @@ namespace Mimas.Client.Presentation
             MatchSetup setup;
             try
             {
-                setup = new MatchSetup(_board.MapData.Id, _settings.PlayerClassId, _settings.OpponentClassId, _settings.FirstPlayer);
+                setup = new MatchSetup(_board.MapData.Id, _settings.PlayerLoadout.ToLoadout(),
+                    _settings.OpponentLoadout.ToLoadout(), _settings.FirstPlayer);
                 foreach (string id in _settings.PlayerModifierIds) if (!string.IsNullOrEmpty(id)) setup.WithModifier(LocalPlayer, id);
                 foreach (string id in _settings.OpponentModifierIds) if (!string.IsNullOrEmpty(id)) setup.WithModifier(BotPlayer, id);
                 _state = new MatchState(_catalog, setup, _settings.Seed);
@@ -313,7 +314,7 @@ namespace Mimas.Client.Presentation
             CollectAbilities();
             RefreshMarkers();
 
-            Debug.Log("[LocalMatchSession] " + _settings.PlayerClassId + " vs " + _settings.OpponentClassId + " on " + _board.MapData.Id
+            Debug.Log("[LocalMatchSession] " + _settings.PlayerLoadout.Weapon + " vs " + _settings.OpponentLoadout.Weapon + " on " + _board.MapData.Id
                 + ", seed " + _settings.Seed + ", " + _turnSeconds + " s per turn.");
 
             Enqueue(_state.Start());
@@ -607,32 +608,34 @@ namespace Mimas.Client.Presentation
                 return;
             }
 
-            ClassDef cls;
-            _catalog.Classes.TryGet(unit.ClassId, out cls);
             var examine = new HudExamine
             {
-                Title = cls != null ? cls.Name : unit.ClassId,
+                Title = "Hero",
                 Subtitle = unit.IsMine ? "Your unit" : "Opponent",
-                Description = cls != null ? cls.Description : null,
+                Description = null,
                 Hp = unit.Hp,
                 MaxHp = unit.MaxHp,
                 Ap = unit.Ap,
                 ApPerTurn = unit.ApPerTurn,
             };
 
-            for (int i = 0; i < unit.Abilities.Count; i++)
+            // Gear first, in slot order: the four items are public even when their abilities are not.
+            for (int i = 0; i < unit.ItemIds.Count; i++)
             {
-                KnownEntry entry = unit.Abilities[i];
-                AbilityDef def = null;
-                bool known = entry.Revealed && _catalog.Abilities.TryGet(entry.Id, out def);
-                examine.Abilities.Add(new HudExamineEntry
+                ItemDef item;
+                bool known = _catalog.Items.TryGet(unit.ItemIds[i], out item);
+                examine.Items.Add(new HudExamineEntry
                 {
-                    Name = entry.Revealed ? (known ? def.Name : entry.Id) : "Unknown ability",
-                    Description = entry.Revealed ? (known ? DescribeAbility(def) : null) : "Revealed once the opponent uses it.",
-                    Icon = known ? def.Icon : null,
-                    Hidden = !entry.Revealed,
+                    Name = known ? item.Name : unit.ItemIds[i],
+                    Description = known ? DescribeItem(item) : null,
+                    Icon = known ? item.Icon : null,
+                    Hidden = false,
                 });
             }
+
+            // Abilities grouped by the item that grants them, innate ones last.
+            for (int i = 0; i < unit.ItemIds.Count; i++) AddAbilityEntries(examine, unit, unit.ItemIds[i]);
+            AddAbilityEntries(examine, unit, null);
 
             for (int i = 0; i < unit.Modifiers.Count; i++)
             {
@@ -649,6 +652,72 @@ namespace Mimas.Client.Presentation
             }
 
             _examine = examine;
+        }
+
+        /// <summary>Adds every ability the given item grants (or every innate one when <paramref name="itemId"/> is null).</summary>
+        private void AddAbilityEntries(HudExamine examine, Mimas.Core.Match.UnitView unit, string itemId)
+        {
+            string group = "Innate";
+            if (itemId != null)
+            {
+                ItemDef item;
+                group = _catalog.Items.TryGet(itemId, out item) ? item.Name : itemId;
+            }
+
+            for (int i = 0; i < unit.Abilities.Count; i++)
+            {
+                KnownEntry entry = unit.Abilities[i];
+                if (entry.SourceItemId != itemId) continue;
+
+                AbilityDef def = null;
+                bool known = entry.Revealed && _catalog.Abilities.TryGet(entry.Id, out def);
+                examine.Abilities.Add(new HudExamineEntry
+                {
+                    Name = entry.Revealed ? (known ? def.Name : entry.Id) : "Unknown ability",
+                    Description = entry.Revealed ? (known ? DescribeAbility(def) : null) : "Revealed once the opponent uses it.",
+                    Icon = known ? def.Icon : null,
+                    Hidden = !entry.Revealed,
+                    Group = group,
+                });
+            }
+        }
+
+        /// <summary>Stat keys in the order the examine panel reads them out; anything else follows, sorted.</summary>
+        private static readonly string[] StatOrder = { "hp", "ap", "power.weapon", "power.spell", "defense.weapon", "defense.spell" };
+
+        /// <summary>The item's own line plus a one-line summary of the stats it adds.</summary>
+        private static string DescribeItem(ItemDef item)
+        {
+            string stats = null;
+            for (int order = 0; order <= StatOrder.Length; order++)
+            {
+                for (int i = 0; i < item.Stats.Entries.Count; i++)
+                {
+                    var entry = item.Stats.Entries[i];
+                    if (entry.Value == 0) continue;
+                    int at = System.Array.IndexOf(StatOrder, entry.Key);
+                    if (at < 0) at = StatOrder.Length;          // unknown keys come last, in key order
+                    if (at != order) continue;
+                    string line = (entry.Value > 0 ? "+" : "") + entry.Value + " " + StatLabel(entry.Key);
+                    stats = stats == null ? line : stats + ", " + line;
+                }
+            }
+            if (string.IsNullOrEmpty(item.Description)) return stats;
+            return stats == null ? item.Description : item.Description + "\n" + stats;
+        }
+
+        private static string StatLabel(string key)
+        {
+            switch (key)
+            {
+                case "hp": return "hp";
+                case "ap": return "ap";
+                case "power.weapon": return "strength";
+                case "power.spell": return "magic";
+                case "defense.weapon": return "weapon armour";
+                case "defense.spell": return "spell armour";
+                default: return key;
+            }
         }
 
         private static string DescribeAbility(AbilityDef def)

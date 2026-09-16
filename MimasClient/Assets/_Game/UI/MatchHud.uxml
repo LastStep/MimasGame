@@ -35,13 +35,15 @@
         <ui:VisualElement name="examine" class="examine">
             <ui:VisualElement class="examine-header">
                 <ui:VisualElement class="examine-titles" picking-mode="Ignore">
-                    <ui:Label name="examine-title" class="examine-title" text="Warrior" />
+                    <ui:Label name="examine-title" class="examine-title" text="Hero" />
                     <ui:Label name="examine-subtitle" class="examine-subtitle" text="Your unit" />
                 </ui:VisualElement>
                 <ui:Button name="examine-close" class="examine-close" text="✕" />
             </ui:VisualElement>
             <ui:Label name="examine-stats" class="examine-stats" text="HP 20 / 20   ·   AP 3 / 3" />
-            <ui:Label name="examine-description" class="examine-description" text="Sturdy melee fighter." />
+            <ui:Label name="examine-description" class="examine-description" text="" />
+            <ui:Label name="examine-items-caption" class="examine-caption" text="GEAR" />
+            <ui:VisualElement name="examine-items" class="examine-abilities" />
             <ui:Label class="examine-caption" text="ABILITIES" />
             <ui:VisualElement name="examine-abilities" class="examine-abilities" />
             <ui:Label name="examine-modifiers-caption" class="examine-caption" text="PASSIVES" />

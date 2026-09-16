@@ -6,8 +6,8 @@ namespace Mimas.Client.Presentation
 {
     /// <summary>
     /// One place to tweak a local match while the real setup flow (matchmaking, lobby, server) does not
-    /// exist yet: which map, which classes, how long a turn is, how the bot behaves, which passives each
-    /// side brings in. Edit the asset in the Inspector (Assets/_Game/Settings/DefaultMatchSettings.asset)
+    /// exist yet: which map, which gear each side wears, how long a turn is, how the bot behaves, which
+    /// passives each side brings in. Edit the asset in the Inspector (Assets/_Game/Settings/DefaultMatchSettings.asset)
     /// or create another via Create > Mimas > Match Settings and point the scene at it. Balance data stays
     /// in JSON; this asset only picks ids and dev-loop knobs.
     /// </summary>
@@ -18,9 +18,9 @@ namespace Mimas.Client.Presentation
         [Tooltip("maps/*.json id. Leave empty to keep whatever the BoardView has set.")]
         public string MapId = "arena-4";
 
-        [Header("Sides (classes/*.json ids)")]
-        public string PlayerClassId = "warrior";
-        public string OpponentClassId = "mage";
+        [Header("Sides (items/*.json ids)")]
+        public LoadoutSettings PlayerLoadout = new LoadoutSettings();
+        public LoadoutSettings OpponentLoadout = new LoadoutSettings { Weapon = "flintlock", Boots = "blink-boots" };
 
         [Tooltip("modifiers/*.json ids the player's unit starts with (stand-in for boons until the draft exists).")]
         public string[] PlayerModifierIds = new string[0];

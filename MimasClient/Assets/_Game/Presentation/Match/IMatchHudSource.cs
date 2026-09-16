@@ -46,6 +46,9 @@ namespace Mimas.Client.Presentation
         public string Description;
         public string Icon;
         public bool Hidden;
+
+        /// <summary>Caption the entry sits under (the granting item's name, or "Innate"), or null for no grouping.</summary>
+        public string Group;
     }
 
     /// <summary>What the examine panel shows for the unit the player clicked.</summary>
@@ -58,6 +61,7 @@ namespace Mimas.Client.Presentation
         public int MaxHp;
         public int Ap;
         public int ApPerTurn;
+        public List<HudExamineEntry> Items = new List<HudExamineEntry>();
         public List<HudExamineEntry> Abilities = new List<HudExamineEntry>();
         public List<HudExamineEntry> Modifiers = new List<HudExamineEntry>();
     }

@@ -13,8 +13,16 @@ MonoBehaviour:
   m_Name: DefaultMatchSettings
   m_EditorClassIdentifier: Mimas.Client.Presentation::Mimas.Client.Presentation.MatchSettings
   MapId: arena-4
-  PlayerClassId: warrior
-  OpponentClassId: mage
+  PlayerLoadout:
+    Weapon: longbow
+    Crown: ember-circlet
+    Boots: leaping-boots
+    Armour: leather-jerkin
+  OpponentLoadout:
+    Weapon: flintlock
+    Crown: ember-circlet
+    Boots: blink-boots
+    Armour: leather-jerkin
   PlayerModifierIds: []
   OpponentModifierIds:
   - ward-of-feathers

@@ -67,7 +67,7 @@ namespace Mimas.Client.Content
             if (_logSummary)
             {
                 Debug.Log("[ContentBootstrap] Content loaded: " + Catalog.Files.Count + " files, "
-                    + Catalog.Abilities.Count + " abilities, " + Catalog.Classes.Count + " classes, "
+                    + Catalog.Abilities.Count + " abilities, " + Catalog.Items.Count + " items, "
                     + Catalog.Maps.Count + " maps, " + Catalog.Terrains.Count + " terrains. Hash " + Catalog.Hash.Substring(0, 12) + "…");
             }
 

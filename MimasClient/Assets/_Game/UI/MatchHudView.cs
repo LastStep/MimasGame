@@ -64,6 +64,7 @@ namespace Mimas.Client.UI
         private VisualElement _actionBar;
         private VisualElement _tooltip;
         private VisualElement _examine;
+        private VisualElement _examineItems;
         private VisualElement _examineAbilities;
         private VisualElement _examineModifiers;
         private VisualElement _unitLayer;
@@ -77,6 +78,7 @@ namespace Mimas.Client.UI
         private Label _examineSubtitle;
         private Label _examineStats;
         private Label _examineDescription;
+        private Label _examineItemsCaption;
         private Label _examineModifiersCaption;
         private Label _previewTitle;
         private Label _previewTotal;
@@ -188,6 +190,8 @@ namespace Mimas.Client.UI
             _examineSubtitle = root.Q<Label>("examine-subtitle");
             _examineStats = root.Q<Label>("examine-stats");
             _examineDescription = root.Q<Label>("examine-description");
+            _examineItemsCaption = root.Q<Label>("examine-items-caption");
+            _examineItems = root.Q<VisualElement>("examine-items");
             _examineAbilities = root.Q<VisualElement>("examine-abilities");
             _examineModifiersCaption = root.Q<Label>("examine-modifiers-caption");
             _examineModifiers = root.Q<VisualElement>("examine-modifiers");
@@ -204,6 +208,7 @@ namespace Mimas.Client.UI
             if (_root == null || _turnPanel == null || _turnOwner == null || _rope == null || _ropeFill == null || _ropeEmber == null
                 || _actionBar == null || _tooltip == null || _tooltipTitle == null || _tooltipBody == null
                 || _examine == null || _examineTitle == null || _examineSubtitle == null || _examineStats == null || _examineDescription == null
+                || _examineItemsCaption == null || _examineItems == null
                 || _examineAbilities == null || _examineModifiersCaption == null || _examineModifiers == null || _examineClose == null || _endTurn == null
                 || _unitLayer == null || _preview == null || _previewTitle == null || _previewTotal == null || _previewLines == null
                 || _flyLayer == null || _banner == null)
@@ -320,6 +325,11 @@ namespace Mimas.Client.UI
             _examineDescription.style.display = string.IsNullOrEmpty(examine.Description) ? DisplayStyle.None : DisplayStyle.Flex;
             _examine.EnableInClassList("examine--theirs", examine.Subtitle != null && examine.Subtitle.StartsWith("Opp", StringComparison.Ordinal));
 
+            FillEntries(_examineItems, examine.Items);
+            bool anyItems = examine.Items.Count > 0;
+            _examineItemsCaption.style.display = anyItems ? DisplayStyle.Flex : DisplayStyle.None;
+            _examineItems.style.display = anyItems ? DisplayStyle.Flex : DisplayStyle.None;
+
             FillEntries(_examineAbilities, examine.Abilities);
             FillEntries(_examineModifiers, examine.Modifiers);
             bool anyModifiers = examine.Modifiers.Count > 0;
@@ -332,9 +342,19 @@ namespace Mimas.Client.UI
         private void FillEntries(VisualElement container, List<HudExamineEntry> entries)
         {
             container.Clear();
+            string group = null;
             for (int i = 0; i < entries.Count; i++)
             {
                 HudExamineEntry entry = entries[i];
+
+                // A new source (the item that grants the next abilities) gets its own small caption row.
+                if (!string.IsNullOrEmpty(entry.Group) && entry.Group != group)
+                {
+                    group = entry.Group;
+                    var caption = new Label { text = group, pickingMode = PickingMode.Ignore };
+                    caption.AddToClassList("examine-group");
+                    container.Add(caption);
+                }
 
                 var row = new VisualElement { pickingMode = PickingMode.Ignore };
                 row.AddToClassList("examine-entry");
