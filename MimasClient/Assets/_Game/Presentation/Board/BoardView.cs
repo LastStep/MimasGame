@@ -72,6 +72,7 @@ namespace Mimas.Client.Presentation
 
         private bool _hasHovered;
         private Hex _hovered;
+        private int _unitsPerLevel = 1;
 
         /// <summary>Raised once, after every tile view exists. Late subscribers should check <see cref="IsBuilt"/>.</summary>
         public event Action BoardBuilt;
@@ -87,6 +88,24 @@ namespace Mimas.Client.Presentation
 
         /// <summary>Hex circumradius in world units.</summary>
         public float TileSize => _tileSize;
+
+        /// <summary>Centre-to-centre distance between two adjacent tiles: the world length of one hex of range.</summary>
+        public float Spacing => HexLayout.TileWidth(_tileSize);
+
+        /// <summary>
+        /// The material every tile renders with. Per-tile colour goes through each tile's property block;
+        /// the range circles (<see cref="RangeCircles"/>) are uniforms on this shared material.
+        /// </summary>
+        public Material TileMaterial => _tileMaterial;
+
+        /// <summary>Height units one map level is worth (<c>rules.heights.unitsPerLevel</c>). 1 until the board is built.</summary>
+        public int UnitsPerLevel => _unitsPerLevel;
+
+        /// <summary>
+        /// World units per height unit — the one conversion between Core's integer body units and the board.
+        /// A tile level is <see cref="UnitsPerLevel"/> of these, so prisms and bodies cannot drift apart.
+        /// </summary>
+        public float WorldPerHeightUnit => _heightUnit / Mathf.Max(1, _unitsPerLevel);
 
         /// <summary>True once <see cref="Build"/> has succeeded.</summary>
         public bool IsBuilt { get; private set; }
@@ -159,6 +178,9 @@ namespace Mimas.Client.Presentation
             MapData = mapData;
             Map = map;
 
+            if (catalog.Rules != null && catalog.Rules.Heights != null) _unitsPerLevel = catalog.Rules.Heights.UnitsPerLevel;
+            else Debug.LogWarning("[BoardView] rules.json has no heights block; treating one map level as one height unit.", this);
+
             CreateTileViews();
 
             IsBuilt = true;
@@ -183,6 +205,20 @@ namespace Mimas.Client.Presentation
         {
             Vector3 local = HexLayout.HexToWorld(hex, _tileSize, SurfaceHeight(hex));
             return transform.TransformPoint(local);
+        }
+
+        /// <summary>
+        /// Where a shot leaves from or lands on this hex: the tile top lifted by <paramref name="aimHeight"/>
+        /// height units. Bodies have their own <c>AimPoint</c>; this is the answer for an empty tile.
+        /// </summary>
+        public Vector3 HexToAimPoint(Hex hex, int aimHeight) => HexToSurface(hex) + Vector3.up * (aimHeight * WorldPerHeightUnit);
+
+        /// <summary>Top of a tile's terrain column in Core's height units — the <c>h0</c>/<c>h1</c> a trajectory is drawn between.</summary>
+        public int TileTopUnits(Hex hex)
+        {
+            Tile tile;
+            if (Map != null && Map.TryGet(hex, out tile)) return tile.Height * _unitsPerLevel;
+            return 0;
         }
 
         /// <summary>Local-space prism height of a tile: its terrain's base prism plus its rules height, or the fallback.</summary>

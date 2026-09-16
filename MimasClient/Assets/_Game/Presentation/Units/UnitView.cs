@@ -28,12 +28,43 @@ namespace Mimas.Client.Presentation
         [SerializeField] private float _bodyHeight = 0.9f;
         [SerializeField] private float _bodyRadius = 0.32f;
 
+        [Header("Aiming")]
+        [Tooltip("Where shots leave from and land on this unit. Left empty, a child named AimPoint is found or created.")]
+        [SerializeField] private Transform _aimPoint;
+
         private readonly List<Renderer> _visualRenderers = new List<Renderer>();
         private UnitMover _mover;
+        private UnitFacing _facing;
         private MaterialPropertyBlock _block;
+        private Transform _placeholderBody;
+        private Transform _placeholderNose;
 
         /// <summary>The hex this unit currently occupies for presentation purposes.</summary>
         public Hex CurrentHex { get; private set; }
+
+        /// <summary>
+        /// The point attacks aim at — Core's <c>aimHeight</c> above this unit's feet, so the drawn line and the
+        /// rule's ray share an endpoint. Placed by <see cref="Configure"/>; before that it sits at the feet.
+        /// </summary>
+        public Transform AimPoint
+        {
+            get
+            {
+                if (_aimPoint == null) EnsureAimPoint();
+                return _aimPoint;
+            }
+        }
+
+        /// <summary>The yaw driver for this unit. Resolved lazily, added on demand.</summary>
+        public UnitFacing Facing
+        {
+            get
+            {
+                if (_facing == null) _facing = GetComponent<UnitFacing>();
+                if (_facing == null) _facing = gameObject.AddComponent<UnitFacing>();
+                return _facing;
+            }
+        }
 
         /// <summary>The mover that animates this unit. Resolved lazily so it is safe to touch before Awake.</summary>
         public UnitMover Mover
@@ -54,8 +85,42 @@ namespace Mimas.Client.Presentation
 
             if (_buildPlaceholderIfEmpty && transform.childCount == 0) BuildPlaceholderVisual();
 
+            EnsureAimPoint();
             CollectRenderers();
             ApplyTint();
+        }
+
+        /// <summary>
+        /// Sizes the unit from the rules: the placeholder body becomes <paramref name="bodyHeight"/> height units
+        /// tall and the aim point sits at <paramref name="aimHeight"/>, both converted with
+        /// <see cref="BoardView.WorldPerHeightUnit"/>. Call it once the <see cref="Mimas.Core.Match.PlayerView"/>
+        /// is known; an authored model keeps its own proportions and only gets the aim point moved.
+        /// </summary>
+        public void Configure(int aimHeight, int bodyHeight, float worldPerUnit)
+        {
+            if (worldPerUnit <= 0f) return;
+
+            EnsureAimPoint();
+            _aimPoint.localPosition = new Vector3(0f, aimHeight * worldPerUnit, 0f);
+
+            // Only the code-built capsule may be rescaled; a real model is authored at its own size.
+            if (_placeholderBody == null) return;
+
+            _bodyHeight = bodyHeight * worldPerUnit;
+            _placeholderBody.localScale = new Vector3(_bodyRadius * 2f, _bodyHeight * 0.5f, _bodyRadius * 2f);
+            _placeholderBody.localPosition = new Vector3(0f, _bodyHeight * 0.5f, 0f);
+            if (_placeholderNose != null)
+                _placeholderNose.localPosition = new Vector3(0f, _bodyHeight * 0.75f, _bodyRadius * 1.15f);
+        }
+
+        private void EnsureAimPoint()
+        {
+            if (_aimPoint != null) return;
+            _aimPoint = transform.Find("AimPoint");
+            if (_aimPoint != null) return;
+            _aimPoint = new GameObject("AimPoint").transform;
+            _aimPoint.SetParent(transform, false);
+            _aimPoint.localPosition = new Vector3(0f, _bodyHeight * 0.65f, 0f);
         }
 
         /// <summary>Teleports the unit onto the top face of a tile and records the coordinate.</summary>
@@ -85,17 +150,20 @@ namespace Mimas.Client.Presentation
             root.layer = gameObject.layer;
             root.transform.SetParent(transform, false);
 
-            // The capsule primitive is 2 units tall and 1 unit across at scale 1.
-            GameObject body = CreateUncollidablePrimitive(PrimitiveType.Capsule, "Body", root.transform);
+            // The capsule primitive is 2 units tall and 1 unit across at scale 1. Its collider stays: the body is
+            // what the cursor picks (design: #presentation, hovering any part of a body selects it).
+            GameObject body = CreatePrimitive(PrimitiveType.Capsule, "Body", root.transform, true);
             body.transform.localScale = new Vector3(_bodyRadius * 2f, _bodyHeight * 0.5f, _bodyRadius * 2f);
             body.transform.localPosition = new Vector3(0f, _bodyHeight * 0.5f, 0f);
+            _placeholderBody = body.transform;
 
-            GameObject nose = CreateUncollidablePrimitive(PrimitiveType.Cube, "Facing", root.transform);
+            GameObject nose = CreatePrimitive(PrimitiveType.Cube, "Facing", root.transform, false);
             nose.transform.localScale = new Vector3(_bodyRadius * 0.45f, _bodyRadius * 0.45f, _bodyRadius * 1.2f);
             nose.transform.localPosition = new Vector3(0f, _bodyHeight * 0.75f, _bodyRadius * 1.15f);
+            _placeholderNose = nose.transform;
         }
 
-        private GameObject CreateUncollidablePrimitive(PrimitiveType type, string name, Transform parent)
+        private GameObject CreatePrimitive(PrimitiveType type, string name, Transform parent, bool keepCollider)
         {
             GameObject go = GameObject.CreatePrimitive(type);
             go.name = name;
@@ -103,7 +171,7 @@ namespace Mimas.Client.Presentation
             go.transform.SetParent(parent, false);
 
             Collider collider = go.GetComponent<Collider>();
-            if (collider != null) Destroy(collider);
+            if (collider != null && !keepCollider) Destroy(collider);
 
             if (_visualMaterial != null)
             {

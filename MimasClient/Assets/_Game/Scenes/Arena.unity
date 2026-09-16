@@ -296,6 +296,7 @@ MonoBehaviour:
   _buildPlaceholderIfEmpty: 1
   _bodyHeight: 0.9
   _bodyRadius: 0.32
+  _aimPoint: {fileID: 0}
 --- !u!114 &396881484
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -436,6 +437,7 @@ MonoBehaviour:
   _buildPlaceholderIfEmpty: 1
   _bodyHeight: 0.9
   _bodyRadius: 0.32
+  _aimPoint: {fileID: 0}
 --- !u!114 &971986042
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -522,8 +524,12 @@ MonoBehaviour:
   _tileMask:
     serializedVersion: 2
     m_Bits: 4294967295
+  _bodyMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
   _rayDistance: 500
   _camera: {fileID: 0}
+  _board: {fileID: 1420187337}
 --- !u!1 &978698671
 GameObject:
   m_ObjectHideFlags: 0
@@ -790,8 +796,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1412345781}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.7071068, y: 0, z: 0, w: 0.7071068}
-  m_LocalPosition: {x: 0, y: 21, z: 0}
+  m_LocalRotation: {x: 0.4226183, y: 0, z: 0, w: 0.9063078}
+  m_LocalPosition: {x: 0, y: 16.1, z: -13.5}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -948,6 +954,8 @@ MonoBehaviour:
     LeapApex: 1.2
     BlinkSeconds: 0.3
   _overlayHeight: 1.35
+  _wallColor: {r: 0.29, g: 0.29, b: 0.314, a: 1}
+  _pillarColor: {r: 0.784, g: 0.706, b: 0.541, a: 1}
 --- !u!1 &1832508621
 GameObject:
   m_ObjectHideFlags: 0

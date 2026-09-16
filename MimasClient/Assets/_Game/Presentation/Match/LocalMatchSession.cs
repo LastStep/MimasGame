@@ -52,6 +52,13 @@ namespace Mimas.Client.Presentation
         [Tooltip("Height above a unit's feet where its hp bar hangs.")]
         [SerializeField] private float _overlayHeight = 1.35f;
 
+        [Header("Props")]
+        [Tooltip("Placeholder colour for props whose id is 'wall'.")]
+        [SerializeField] private Color _wallColor = new Color(0.290f, 0.290f, 0.314f, 1f);
+
+        [Tooltip("Placeholder colour for props whose id is 'pillar'.")]
+        [SerializeField] private Color _pillarColor = new Color(0.784f, 0.706f, 0.541f, 1f);
+
         private const int LocalPlayer = 0;
         private const int BotPlayer = 1;
         private const int None = -1;
@@ -65,8 +72,10 @@ namespace Mimas.Client.Presentation
 
         // Views.
         private readonly Dictionary<int, UnitView> _unitViews = new Dictionary<int, UnitView>();
+        private readonly Dictionary<int, PropView> _propViews = new Dictionary<int, PropView>();
         private readonly List<HudUnit> _hudUnits = new List<HudUnit>();
         private readonly Dictionary<int, HudUnit> _hudUnitsById = new Dictionary<int, HudUnit>();
+        private Transform _propRoot;
 
         // Event playback.
         private readonly Queue<MatchEvent> _pending = new Queue<MatchEvent>();
@@ -279,6 +288,7 @@ namespace Mimas.Client.Presentation
             _bot = new RandomBot(_settings.Seed ^ 0x9E3779B9u);
 
             _unitViews.Clear();
+            _propViews.Clear();
             _hudUnits.Clear();
             _hudUnitsById.Clear();
             for (int i = 0; i < _state.Units.All.Count; i++)
@@ -311,6 +321,7 @@ namespace Mimas.Client.Presentation
 
             _ready = true;
             RefreshView();
+            BuildBodies();
             CollectAbilities();
             RefreshMarkers();
 
@@ -319,6 +330,52 @@ namespace Mimas.Client.Presentation
 
             Enqueue(_state.Start());
             RaiseStateChanged();
+        }
+
+        /// <summary>
+        /// Sizes every body on the board from the projection: heroes get their aim point and placeholder height
+        /// from <c>UnitView.AimHeight</c> / <c>BodyHeight</c>, and every prop the map placed gets a view. One
+        /// conversion (<see cref="BoardView.WorldPerHeightUnit"/>) turns Core's integer units into world units,
+        /// so nothing here repeats a number that lives in <c>rules.json</c>.
+        /// </summary>
+        private void BuildBodies()
+        {
+            if (_view == null) return;
+            float worldPerUnit = _board.WorldPerHeightUnit;
+
+            for (int i = 0; i < _view.Units.Count; i++)
+            {
+                Mimas.Core.Match.UnitView unit = _view.Units[i];
+                UnitView view;
+                if (_unitViews.TryGetValue(unit.Id, out view)) view.Configure(unit.AimHeight, unit.BodyHeight, worldPerUnit);
+            }
+
+            if (_propRoot == null)
+            {
+                _propRoot = new GameObject("Props").transform;
+                _propRoot.SetParent(_board.transform, false);
+            }
+
+            for (int i = 0; i < _view.Props.Count; i++)
+            {
+                Mimas.Core.Match.PropView prop = _view.Props[i];
+                if (_propViews.ContainsKey(prop.Id)) continue;
+
+                var go = new GameObject("Prop_" + prop.DefId + "_" + prop.Id);
+                go.layer = _board.gameObject.layer;
+                go.transform.SetParent(_propRoot, false);
+                PropView view = go.AddComponent<PropView>();
+                view.Configure(prop, _board, worldPerUnit, PropColor(prop.DefId));
+                _propViews[prop.Id] = view;
+            }
+        }
+
+        /// <summary>Placeholder colours until props have models: a wall is stone-dark, a pillar sandstone.</summary>
+        private Color PropColor(string defId)
+        {
+            if (string.Equals(defId, "wall", StringComparison.Ordinal)) return _wallColor;
+            if (string.Equals(defId, "pillar", StringComparison.Ordinal)) return _pillarColor;
+            return _wallColor;
         }
 
         private void CollectAbilities()
@@ -404,6 +461,19 @@ namespace Mimas.Client.Presentation
                 case AttackResolvedEvent attack:
                     PlayAttack(attack);
                     break;
+
+                case PropDestroyedEvent destroyed:
+                {
+                    PropView prop;
+                    if (_propViews.TryGetValue(destroyed.PropId, out prop))
+                    {
+                        _propViews.Remove(destroyed.PropId);
+                        if (prop != null) prop.PlayDestroyed(null);
+                    }
+                    RefreshView();
+                    RaiseStateChanged();
+                    break;
+                }
 
                 case UnitDiedEvent died:
                 {
