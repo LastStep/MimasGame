@@ -2,7 +2,7 @@
   "version": 1,
   "id": "stone-skin",
   "name": "Stone Skin",
-  "description": "Takes 2 less damage from weapon attacks. Hidden until it first changes a hit.",
+  "description": "Takes 2 less damage from weapon attacks.",
   "trigger": "takeDamage",
   "when": { "damageTypes": ["weapon"] },
   "effect": { "damage": -2 },

@@ -2,7 +2,7 @@
   "version": 1,
   "id": "ward-of-feathers",
   "name": "Ward of Feathers",
-  "description": "Takes 4 less damage from spell attacks. Hidden until it first changes a hit.",
+  "description": "Takes 4 less damage from spell attacks.",
   "trigger": "takeDamage",
   "when": { "damageTypes": ["spell"] },
   "effect": { "damage": -4 },
