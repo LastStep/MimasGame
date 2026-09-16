@@ -31,6 +31,13 @@ server loads the same content, and, in the second 15 Sep session (ADR-016..019):
 Not done / deferred: tile-effect `OnEnter` hooks (no tile effects exist yet; the `effect` field now names a
 combat modifier), an attack animation (flyover + hp change only), boons (M3), the network session (M2).
 
+Playtest 16 Sep 2026 (Rohan, warrior vs bot mage): clean console, won by elimination. Not yet exercised and
+worth a pass first thing: the bot attacking (its flyover, an "EXTRA" reveal, its ability appearing in
+examine) since the random bot rarely picks attacks; Fire Bolt and line of sight from the player's side
+(set `PlayerClassId` to `mage`); the DEFEAT banner; the height-advantage preview line from the ramp; a
+Web build of the new HUD. Tuning thoughts: the 7 s idle penalty bites on a first turn; a refused far
+click while Move is armed is silent on screen.
+
 Next: M2 (WebSocket rooms, guest auth, matchmaking, server-side clocks that submit
 `EndTurnCommand(Timeout)`, reconnect via `PlayerView` resync). Before that, a short balance pass on the
 shipped numbers (warrior 20 hp / mage 16 hp, jab 1 AP 2 dmg, strike 2 AP 5 dmg, fire bolt 2 AP 6 dmg) by
