@@ -19,7 +19,7 @@ Mimas is a browser-based, 1v1 online, turn-based tactics game (hex tiles, 3D cha
 2. **Never hand-edit `.unity` / `.prefab`.** Drive the live Editor instead: `unity status` → `unity command <name>` (or the Unity MCP tools). If no Editor is reachable, say so and ask.
 3. `shared/Mimas.Core` must stay Unity-free: no `UnityEngine`, no `Debug.Log`, no `System.Threading` timers, no `dynamic`, no reflection-emit (IL2CPP). C# 9 max (Unity 6 limit): no `record`, no `required`, no file-scoped namespaces.
 4. **Determinism:** all randomness in Core goes through `Mimas.Core.Rng` seeded per match. No `DateTime.Now`, no `Guid.NewGuid()`, no `Dictionary` iteration order dependence, no floats in rules (use `int`; fixed-point if needed). Same inputs + seed ⇒ same result on server and client.
-5. **Game data is JSON** under `MimasClient/Assets/_Game/Data/` (items, abilities, boons, maps, modifiers, rules). Core loads it; never hard-code balance numbers in C#. Schema changes ⇒ update `docs/data.md` **and** the matching JSON Schema in `tools/schemas/`.
+5. **Game data is JSON** under `MimasClient/Assets/_Game/Data/` (items, abilities, boons, maps, modifiers, props, rules). Core loads it; never hard-code balance numbers in C#. Schema changes ⇒ update `docs/data.md` **and** the matching JSON Schema in `tools/schemas/`.
 6. **Hidden information lives on the server.** Client only ever receives a `PlayerView` projection. Never send full `MatchState` to a client.
 7. Do not modify `MimasClient/ProjectSettings/**`, `Packages/manifest.json`, or `packages-lock.json` without saying so explicitly first.
 8. Renamed serialized fields get `[FormerlySerializedAs("_old")]`. Compare `UnityEngine.Object` with `== null` (never `is null` / `?.`).

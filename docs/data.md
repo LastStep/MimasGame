@@ -8,12 +8,13 @@ Numbers are integers (no floats in rules).
 | File | Contents | Status |
 |---|---|---|
 | `terrains.json` | Terrain catalogue: `id`, `walkable`, `moveCost`, `modifiers[]` | loaded |
-| `rules.json` | Match-wide rules: `damageTypes[]` (the two lanes), `globalModifiers[]` (height advantage lives here as data), `baseStats` (every hero's numbers before gear), `innateAbilities[]` (the walk) | loaded |
+| `rules.json` | Match-wide rules: `damageTypes[]` (the two lanes), `globalModifiers[]` (height advantage lives here as data), `heights` (levels → body units), `baseStats` (every hero's numbers before gear), `innateAbilities[]` (the walk) | loaded |
 | `timecontrols.json` | `{ "version": 1, "timeControls": [ { "id": "3+2", "name", "baseMs", "incrementMs", "turnCapMs" } ] }` | loaded |
 | `abilities/*.json` | One ability per file; `type` picks the schema (`movement`, `attack`). Every ability has an AP `cost` (default 1) | loaded |
 | `items/*.json` | One item per file: `id`, `slot`, `kind`, `stats`, `abilities`, `tags` | loaded |
-| `maps/*.json` | Map: name, hexes[] (`q,r,terrain,height,effect?`), spawns (`p1`,`p2`), symmetry type, ladder position | loaded |
+| `maps/*.json` | Map: name, hexes[] (`q,r,terrain,height,effect?,prop?`), spawns (`p1`,`p2`), symmetry type, ladder position | loaded |
 | `modifiers/*.json` | Flat damage modifiers: `trigger`, `when` conditions, `effect.damage`, `visibility`. Attached by terrains, map hexes (`effect`), `rules.globalModifiers` and (later) boons | loaded |
+| `props/*.json` | Non-unit bodies a map hex can carry: `bodyHeight`, `aimHeight`, optional `stats` (a prop with `hp` can be destroyed) | loaded |
 | `boons/*.json` | Boon offers: tier, effects, exclusivity tags | not yet (same) |
 
 ## The content catalogue
@@ -23,16 +24,17 @@ or throws one `ContentLoadException` listing **every** problem, each tagged with
 an unrecognised file or folder is an error, never ignored.
 
 1. **Parse.** Each file is parsed on its own by path: `terrains.json`, `rules.json`, `timecontrols.json`,
-   `abilities/`, `items/`, `maps/`, `modifiers/`. Duplicate ids across files are reported with both file names.
+   `abilities/`, `items/`, `maps/`, `modifiers/`, `props/`. Duplicate ids across files are reported with both file names.
 2. **Link.** Item ability ids must exist and must not repeat an innate one; an item in the `weapon` slot
    needs at least one attack ability and may grant only `weapon`-category ones, and a `crown` may grant only
    `spell` ones (`#attacks`: the lane and the HUD section must agree); item stat keys must name a lane. `rules.innateAbilities` ids must
    exist and at least one of them must be a movement ability (the walk). A movement's `terrainCosts` keys
    must be real terrains; `rules.baseStats` keys, item stat keys, attack `damageType`s and modifier
    `damageTypes` conditions must name a type in `rules.damageTypes`; terrain `modifiers`, map hex `effect`s
-   and `rules.globalModifiers` must be real modifiers; every map must pass `BuildTileMap` (symmetry, spawns,
+   and `rules.globalModifiers` must be real modifiers; a map hex's `prop` must name a real prop and sit on
+   walkable terrain (`MapData.ValidateProps`); every map must pass `BuildTileMap` (symmetry, spawns,
    connectivity). So a map that would fail at match start fails at boot instead.
-3. **Tables.** `Abilities`, `Items`, `Maps`, `TimeControls`, `Modifiers` are `DefinitionTable<T>`: sorted by ordinal id,
+3. **Tables.** `Abilities`, `Items`, `Maps`, `TimeControls`, `Modifiers`, `Props` are `DefinitionTable<T>`: sorted by ordinal id,
    `Get` / `TryGet` / `IndexOf` / `ByIndex`. Indices are stable small integers for wire encoding.
    `Terrains` is the existing `TerrainSet`; `Movements` is the movement subset; `GetMovement(id)`.
 4. **Hash.** `Hash` is SHA-256 over path + canonical JSON (sorted keys, no whitespace) of every file, in path
@@ -92,6 +94,7 @@ standing on the terrain carries for combat (see *Modifiers*); the catalogue reje
   "version": 1,
   "damageTypes": ["weapon", "spell"],
   "globalModifiers": ["high-ground"],
+  "heights": { "unitsPerLevel": 3, "body": 6, "aim": 4 },
   "baseStats": { "hp": 20, "ap": 3, "power.weapon": 1, "power.spell": 1, "defense.weapon": 0, "defense.spell": 0 },
   "innateAbilities": ["move"]
 }
@@ -101,6 +104,22 @@ standing on the terrain carries for combat (see *Modifiers*); the catalogue reje
 `damageType` and every modifier `damageTypes` condition must name one, so adding a lane is one line here.
 `globalModifiers` apply to every attack (height advantage is the shipped example); they are ordinary
 modifier ids. `baseStats` and `innateAbilities` are both required and are described below.
+
+## Heights (`rules.json`, `heights`)
+
+```json
+{ "unitsPerLevel": 3, "body": 6, "aim": 4 }
+```
+
+Required. A map's `height` is an integer **level**; sight and trajectories are measured in **body units**,
+and this block is the conversion. One level is `unitsPerLevel` units tall (3), a hero's body is `body`
+units above the tile top (6), and every attack leaves from and lands at `aim` units above the tile top (4).
+Constraints: `unitsPerLevel` ≥ 1, `body` ≥ 1, `1 ≤ aim ≤ body`. The numbers are balance placeholders.
+
+What they buy: a flat shot between two heroes standing on the ground runs at 4, so a level-1 step (top 3)
+does not block it but a level-2 plateau (top 6) does, and so does any body — hero, wall or pillar — because
+a body's top is the tile top plus 6. `HeightsDef.TileTop(tile)` is the one conversion; nothing else
+multiplies a level.
 
 ## Base stats (`rules.json`, `baseStats`)
 
@@ -166,7 +185,8 @@ end of turn.
 {
   "version": 1, "id": "fire-bolt", "name": "Fire Bolt", "type": "attack", "category": "spell",
   "icon": "fire-bolt", "cost": 2,
-  "attack": { "damage": 6, "damageType": "spell", "range": 3, "minRange": 1 }
+  "attack": { "damage": 6, "damageType": "spell", "range": 3, "minRange": 1,
+              "trajectory": "direct", "lineOfSight": true }
 }
 ```
 
@@ -175,13 +195,28 @@ end of turn.
 | `category` | yes | `weapon` or `spell` (never `movement`). Picks the action-bar section, and **must equal `attack.damageType`** — the catalogue enforces it through the granting item's slot, a repo-data test checks it across the shipped catalogue, and the schema flags it as you type. |
 | `attack.damage` | yes, 0 or more | Flat base damage. |
 | `attack.damageType` | yes | The lane: `weapon` or `spell` (one of `rules.damageTypes`). Selects `power.<type>` and `defense.<type>` and is matched by modifiers. |
-| `attack.range` | yes, 1 or more | Maximum hex distance to the target. |
-| `attack.minRange` | no, default 1 | Minimum hex distance (`1..range`). |
+| `attack.range` | yes, 1 or more | Maximum **Euclidean centre distance in tile spacings** (see below). |
+| `attack.minRange` | no, default 1 | Minimum Euclidean centre distance in tile spacings (`1..range`). |
+| `attack.trajectory` | yes | How the attack travels: `direct`, `arc` or `sky`. See *Line of sight and trajectories*. |
+| `attack.apex` | required iff `arc`, forbidden otherwise | How far above the higher endpoint the arc peaks, 0 or more. |
+| `attack.lineOfSight` | yes | Must the attacker see the target? Independent of `trajectory`; both must pass. |
 | `tags` | no | Free strings (weapon kinds, later elements) for modifiers to match. Unique. |
 
-Targeting (Core, `Mimas.Core.Combat.AttackTargeting`): the target hex must hold a living enemy unit inside
-the range band, and the line of sight (`LineOfSight.IsClear`, the teleport rule) must be clear, always,
-even at range 1. `Enumerate` and `Check` agree by construction.
+**Range is a circle.** A target is in the band when `minRange² ≤ q² + qr + r² ≤ range²` for the offset
+`target − attacker` (`Hex.EuclideanSquared`, `AttackDef.InRangeSquared`). That integer is exactly the
+squared distance between the two hex centres in units of the centre-to-centre spacing, so a client can draw
+a true circle and be right. Up to 6 it equals hex distance; from 7 up the diagonals reach further — the
+gun's range 7 covers `(4,4)`-shaped offsets at hex distance 8 (48 ≤ 49) but not 8 straight along an axis
+(64 > 49). Movement is unchanged: it still counts hexes.
+
+Targeting (Core, `Mimas.Core.Combat.AttackTargeting.Check`) returns a `TargetCheck` and refuses in this
+order: nothing alive on the hex (`NoBody` — ground targeting is not legal), the body has no hit points
+(`NotDamageable`, a wall), it is the attacker's own hero (`OwnUnit`), `TargetDead`, `OutOfRange`, then
+`NoLineOfSight` when `lineOfSight` is set and the ray is blocked, then `TrajectoryBlocked`. The last two
+carry `BlockedAt`, the hex that stopped the shot. Anything with health can be hit and nothing else, so an
+enemy hero and a destructible prop are targets and a wall is not. `Enumerate` and `Check` agree by
+construction; `MatchState.CheckTarget` is the non-throwing wrapper a HUD polls, and `MatchState.RangeBand`
+lists the tiles inside the circle.
 
 Damage (`Mimas.Core.Combat.DamageCalculator`):
 
@@ -235,10 +270,93 @@ only ever see `MatchState.ViewFor(player)` (`PlayerView`) and events passed thro
 ## Tile height (`maps/*.json`, `height`)
 
 Each hex may carry an integer `height` (default 0, negatives allowed). Height is a rules value, not a
-visual one: walking may rise at most `maxClimb` per step, a jump is blocked by anything more than
-`jumpHeight` above the tile the unit *stands on*, and line of sight is blocked by tiles taller than both
-endpoints. Descending is never limited. Keep heights rotationally symmetric like terrain (the loader does
-not enforce this yet; `Arena4_HeightsAreRotationallySymmetric` in the tests does for arena-4).
+visual one, and it is a **level**: movement reads levels directly (walking may rise at most `maxClimb` per
+step; a jump is blocked by anything more than `jumpHeight` above the tile the unit *stands on*), while
+sight and trajectories convert through `rules.heights` (see below). Descending is never limited. Keep
+heights rotationally symmetric like terrain (the loader does not enforce this yet;
+`Arena4_HeightsAreRotationallySymmetric` in the tests does for arena-4).
+
+## Line of sight and trajectories
+
+An attack declares two independent things, and both must pass: whether the attacker must **see** the
+target (`lineOfSight`) and how the attack **travels** (`trajectory`). They are separate because a lobbed
+arrow should be able to drop behind cover you cannot see past, while a straight shot needs both.
+
+**The ray.** Sight is a straight line from the attacker's aim point to the target's aim point, in absolute
+units: `heights.TileTop(tile) + body.AimHeight` at each end. Every column strictly between them is tested,
+and a column blocks when its top *reaches* the line — a graze blocks. The test is integer, cross-multiplied
+and never divides: for a sample at parameter `a / b`,
+
+```
+column blocks  ⟺  top · b  ≥  h0 · (b − a) + h1 · a
+```
+
+A column's top is the tile top raised by any **living body** standing there (a hero, a wall or a pillar:
+`tileTop + BodyHeight`). The attacker's and the target's own bodies never count. **Endpoint tiles never
+block**, holes in the map (no tile) never block, and **unwalkable terrain is solid**: it stops everything
+but `sky` whatever its height. Sight is symmetric between two heroes — if you can see me, I can see you —
+because both sides use the same aim height and the sample set mirrors.
+
+**Which columns.** `HexLine.Trace` gives the integer-exact line; where a sample sits on an edge both
+flanking hexes are tested, so a shot is never legal in one direction and illegal in the other. A tile is a
+prism, so each tile is tested at **both** of its ends: for the `k`-th tile of an `n`-tile flight, at
+`a = 2k − 1` and `a = 2k + 1` over `b = 2n`. The lowest point of a monotone flight over a tile is at one of
+its edges, so two samples are exact, not an approximation.
+
+**The three trajectories** (`Mimas.Core.Combat`, one resolver each, registered in `TrajectoryRegistry`):
+
+| Mode | Rule |
+|---|---|
+| `direct` | The same ray as sight, by construction. What a gun or a bolt does. |
+| `arc` | An integer parabola through the same endpoints, peaking `max(h0,h1) + apex` at mid-flight. What a bow does. |
+| `sky` | Never blocked. Exists in code and test fixtures; no shipped ability uses it. |
+
+The arc's height at `t`, with `d = h1 − h0`, is `h0 + d·t + (4·apex + 2·|d|)·t·(1 − t)`; scaled by `b²` it
+is all integers, and a column blocks when `top · b² ≥` that value. A bow arrow (`apex` 3) therefore peaks
+three units above the higher of the two aim points: it clears a 6-unit wall two tiles away but not the wall
+right next to it, which is the whole point of the field. An unknown trajectory throws — content that gets
+this far has already been parsed.
+
+Movement's `requiresLineOfSight` (the teleport) uses the same ray, from the mover's aim point to the aim
+height of the destination tile, ignoring the mover's own body (`Movement.LineOfSight.IsClear`). A context
+built without `heights` refuses such a movement loudly rather than skipping the check.
+
+## Props (`props/*.json`)
+
+```json
+{
+  "version": 1, "id": "pillar", "name": "Stone Pillar", "icon": "pillar",
+  "description": "A cracked pillar the height of a hero. It blocks shots and can be brought down.",
+  "bodyHeight": 6, "aimHeight": 3,
+  "stats": { "hp": 10, "defense.weapon": 0, "defense.spell": 0 }
+}
+```
+
+A prop is a **body** that is not a hero: it stands on a hex, occupies it, and blocks movement, sight and
+trajectories with its height, exactly as a hero does (`IBody`, ADR-024).
+
+| Field | Required | Meaning |
+|---|---|---|
+| `bodyHeight` | yes, 1 or more | Height in units above the tile top: what it blocks with. |
+| `aimHeight` | yes, `1..bodyHeight` | Where attacks land on it. Required even for a wall, so a client can place a marker. |
+| `stats` | no | `hp` (1 or more) and `defense.<lane>` only. `ap` and `power.*` are errors. Lanes are link-checked against `rules.damageTypes`. |
+| `name` / `description` / `icon` | no | Presentation. `name` defaults to the id. |
+
+Rules (design: `#props`):
+
+- A prop **with** `stats.hp` is destructible and a legal target; **without**, it is a permanent wall that
+  cannot be hit at all (`NotDamageable`).
+- Props are **neutral** (`Owner == -1`) and entirely **public**: both `PlayerView`s list them.
+- A destroyed prop is **removed**: nothing reports it any more and its tile is enterable again. Killing one
+  never ends the round.
+- Body ids continue after the units: with two heroes (0 and 1) the map's props are 2, 3, … in the map's
+  authored hex order. `BodySet.All` is units in unit-set order, then props in that order.
+- `PropDestroyedEvent(propId)` is public; `AttackResolvedEvent.TargetIsProp` says which kind of body the
+  `TargetId` names.
+
+**Placement** is a map field: a hex may carry `"prop": "<id>"`. The id must exist, the hex's terrain must be
+walkable, the hex's 180° twin must carry the same prop, and a spawn may carry none. The shipped catalogue
+has `pillar` (10 hp, no armour — about one full turn of damage) and `wall` (indestructible).
 
 ## Movement abilities (`abilities/*.json`, `"type": "movement"`)
 
@@ -303,15 +421,19 @@ never a raw `JsonException`, never a silent default.
 
 - `TerrainSet.FromJson(json)` → `Get(id)` (throws on unknown), `TryGet(id, out def)`, `IsWalkable(id)`, `All`.
 - `MapData.FromJson(json)` parses the schema only: `version` must be `1`, `id` / `name` / `symmetry` /
-  `ladderPosition` / `spawns.p1` / `spawns.p2` / `hexes` are required, `height` and `effect` are optional,
-  and duplicate `q,r` pairs are rejected.
+  `ladderPosition` / `spawns.p1` / `spawns.p2` / `hexes` are required, `height`, `effect` and `prop` are
+  optional, and duplicate `q,r` pairs are rejected.
+- `PropDef.FromJson(json)` parses one prop file (see *Props*).
 - `MapData.BuildTileMap(terrains)` resolves terrain to `Tile.Walkable` (unknown terrain id ⇒ throw) and then
   enforces the design invariants:
   1. **Symmetry.** Only `"rotational-180"` is implemented (`"mirror-q"` throws "unsupported symmetry").
-     Every hex needs a 180° twin *with the same terrain*, not just the same shape.
-  2. **Spawns.** Both are on the map, both are walkable, and no pair of walkable tiles is further apart
-     than the spawn pair.
+     Every hex needs a 180° twin *with the same terrain and the same prop*, not just the same shape.
+  2. **Spawns.** Both are on the map, both are walkable, neither carries a prop, and no pair of walkable
+     tiles is further apart than the spawn pair.
   3. **Connectivity.** Every walkable tile is reachable from `p1` over walkable tiles.
+
+  `MapData.ValidateProps(props, terrains)` is separate, because it needs the prop catalogue: it runs in the
+  catalogue's link phase and rejects an unknown prop id or a prop on unwalkable terrain.
 
 Validation runs on `BuildTileMap`, not on `FromJson`, so an authoring tool can parse a half-finished map.
 
@@ -339,7 +461,9 @@ on blocking terrain.
 (Generate full rings with `Hex.Ring(center, radius)` in an editor tool rather than typing hexes by hand.)
 
 Every shipped map must pass every check, because the catalogue validates all of them at boot (the old
-all-stone `ring-3.json` sample was removed for that reason). `board-3.json` and `arena-4.json` are playable. `arena-4.json` also
-exercises height: the six inner pillars are height 2 (a `jumpHeight: 1` jump cannot clear them), the six
-outer pillars height 1 (jumpable), and the centre row `(-1,0)…(1,0)` is a height-2 plateau with height-1
-ramps at `(±2,0)`.
+all-stone `ring-3.json` sample was removed for that reason). `board-3.json` and `arena-4.json` are playable.
+`board-3.json` is a flat radius-3 field with one stone hex at the centre, which is still solid and still
+blocks sight. `arena-4.json` has no stone at all: it is 61 grass tiles with a level-2 plateau across
+`(-1,0)…(1,0)`, level-1 steps at `(±2,0)`, `(-1,4)` and `(1,-4)`, four `wall` props at `(0,±2)`, `(1,1)`,
+`(-1,-1)` and four `pillar` props at `(±2,∓1)`, `(2,2)`, `(-2,-2)` — cover is bodies now, not terrain. The
+plateau is what stops a spawn-to-spawn shot.

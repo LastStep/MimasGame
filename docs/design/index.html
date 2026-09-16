@@ -270,6 +270,10 @@ figure{margin:12px 0} figure svg{width:100%; height:auto; display:block} figcapt
 <tr><td><a href="#blessing">Blessing</a></td><td>A boon that is a passive on the character (immune to fire, +max health).</td><td>Enchant.</td></tr>
 <tr><td><a href="#enchant">Enchant</a></td><td>A boon that changes a property of one equipped item (+range on bow, fire on crown).</td><td>Sigil.</td></tr>
 <tr><td><a href="#sigil">Sigil</a></td><td>A boon that adds a new active ability to one equipped item (triple shot on gun, blink on boots).</td><td>Enchant.</td></tr>
+<tr><td><a href="#props">Body</a></td><td>Anything standing on a tile with a height: a hero or a prop. It occupies the tile, blocks sight and trajectories, and can be hit if it has health.</td><td>Unit (a hero specifically).</td></tr>
+<tr><td><a href="#line-of-sight">Aim point</a></td><td>The height on a body that attacks leave from and land at: <code>tileTop + aim</code>. Both ends of every sight ray.</td><td>Body height (the full height, which is what blocks).</td></tr>
+<tr><td><a href="#trajectories">Trajectory</a></td><td>How an attack travels: <code>direct</code>, <code>arc</code> or <code>sky</code>. A separate field from whether it needs sight.</td><td>Line of sight.</td></tr>
+<tr><td><a href="#props">Prop</a></td><td>A neutral, public body placed by a map: a wall (indestructible) or a pillar (10 hp). Cover you can sometimes shoot down.</td><td>Terrain (which is the tile itself).</td></tr>
 <tr><td><a href="#abilities">Ability</a></td><td>Any active thing a unit can do for AP: a movement or an attack. Granted by gear or sigils.</td><td>Modifier (passive).</td></tr>
 <tr><td><a href="#modifiers">Modifier</a></td><td>A passive rule that changes a damage result under conditions. Owned by a unit, a terrain, a hex or the rules.</td><td>Ability.</td></tr>
 <tr><td><a href="#damage">Lane</a></td><td>Weapon or spell. Every attack is in exactly one lane; the lane picks the power stat and the armour defence.</td><td>Element.</td></tr>
@@ -428,24 +432,49 @@ figure{margin:12px 0} figure svg{width:100%; height:auto; display:block} figcapt
 <h3>Rules</h3>
 <ol>
   <li><b>Terrain</b> (<code>terrains.json</code>): <code>walkable</code>, <code>moveCost</code>, optional <code>modifiers[]</code> granted to whoever stands on it. Current: grass (walkable, 1), stone (blocking).</li>
-  <li><b>Height</b> is a rules value: walking may rise at most <code>maxClimb</code> per step; a jump is blocked by anything more than <code>jumpHeight</code> above the origin; <a href="#line-of-sight">line of sight</a> is blocked by tiles taller than both endpoints. Descending is never limited.</li>
+  <li><b>Height</b> is a rules value, and it is an integer <b>level</b>. Movement reads levels directly: walking may rise at most <code>maxClimb</code> per step; a jump is blocked by anything more than <code>jumpHeight</code> above the origin. Descending is never limited.</li>
+  <li><b>Body units.</b> <a href="#line-of-sight">Sight</a> and <a href="#trajectories">trajectories</a> are measured in finer <em>body units</em>, and <code>rules.heights</code> is the conversion: one level is <code>unitsPerLevel</code> units (3), a hero's body is <code>body</code> units above the tile top (6), and every attack leaves from and lands at <code>aim</code> (4). So a level-1 step (top 3) does not block a flat shot between two heroes on the ground, a level-2 plateau (top 6) does, and so does any <a href="#props">body</a> standing in the way.</li>
   <li><b>High ground</b>: attacking from a higher tile adds a public flat bonus (global modifier <code>high-ground</code>, currently +2). See <a href="#modifiers">Modifiers</a>.</li>
   <li><b>Occupancy</b>: one living unit per tile; dead units occupy nothing.</li>
   <li>All geometry is integer-exact (<code>HexLine</code>, ADR-013) so server and client agree bit for bit.</li>
 </ol>
-<h3>Depends on</h3><ul><li><a href="#maps">Maps</a>, <a href="#movement">Movement</a>, <a href="#line-of-sight">Line of sight</a></li></ul>
-<p class="src">Source: pillar 4; ADR-003, ADR-013; docs/data.md.</p>
+<h3>Depends on</h3><ul><li><a href="#maps">Maps</a>, <a href="#movement">Movement</a>, <a href="#line-of-sight">Line of sight</a>, <a href="#props">Props</a></li></ul>
+<p class="src">Source: pillar 4; ADR-003, ADR-013, ADR-023; docs/data.md.</p>
 </section>
 
 <section class="concept" id="line-of-sight" data-design="decided" data-impl="implemented" data-title="Line of sight">
 <header><h2>Line of sight</h2></header>
-<p class="lead">Every attack, including melee, requires a clear line of sight to its target. Teleports may require it as a balance lever. Sight follows the exact hex line and is blocked by unwalkable tiles and by tiles taller than both endpoints.</p>
+<p class="lead">Sight is a straight ray from the attacker's <b>aim point</b> to the target's aim point, over <a href="#board">heights in body units</a>. Whether an attack needs it is a per-attack field; how the attack <em>travels</em> is a separate one (<a href="#trajectories">Trajectories</a>). Both must pass.</p>
+<h3>Rules</h3>
 <ol>
-  <li>A grazing line (through a hex edge or corner) is blocked if <em>either</em> flanking tile blocks (supercover). <code>Line(a,b)</code> equals <code>Line(b,a)</code>.</li>
-  <li>Units do not block sight (proposed; only one enemy unit exists, so it is moot at launch).</li>
+  <li><b>Aim point = muzzle.</b> The ray runs from <code>tileTop(attacker) + aim</code> to <code>tileTop(target) + aim</code>. Two heroes therefore see each other symmetrically: if I can see you, you can see me.</li>
+  <li><b>A column blocks when its top reaches the ray.</b> For a sample at parameter <code>a/b</code> the test is the cross-multiplied integer <code>top·b ≥ h0·(b−a) + h1·a</code>. A graze (equality) blocks. No division, no float, same answer on server and client.</li>
+  <li><b>Bodies block.</b> A column's top is the tile top plus the <a href="#props">body</a> of any living thing standing there — a hero, a wall, a pillar. The attacker and the target never block themselves.</li>
+  <li><b>Endpoints never block</b>, holes in the map never block, and <b>unwalkable terrain is solid</b>: it stops everything except <code>sky</code>, whatever its height.</li>
+  <li>A grazing line (through a hex edge or corner) is blocked if <em>either</em> flanking hex blocks (supercover), so a shot is never legal in one direction and illegal in the other. Each tile is tested at both of its ends, because a tile is a prism and a flight is lowest at an edge.</li>
+  <li>Movement's <code>requiresLineOfSight</code> (the teleport) uses this same ray, ignoring the mover's own body.</li>
 </ol>
-<div class="open-q"><h3>Open questions</h3><ul><li id="q-los-units">Should units block sight once summons or obstacles exist?</li></ul></div>
-<p class="src">Source: ADR-013; design v0.1 targeting decision.</p>
+<h3>Depends on</h3><ul><li><a href="#board">Board</a>, <a href="#trajectories">Trajectories</a>, <a href="#props">Props</a>, <a href="#movement">Movement</a></li></ul>
+<p class="src">Source: ADR-013, ADR-023; design v0.1 targeting decision; 16 Sep 2026 question round.</p>
+</section>
+
+<section class="concept" id="props" data-design="decided" data-impl="implemented" data-title="Props: walls and pillars">
+<header><h2>Props: walls and pillars</h2></header>
+<p class="lead">A prop is a <b>body</b> that is not a hero: a pillar, a wall. It stands on a hex, occupies it, and blocks movement, sight and trajectories with its height, exactly as a hero does. Cover is a thing on the board, not a kind of terrain.</p>
+<h3>Rules</h3>
+<ol>
+  <li><b>Anything with health can be hit; nothing else.</b> A prop with hit points is a legal target with its own aim point; a prop without them is a permanent wall that blocks shots and can never be hit.</li>
+  <li>Props are <b>neutral</b> (no owner) and entirely <b>public</b>: both players see every prop, its position and its health. Nothing about a prop is hidden.</li>
+  <li>A destroyed prop is <b>removed</b>: its tile is enterable again and nothing on the board reports it. Killing a prop never ends the <a href="#round">round</a>.</li>
+  <li><b>Data</b> (<code>props/*.json</code>): <code>bodyHeight</code> (what it blocks with), <code>aimHeight</code> (where shots land, required even for a wall so a client can place a marker), optional <code>stats</code> with <code>hp</code> and per-lane defence. Shipped: <b>pillar</b> (body 6, 10 hp, no armour — about one full turn of damage) and <b>wall</b> (body 6, indestructible).</li>
+  <li><b>Placement</b> is a <a href="#maps">map</a> field: a hex may carry <code>"prop": "&lt;id&gt;"</code>. The terrain must be walkable, the hex's 180° twin must carry the same prop, and a spawn may carry none.</li>
+</ol>
+<div class="open-q"><h3>Open questions</h3><ul>
+<li id="q-props-owned">Owned props: shield generators, traps, summons a player places. Needs an owner, a spawn action and a reveal rule. Not at launch.</li>
+<li id="q-props-rubble">Does a destroyed pillar leave rubble (a low tile, a cost, a half-cover body), or simply vanish? Proposed: it vanishes.</li>
+</ul></div>
+<h3>Depends on</h3><ul><li><a href="#board">Board</a>, <a href="#line-of-sight">Line of sight</a>, <a href="#attacks">Attacks</a>, <a href="#maps">Maps</a></li></ul>
+<p class="src">Source: ADR-024; 16 Sep 2026 question round (spec <code>docs/specs/2026-09-16-aiming-rules.md</code>).</p>
 </section>
 
 <section class="concept" id="maps" data-design="decided" data-impl="implemented" data-title="Maps and the ladder">
@@ -454,9 +483,28 @@ figure{margin:12px 0} figure svg{width:100%; height:auto; display:block} figcapt
 <ol>
   <li>Symmetry: <code>rotational-180</code> implemented; <code>mirror-q</code> reserved.</li>
   <li>Spawns are opposite each other at maximum walkable distance (pillar 14).</li>
-  <li><b>Ladder</b>: <code>ladderPosition</code> orders maps; lower positions are smaller and simpler, higher ones add height, pillars and (later) <a href="#tile-effects">tile effects</a>. Current: board-3 (position 1?), arena-4 (position 3).</li>
-  <li>Heights must be symmetric too (enforced by test only; loader check pending).</li>
+  <li><b>Ladder</b>: <code>ladderPosition</code> orders maps; lower positions are smaller and simpler, higher ones add height, <a href="#props">props</a> and (later) <a href="#tile-effects">tile effects</a>. Current: board-3 (position 1), arena-4 (position 3).</li>
+  <li>Heights must be symmetric too (enforced by test only; loader check pending). Props must be symmetric, must sit on walkable terrain, and may not sit on a spawn — all three enforced by the loader.</li>
 </ol>
+<h3>Shipped maps</h3>
+<p><b>board-3</b>: a flat radius-3 field, 37 tiles, one stone hex at the centre. Stone is unwalkable and therefore solid: it blocks sight. Unchanged.</p>
+<p><b>arena-4</b>: radius 4, 61 tiles, <em>all grass</em> — its cover is props now, not terrain. A raised central plateau with a step on each side, four walls and four destructible pillars. Spawns at <code>(-4,0)</code> and <code>(4,0)</code>, eight apart, and the plateau is what stops a spawn-to-spawn shot.</p>
+<table>
+<tr><th>Hexes (q, r)</th><th>Height</th><th>Prop</th></tr>
+<tr><td>(−1, 0), (0, 0), (1, 0)</td><td>2</td><td>—</td></tr>
+<tr><td>(−2, 0), (2, 0), (−1, 4), (1, −4)</td><td>1</td><td>—</td></tr>
+<tr><td>(0, 2), (1, 1), (0, −2), (−1, −1)</td><td>0</td><td><code>wall</code></td></tr>
+<tr><td>(2, −1), (−2, 1), (2, 2), (−2, −2)</td><td>0</td><td><code>pillar</code></td></tr>
+</table>
+<pre><code>r=-4        . , . . .        . ground   , height 1
+r=-3       . . . . . .       ^ height 2  W wall
+r=-2      P . W . . . .      P pillar    S spawn
+r=-1     . . W . . P . .
+r= 0    S . , ^ ^ ^ , . S
+r=+1     . . P . . W . .
+r=+2      . . . . W . P
+r=+3       . . . . . .
+r=+4        . . . , .</code></pre>
 <div class="open-q"><h3>Open questions</h3><ul>
 <li id="q-maps-count">How many maps per ladder position for variety, and whether players see the next map before drafting.</li>
 </ul></div>
@@ -564,8 +612,8 @@ figure{margin:12px 0} figure svg{width:100%; height:auto; display:block} figcapt
 <p class="lead">The weapon grants the hero's two weapon-lane <a href="#attacks">attacks</a> and some Strength. Every weapon has a minimum and a maximum range. Kinds at launch: <b>bow</b> and <b>gun</b>. Both hit adjacent enemies; the gun reaches further, the bow hits slightly harder.</p>
 <table>
 <tr><th>Kind</th><th>Range</th><th>Identity</th><th>Innate abilities (current data)</th><th>Later enchants / sigils</th></tr>
-<tr><td>Bow</td><td>1..5</td><td>Slightly more damage per shot; needs line of sight; high ground matters</td><td>Arrow Shot (1 AP, 3), Aimed Shot (2 AP, 6)</td><td>+1 range; Volley (sigil)</td></tr>
-<tr><td>Gun</td><td>1..7</td><td>Whole-field reach, lighter hits</td><td>Quick Shot (1 AP, 2), Heavy Shot (2 AP, 5)</td><td>Triple Shot (sigil); cheaper shot</td></tr>
+<tr><td>Bow</td><td>1..5</td><td><b>Lobbed</b> (<a href="#trajectories">arc</a>, apex 3 / 4), <b>no sight needed</b>: it can drop behind cover you cannot see past. Slightly more damage per shot; high ground matters</td><td>Arrow Shot (1 AP, 3), Aimed Shot (2 AP, 6)</td><td>+1 range; +1 apex; Volley (sigil)</td></tr>
+<tr><td>Gun</td><td>1..7</td><td><b>Straight</b> (direct), <b>needs sight</b>. Whole-field reach, lighter hits</td><td>Quick Shot (1 AP, 2), Heavy Shot (2 AP, 5)</td><td>Triple Shot (sigil); cheaper shot</td></tr>
 <tr><td>Blade (deferred)</td><td>1..1</td><td>Adjacent only, cheap repeats, most Strength</td><td>Jab, Strike (files kept, unreferenced)</td><td>Cleave (sigil)</td></tr>
 </table>
 <div class="open-q"><h3>Open questions</h3><ul><li id="q-weapon-ammo">Do guns have ammo / reload as a state, or is AP cost the only limiter? Proposed: AP only.</li><li id="q-weapon-blade">When does blade (melee) join the catalogue, and with what identity beyond "adjacent, cheap"?</li></ul></div>
@@ -578,7 +626,7 @@ figure{margin:12px 0} figure svg{width:100%; height:auto; display:block} figcapt
 <ol>
   <li>Every base crown lists exactly two spells. More spells arrive through <a href="#sigil">Sigils</a>.</li>
   <li>An <a href="#enchant">Enchant</a> on the crown can add an element to every spell it grants ("fire on crown" = all crown spells are tagged fire and gain a fire rider).</li>
-  <li>Spells are attacks in the spell lane; they may ignore some targeting rules by data (e.g. <code>minRange</code>), but always need <a href="#line-of-sight">line of sight</a>.</li>
+  <li>Spells are attacks in the spell lane; they may ignore some targeting rules by data (e.g. <code>minRange</code>). Both shipped spells are <code>direct</code> and need <a href="#line-of-sight">line of sight</a>, but that is data, not a law of crowns.</li>
 </ol>
 <div class="open-q"><h3>Open questions</h3><ul><li id="q-crown-utility">Can crowns grant non-damage spells (heal, shield, slow)? Needs an effect vocabulary beyond damage. Proposed: not at launch.</li></ul></div>
 <p class="src">Source: notebook page 1 (Crown).</p>
@@ -632,26 +680,56 @@ figure{margin:12px 0} figure svg{width:100%; height:auto; display:block} figcapt
   <li><code>terrainCosts</code> per ability overrides the terrain catalogue (an integer makes even stone enterable; <code>null</code> makes even grass impassable).</li>
   <li>A move produces a <code>MovePlan</code>: <code>Path</code> to animate and <code>EnteredTiles</code> for <a href="#tile-effects">tile effects</a>.</li>
   <li>New modes are one resolver class plus one JSON; unknown modes fail closed.</li>
+  <li><code>requiresLineOfSight</code> (the teleport) uses the <a href="#line-of-sight">attack ray</a>: from the mover's aim point to the aim height of the destination, ignoring the mover's own body. One sight rule for the whole game.</li>
 </ol>
 <p class="src">Source: pillar 12; ADR-012; docs/data.md "Movement abilities".</p>
 </section>
 
 <section class="concept" id="attacks" data-design="decided" data-impl="partial" data-title="Attacks">
 <header><h2>Attacks</h2></header>
-<p class="lead">An attack targets one living enemy unit inside a <code>minRange..range</code> band with clear <a href="#line-of-sight">line of sight</a>, always, even at range 1. It declares its <b>lane</b> (weapon or spell), a flat base damage, optional <a href="#elements">element</a> and tags.</p>
+<p class="lead">An attack targets one <b>damageable body</b> — an enemy hero or a destructible <a href="#props">prop</a> — inside a circular <code>minRange..range</code> band, subject to its own <a href="#line-of-sight">sight</a> requirement and its <a href="#trajectories">trajectory</a>. It declares its <b>lane</b> (weapon or spell), a flat base damage, optional <a href="#elements">element</a> and tags.</p>
 <pre><code>{ "version": 1, "id": "fire-bolt", "name": "Fire Bolt", "type": "attack", "category": "spell", "cost": 2,
-  "attack": { "damage": 6, "damageType": "spell", "range": 3, "minRange": 1, "element": "fire" },
+  "attack": { "damage": 6, "damageType": "spell", "range": 3, "minRange": 1,
+              "trajectory": "direct", "lineOfSight": true, "element": "fire" },
   "tags": ["bolt"] }</code></pre>
 <ol>
   <li><code>category</code> is <code>weapon</code> or <code>spell</code> and must match the lane (an attack granted by a crown is a spell; by a weapon, a weapon). HUD only reads category; rules read the lane.</li>
-  <li>Targeting and legality come from one function used by HUD, server and bots.</li>
+  <li><b>The range band is a circle.</b> In range iff <code>minRange² ≤ q² + qr + r² ≤ range²</code> for the offset target − attacker: the exact squared distance between the two hex centres, in integers, so the client can draw a true circle and be right. Up to 6 it equals hex distance; from 7 up the diagonals reach further. Movement still counts hexes.</li>
+  <li><b>Two required fields</b>, <code>lineOfSight</code> and <code>trajectory</code> (plus <code>apex</code> for an arc), and both must pass. There is no default: an attack that declares neither is a content error.</li>
+  <li><b>Targets.</b> Anything with health can be hit and nothing else: an enemy hero, a destructible prop. A wall blocks shots but is never a target, and <b>targeting the ground is not legal</b> (the client may preview a landing spot; the rules refuse it).</li>
+  <li>Targeting and legality come from one function used by HUD, server and bots. A refusal names its reason and, for a blocked shot, the hex that stopped it.</li>
   <li>Multi-target shapes (cone, line, area) are <mark>not designed</mark>; Sigils like Triple Shot will need a <code>shape</code> or a multi-hit count. See open question.</li>
 </ol>
-<div class="drift-note"><b>Partial.</b> Lanes are weapon / spell; the <code>element</code> field does not exist yet.</div>
+<div class="drift-note"><b>Partial.</b> Lanes are weapon / spell; the <code>element</code> field does not exist yet. Everything else on this page is in code.</div>
 <div class="open-q"><h3>Open questions</h3><ul>
 <li id="q-attacks-multi">Multi-hit and area attacks (Triple Shot, Cleave): repeated single resolution vs a shape. Proposed: <code>hits: 3</code> repeats the single-target resolution; shapes later.</li>
 </ul></div>
-<p class="src">Source: ADR-017; design v0.1 targeting decision.</p>
+<p class="src">Source: ADR-017, ADR-023; design v0.1 targeting decision.</p>
+</section>
+
+<section class="concept" id="trajectories" data-design="decided" data-impl="implemented" data-title="Trajectories">
+<header><h2>Trajectories</h2></header>
+<p class="lead">Two independent fields decide whether an attack is legal. <code>lineOfSight</code> asks whether the attacker must <em>see</em> the target (<a href="#line-of-sight">the ray</a>). <code>trajectory</code> says how the attack <em>travels</em>, and each mode has its own blocking rule. An attack is legal only if both pass.</p>
+<h3>The three modes</h3>
+<table>
+<tr><th>Mode</th><th>Blocked by</th><th>Shipped by</th></tr>
+<tr><td><code>direct</code></td><td>The same ray as sight, by construction.</td><td>Gun (Quick Shot, Heavy Shot), crown spells (Fire Bolt, Arcane Spark) — all with <code>lineOfSight</code> true.</td></tr>
+<tr><td><code>arc</code></td><td>An integer parabola through the same endpoints, peaking <code>max(h0,h1) + apex</code> at mid-flight.</td><td>Bow (Arrow Shot, apex 3; Aimed Shot, apex 4) — with <code>lineOfSight</code> <b>false</b>: an arrow may drop behind cover you cannot see past.</td></tr>
+<tr><td><code>sky</code></td><td>Nothing. Whatever lies between is irrelevant.</td><td>Nothing yet: it exists in code and test fixtures, waiting for a mortar or a meteor.</td></tr>
+</table>
+<h3>Rules</h3>
+<ol>
+  <li><code>apex</code> (an integer, 0 or more) is <b>required</b> for <code>arc</code> and <b>forbidden</b> for everything else. It is measured above the higher of the two aim points, so the same bow clears the same wall differently depending on where it stands.</li>
+  <li>The arc is sampled per intervening tile at both of the tile's ends, in integers scaled by <code>b²</code>. No float ever touches it.</li>
+  <li>A bow arrow with apex 3 clears a 6-unit wall two tiles away but not the wall right next to it. That distance-sensitivity is the point: cover should depend on where you stand, not only on what is there.</li>
+  <li><b>Unknown modes fail closed</b> and throw. A new mode is one resolver class plus one line in the registry, exactly like <a href="#movement">movement</a>.</li>
+  <li><b>The override seam.</b> Resolution reads trajectory, apex, sight and the range band from the attack definition through one place, so an <a href="#enchant">Enchant</a> can hand it a modified copy without touching the resolvers. No enchant does this yet.</li>
+</ol>
+<div class="open-q"><h3>Open questions</h3><ul>
+<li id="q-trajectory-enchant">Which Enchant first swaps a trajectory ("your gun shots arc", "your arrows fly flat and gain range"), and does swapping it also change <code>lineOfSight</code>?</li>
+</ul></div>
+<h3>Depends on</h3><ul><li><a href="#attacks">Attacks</a>, <a href="#line-of-sight">Line of sight</a>, <a href="#board">Board</a></li></ul>
+<p class="src">Source: ADR-023; 16 Sep 2026 question round (spec <code>docs/specs/2026-09-16-aiming-rules.md</code>).</p>
 </section>
 
 <section class="concept" id="damage" data-design="decided" data-impl="partial" data-title="Damage">
@@ -666,6 +744,7 @@ figure{margin:12px 0} figure svg{width:100%; height:auto; display:block} figcapt
   <li><b>Preview and actual are the same function.</b> The preview uses the attacker's <a href="#hidden-info">knowledge</a> (hidden enemy modifiers dropped and counted as "?"); the server resolves with full knowledge. When they differ, the modifier that caused it is revealed.</li>
   <li>Immunity (from a Blessing) is a modifier whose effect <code>nullify</code> sets the total to 0 after everything else. Shown as one line "Immune (fire)".</li>
   <li>Percentages are not allowed. If ever needed they are computed in integer basis points, never floats.</li>
+  <li><b>High ground</b> applies to every <a href="#trajectories">trajectory</a>: the condition is the attacker's tile being higher than the target's, whatever the shot did on the way.</li>
   <li>Enemy health is fully visible (pillar 8 surprise lives in abilities and modifiers, not in the health bar).</li>
 </ol>
 <div class="drift-note"><b>Partial.</b> Two lanes in code; <code>nullify</code> (immunity) does not exist yet.</div>
@@ -821,6 +900,7 @@ figure{margin:12px 0} figure svg{width:100%; height:auto; display:block} figcapt
 <tr><td>Lineage and starting Blessing</td><td>Hidden</td><td>first reveal of any boon of that lineage; the Blessing when it changes a result</td></tr>
 <tr><td>Drafted boons</td><td>Hidden (opponent sees "picked")</td><td>Blessing / Enchant: first time it changes a result or an observed number; Sigil: first use</td></tr>
 <tr><td>Tile and global modifiers (high ground, terrain)</td><td>Public</td><td>always</td></tr>
+<tr><td><a href="#props">Props</a> (position, health, height)</td><td>Public</td><td>always — props are neutral and have nothing to hide</td></tr>
 </table>
 <h3>Rules</h3>
 <ol>
@@ -885,6 +965,8 @@ figure{margin:12px 0} figure svg{width:100%; height:auto; display:block} figcapt
 <p>FMOD music that stays out of the way; distinct SFX per ability category and per element; VFX via Shuriken and Shader Graph (no VFX Graph on WebGL2).</p>
 <h4>Art direction</h4>
 <p>Low-poly stylised; gear must read at the tilted camera distance (silhouette per weapon kind, colour per lineage once revealed). Rules of readability come before beauty.</p>
+<h4 id="aiming-presentation">Aiming (proposed)</h4>
+<p>The rules half of aiming is in code; the client half is specified in <code>docs/specs/2026-09-16-aiming-client.md</code>: true <b>range circles</b> drawn in the tile shader (the band really is a circle now), a <b>path and trajectory preview</b> that shows where a blocked shot stops, a <b>projectile</b> that follows the resolved arc or ray, and <b>facing</b>. None of this enters Core or the wire: the cursor and the armed ability are presentation.</p>
 <div class="open-q"><h3>Open questions</h3><ul><li id="q-pres-select">Character select and draft screens are not mocked yet (follow the research-then-options workflow).</li></ul></div>
 <p class="src">Source: pillars 9-13; ADR-015, ADR-019.</p>
 </section>
@@ -894,15 +976,16 @@ figure{margin:12px 0} figure svg{width:100%; height:auto; display:block} figcapt
 <p class="lead">All content is JSON under <code>MimasClient/Assets/_Game/Data/</code>, loaded by one fail-closed catalogue on every peer. This table is the target layout; field-level schemas live in <code>docs/data.md</code>.</p>
 <table>
 <tr><th>File / folder</th><th>Contents</th><th>Design</th><th>Code</th></tr>
-<tr><td><code>rules.json</code></td><td><code>damageTypes</code> (weapon, spell), <code>elements[]</code>, <code>globalModifiers[]</code>, <code>baseStats</code>, <code>innateAbilities[]</code>, <code>series</code> (best of)</td><td><a href="#stats">Stats</a>, <a href="#elements">Elements</a></td><td>partial (no elements, no series)</td></tr>
+<tr><td><code>rules.json</code></td><td><code>damageTypes</code> (weapon, spell), <code>elements[]</code>, <code>globalModifiers[]</code>, <code>heights</code>, <code>baseStats</code>, <code>innateAbilities[]</code>, <code>series</code> (best of)</td><td><a href="#stats">Stats</a>, <a href="#board">Board</a>, <a href="#elements">Elements</a></td><td>partial (no elements, no series)</td></tr>
 <tr><td><code>terrains.json</code></td><td>terrain catalogue</td><td><a href="#board">Board</a></td><td>in code</td></tr>
 <tr><td><code>timecontrols.json</code></td><td>time controls</td><td><a href="#time-controls">Time controls</a></td><td>in code</td></tr>
-<tr><td><code>abilities/</code></td><td>movement and attack abilities (attack gains <code>element</code>)</td><td><a href="#abilities">Abilities</a></td><td>partial</td></tr>
+<tr><td><code>abilities/</code></td><td>movement and attack abilities (attack carries <code>trajectory</code>, <code>apex</code>, <code>lineOfSight</code>; gains <code>element</code>)</td><td><a href="#abilities">Abilities</a>, <a href="#trajectories">Trajectories</a></td><td>partial</td></tr>
 <tr><td><code>items/</code></td><td>gear: slot, kind, stats, abilities, tags</td><td><a href="#equipment">Equipment</a></td><td>in code</td></tr>
 <tr><td><code>lineages/</code></td><td>starting blessing, pool</td><td><a href="#lineage">Lineage</a></td><td>not started</td></tr>
 <tr><td><code>boons/</code></td><td>blessings, enchants, sigils</td><td><a href="#boons">Boons</a></td><td>not started (empty folder)</td></tr>
 <tr><td><code>modifiers/</code></td><td>flat damage modifiers (gain <code>elements</code>, <code>itemKinds</code>, <code>nullify</code>)</td><td><a href="#modifiers">Modifiers</a></td><td>partial</td></tr>
-<tr><td><code>maps/</code></td><td>hex lists, spawns, ladder position</td><td><a href="#maps">Maps</a></td><td>in code</td></tr>
+<tr><td><code>maps/</code></td><td>hex lists (<code>prop?</code> per hex), spawns, ladder position</td><td><a href="#maps">Maps</a></td><td>in code</td></tr>
+<tr><td><code>props/</code></td><td>walls and pillars: <code>bodyHeight</code>, <code>aimHeight</code>, optional <code>stats</code></td><td><a href="#props">Props</a></td><td>in code</td></tr>
 <tr><td><code>classes/</code></td><td><s>class definitions</s></td><td><a href="#classes">superseded</a></td><td>removed</td></tr>
 <tr><td><code>presets/</code> (client only)</td><td>suggested kits for character select</td><td><a href="#character-select">Character select</a></td><td>not started</td></tr>
 </table>
@@ -938,6 +1021,15 @@ figure{margin:12px 0} figure svg{width:100%; height:auto; display:block} figcapt
 <tr><td>2026-09-16</td><td>Two damage lanes (weapon, spell) with Strength / Magic power and per-lane armour defence; elements are a modifier class, not a lane; more modifier classes later</td><td><a href="#damage">Damage</a>, <a href="#elements">Elements</a>, <a href="#armour">Armour</a></td><td>021</td></tr>
 <tr><td>2026-09-16</td><td>Lineage grants a starting Blessing and defines the draft pool; vocabulary: Boon = Blessing / Enchant / Sigil</td><td><a href="#lineage">Lineage</a>, <a href="#boons">Boons</a></td><td>022</td></tr>
 <tr><td>2026-09-16</td><td>Gear identity and innate stats are public; lineage, abilities and boons hidden until used or triggered</td><td><a href="#hidden-info">Hidden info</a></td><td>022</td></tr>
+<tr><td>2026-09-16</td><td><b>Heights in body units.</b> A map's <code>height</code> stays an integer level; <code>rules.heights</code> converts levels to body units (<code>unitsPerLevel</code> 3, hero <code>body</code> 6, <code>aim</code> 4). A level-1 step does not block a flat shot, a level-2 plateau does</td><td><a href="#board">Board</a>, <a href="#line-of-sight">Sight</a></td><td>023</td></tr>
+<tr><td>2026-09-16</td><td><b>Sight is a ray between aim points</b>, blocked when an intervening column reaches it (a graze blocks); bodies block, endpoints and holes never block, unwalkable terrain is solid. <b>Resolved: yes, units block sight</b> (<code>q-los-units</code> closed)</td><td><a href="#line-of-sight">Line of sight</a></td><td>023</td></tr>
+<tr><td>2026-09-16</td><td><b>Two independent attack fields:</b> <code>lineOfSight</code> (must I see you) and <code>trajectory</code> (<code>direct</code> / <code>arc</code> / <code>sky</code>), both required, legal only if both pass. <code>apex</code> required iff <code>arc</code>; an arc is an integer parabola peaking <code>max(h0,h1) + apex</code>; unknown modes throw</td><td><a href="#trajectories">Trajectories</a></td><td>023</td></tr>
+<tr><td>2026-09-16</td><td>Shipped aiming values: bow arcs without sight (apex 3 / 4), gun and crown spells are direct and need sight; <code>sky</code> exists in code only. One override seam (<code>WithTrajectory</code>) for a future Enchant</td><td><a href="#weapon">Weapon</a>, <a href="#crown">Crown</a>, <a href="#trajectories">Trajectories</a></td><td>023</td></tr>
+<tr><td>2026-09-16</td><td><b>Ranges are Euclidean:</b> in range iff <code>minRange² ≤ q²+qr+r² ≤ range²</code>, so a range circle drawn on the board is honest. Movement still counts hexes. High ground applies to every trajectory</td><td><a href="#attacks">Attacks</a>, <a href="#damage">Damage</a></td><td>023</td></tr>
+<tr><td>2026-09-16</td><td><b>Props are bodies.</b> Anything with health can be hit and nothing else; props are neutral and public, occupy their tile, block with their body, are removed when destroyed, and never end a round. Placed by map hexes, symmetric, on walkable terrain, never on a spawn</td><td><a href="#props">Props</a>, <a href="#maps">Maps</a></td><td>024</td></tr>
+<tr><td>2026-09-16</td><td>Arena-4 reworked: all 12 stone hexes replaced by a plateau with steps, four walls and four pillars. Board-3 untouched</td><td><a href="#maps">Maps</a></td><td>—</td></tr>
+<tr><td>2026-09-16</td><td>Teleport sight uses the same ray as attacks, ignoring the mover's own body</td><td><a href="#movement">Movement</a></td><td>023</td></tr>
+<tr><td>2026-09-16</td><td>Aiming slice scoped: facing, range circles, path previews and projectiles are presentation and never enter Core or the wire. Specs: <code>docs/specs/2026-09-16-aiming-rules.md</code> (rules) and <code>…-aiming-client.md</code> (client)</td><td><a href="#presentation">Presentation</a></td><td>—</td></tr>
 <tr><td>2026-09-16</td><td>Loadout slice scoped: same base stats for every hero in <code>rules.baseStats</code>; walk innate, boots add a mode; every base weapon and crown has exactly two abilities; no negative item stats; launch catalogue bow (1..5) + gun (1..7), one crown, jump + teleport boots, one armour; ability count per item visible as "?" slots; blade deferred. Spec: <code>docs/specs/2026-09-16-loadout-slice.md</code></td><td><a href="#stats">Stats</a>, <a href="#equipment">Equipment</a>, <a href="#weapon">Weapon</a>, <a href="#boots">Boots</a>, <a href="#hidden-info">Hidden info</a></td><td>—</td></tr>
 </table>
 </section>
@@ -958,6 +1050,7 @@ figure{margin:12px 0} figure svg{width:100%; height:auto; display:block} figcapt
 <header><h2>Changelog</h2></header>
 <table>
 <tr><th>Date</th><th>Change</th></tr>
+<tr><td>2026-09-16</td><td>Aiming slice shipped (rules half): height-aware ray sight between aim points, trajectories (direct / arc / sky) with an apex, circular range bands, props (wall and pillar) as bodies, arena-4 reworked. New sections <a href="#trajectories">Trajectories</a> and <a href="#props">Props</a>; <a href="#line-of-sight">Line of sight</a> rewritten and its "do units block sight" question answered yes. Client half pending (spec B).</td></tr>
 <tr><td>2026-09-16</td><td>Loadout slice shipped: items replace classes, two lanes, base stats, innate walk, examine shows gear.</td></tr>
 <tr><td>2026-09-16</td><td>v0.2.1. Loadout question round: base stats, boots, two abilities per weapon/crown, no negative stats, launch catalogue, bow/gun ranges, "?" ability slots. Five open questions closed, two added. Spec written for the next session.</td></tr>
 <tr><td>2026-09-16</td><td>v0.2. First HTML edition. Migrated design.md v0.1 (pillars, win conditions, resolved questions). Added from the notebook: character = gear + lineage + boons, four equipment slots, stats (Health / Strength / Magic / Armour per lane), two damage lanes + elements, lineages (Greek, Norse, Hindu), boon kinds Blessing / Enchant / Sigil, draft rules, hidden-information table, character select flow. Marked classes superseded and recorded drift against the M1 code.</td></tr>

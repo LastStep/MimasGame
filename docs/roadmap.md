@@ -63,6 +63,31 @@ gear rather than classes. Before or alongside it, a short balance pass on the sh
 1 AP 3 dmg, aimed shot 2 AP 6, quick shot 1 AP 2, heavy shot 2 AP 5, fire bolt 2 AP 6, arcane spark 1 AP 2)
 by letting two random bots play a few hundred seeded games.
 
+## M3 progress (16 Sep 2026): the aiming slice, rules half
+
+Attacks now aim at a point on the body and are resolved against heights in *body units*. `rules.json`
+carries `heights` (1 level = 3 units, hero body 6, aim 4), so a level-1 step no longer blocks a flat shot
+between two heroes but a level-2 plateau does — and so does any body. Sight is a straight ray from aim
+point to aim point with a cross-multiplied integer test (a graze blocks, endpoints and holes never block,
+unwalkable terrain is solid), and every attack declares two independent required fields: `lineOfSight` and
+`trajectory` (`direct`, `arc` with an `apex`, or `sky`, one resolver each behind a fail-closed registry).
+The bow lobs without needing sight (apex 3 and 4); the gun and both crown spells are straight and need it;
+`sky` exists in code only. Range bands are circular (`minRange² ≤ q²+qr+r² ≤ range²`), so the client can
+draw a true circle — from radius 7 up the diagonals reach further than hex distance would.
+
+**Props** are the first non-unit bodies: `props/pillar.json` (body 6, 10 hp, no armour — about one full
+turn of damage) and `props/wall.json` (body 6, indestructible). A map hex may carry one; they occupy their
+tile, block sight and trajectories with their body, and a destructible one is a legal target that is
+removed when it falls without ending the round. `arena-4.json` was reworked around them: all 12 stone hexes
+are gone, replaced by a level-2 plateau with level-1 steps, four walls and four pillars — cover is bodies
+now, not terrain. `board-3.json` is untouched and its stone still blocks. Core gained `IBody`, `BodySet`,
+`Prop`, `PropDef`, `HeightsDef`, `Ballistics`, the trajectory resolvers and `TargetCheck`; `PlayerView`
+lists props and every `UnitView` carries its body and aim heights; `/health` reports `props`. 287 Core tests.
+
+Not done / deferred: the whole client half (range circles, trajectory preview, projectiles, facing) —
+spec `docs/specs/2026-09-16-aiming-client.md`; enchant or boon overrides of a trajectory (only the seam
+exists); area and multi-target shapes; owned props, rubble, units-as-cover penalties; a beam trajectory.
+
 ## Tooling backlog
 
 Small editor/authoring tools, in the order they are likely to be worth building.
@@ -86,3 +111,4 @@ Small editor/authoring tools, in the order they are likely to be worth building.
 | Core test count / runtime | 169 / 0.26 s (+ stats, attacks, modifiers, match state, bot games) | 15 Sep 2026 |
 | Core test count / runtime | 197 / 0.30 s (+ items, loadouts, base stats, ability sources, shipped-data conventions) | 16 Sep 2026 |
 | Core test count / runtime | 203 / 0.27 s (+ item slot vs ability category, schema tolerance, attack lane conventions) | 16 Sep 2026 |
+| Core test count / runtime | 287 / 0.24 s (+ ballistics, ray sight, trajectories, props and bodies, circular ranges) | 16 Sep 2026 |
