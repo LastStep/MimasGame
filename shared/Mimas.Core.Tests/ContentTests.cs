@@ -135,6 +135,42 @@ namespace Mimas.Core.Tests
         }
 
         [Fact]
+        public void Catalogue_WeaponGrantingSpellAttack_IsAnError()
+        {
+            var files = ContentFixtures.Minimal();
+            files.Add(new ContentFile("abilities/zap.json", @"{ ""version"": 1, ""id"": ""zap"", ""type"": ""attack"", ""category"": ""spell"",
+                ""attack"": { ""damage"": 1, ""damageType"": ""magic"", ""range"": 2 } }"));
+            files.Add(new ContentFile("items/odd-bow.json", @"{ ""version"": 1, ""id"": ""odd-bow"", ""slot"": ""weapon"", ""kind"": ""bow"",
+                ""stats"": {}, ""abilities"": [ ""zap"" ] }"));
+            Assert.Contains("item 'odd-bow' is a weapon but grants attack 'zap' with category 'spell'; a weapon may only grant 'weapon' attacks",
+                ContentFixtures.ErrorsOf(files));
+        }
+
+        [Fact]
+        public void Catalogue_CrownGrantingWeaponAttack_IsAnError()
+        {
+            var files = ContentFixtures.Minimal();
+            files.Add(new ContentFile("abilities/whack.json", @"{ ""version"": 1, ""id"": ""whack"", ""type"": ""attack"", ""category"": ""weapon"",
+                ""attack"": { ""damage"": 1, ""damageType"": ""melee"", ""range"": 1 } }"));
+            files.Add(new ContentFile("items/odd-crown.json", @"{ ""version"": 1, ""id"": ""odd-crown"", ""slot"": ""crown"", ""kind"": ""circlet"",
+                ""stats"": {}, ""abilities"": [ ""whack"" ] }"));
+            Assert.Contains("item 'odd-crown' is a crown but grants attack 'whack' with category 'weapon'; a crown may only grant 'spell' attacks",
+                ContentFixtures.ErrorsOf(files));
+        }
+
+        [Fact]
+        public void Catalogue_ArmourGrantingAnAttack_IsAllowed()
+        {
+            var files = ContentFixtures.Minimal();
+            files.Add(new ContentFile("abilities/spikes.json", @"{ ""version"": 1, ""id"": ""spikes"", ""type"": ""attack"", ""category"": ""weapon"",
+                ""attack"": { ""damage"": 1, ""damageType"": ""melee"", ""range"": 1 } }"));
+            files.Add(new ContentFile("items/spiked-vest.json", @"{ ""version"": 1, ""id"": ""spiked-vest"", ""slot"": ""armour"", ""kind"": ""vest"",
+                ""stats"": {}, ""abilities"": [ ""spikes"" ] }"));
+            var catalog = ContentCatalog.Load(files);
+            Assert.Equal(new[] { "spikes" }, catalog.Items.Get("spiked-vest").AbilityIds);
+        }
+
+        [Fact]
         public void Catalogue_UnknownInnateAbility_IsAnError()
         {
             var files = CombatFixtures.Files();

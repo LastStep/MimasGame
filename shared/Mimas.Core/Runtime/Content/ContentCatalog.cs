@@ -10,8 +10,8 @@ namespace Mimas.Core.Content
     /// immutable afterwards. The single place code looks up an id.
     ///
     /// Loading is two-phase. Phase 1 parses each file on its own and records errors against that file.
-    /// Phase 2 links: item and innate ability ids must exist, a weapon must grant an attack, item and base
-    /// stat keys must name declared damage types, attack damage types must be declared, movement terrain
+    /// Phase 2 links: item and innate ability ids must exist, a weapon must grant an attack and only
+    /// weapon-category ones (a crown only spells), item and base stat keys must name declared damage types, attack damage types must be declared, movement terrain
     /// overrides must name real terrains, terrain and map-hex modifiers and global modifiers must exist,
     /// every map must build (symmetry, spawns, connectivity). All errors are collected and thrown together as one
     /// <see cref="ContentLoadException"/>. Unknown files are errors too: the catalogue fails closed rather
@@ -277,8 +277,8 @@ namespace Mimas.Core.Content
             foreach (var a in abilities) abilityIds.Add(a.Id);
             var movementIds = new HashSet<string>(StringComparer.Ordinal);
             foreach (var a in abilities) if (a is MovementDef) movementIds.Add(a.Id);
-            var attackIds = new HashSet<string>(StringComparer.Ordinal);
-            foreach (var a in abilities) if (a is AttackDef) attackIds.Add(a.Id);
+            var attacksById = new Dictionary<string, AttackDef>(StringComparer.Ordinal);
+            foreach (var a in abilities) { var attack = a as AttackDef; if (attack != null) attacksById[attack.Id] = attack; }
 
             if (rules != null)
             {
@@ -296,6 +296,12 @@ namespace Mimas.Core.Content
 
             foreach (var item in items)
             {
+                // A weapon's attacks are weapon-lane, a crown's are spells (design: #attacks). Other slots
+                // grant no attacks today, so nothing is asserted about them.
+                string requiredCategory = null;
+                if (item.Slot == ItemSlots.Weapon) requiredCategory = AbilityCategories.Weapon;
+                else if (item.Slot == ItemSlots.Crown) requiredCategory = AbilityCategories.Spell;
+
                 bool hasAttack = false;
                 foreach (string abilityId in item.AbilityIds)
                 {
@@ -306,8 +312,12 @@ namespace Mimas.Core.Content
                     }
                     if (rules != null && rules.IsInnateAbility(abilityId))
                         errors.Add(new ContentError(itemFiles[item.Id], $"item '{item.Id}' grants '{abilityId}', which is already innate (rules.innateAbilities)."));
-                    if (attackIds.Contains(abilityId))
-                        hasAttack = true;
+
+                    AttackDef attack;
+                    if (!attacksById.TryGetValue(abilityId, out attack)) continue;
+                    hasAttack = true;
+                    if (requiredCategory != null && attack.Category != requiredCategory)
+                        errors.Add(new ContentError(itemFiles[item.Id], $"item '{item.Id}' is a {item.Slot} but grants attack '{abilityId}' with category '{attack.Category}'; a {item.Slot} may only grant '{requiredCategory}' attacks."));
                 }
                 if (item.Slot == ItemSlots.Weapon && !hasAttack)
                     errors.Add(new ContentError(itemFiles[item.Id], $"item '{item.Id}' is a weapon but grants no attack ability."));

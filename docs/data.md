@@ -25,7 +25,8 @@ an unrecognised file or folder is an error, never ignored.
 1. **Parse.** Each file is parsed on its own by path: `terrains.json`, `rules.json`, `timecontrols.json`,
    `abilities/`, `items/`, `maps/`, `modifiers/`. Duplicate ids across files are reported with both file names.
 2. **Link.** Item ability ids must exist and must not repeat an innate one; an item in the `weapon` slot
-   needs at least one attack ability; item stat keys must name a lane. `rules.innateAbilities` ids must
+   needs at least one attack ability and may grant only `weapon`-category ones, and a `crown` may grant only
+   `spell` ones (`#attacks`: the lane and the HUD section must agree); item stat keys must name a lane. `rules.innateAbilities` ids must
    exist and at least one of them must be a movement ability (the walk). A movement's `terrainCosts` keys
    must be real terrains; `rules.baseStats` keys, item stat keys, attack `damageType`s and modifier
    `damageTypes` conditions must name a type in `rules.damageTypes`; terrain `modifiers`, map hex `effect`s
@@ -171,7 +172,7 @@ end of turn.
 
 | Field | Required | Meaning |
 |---|---|---|
-| `category` | yes | `weapon` or `spell` (never `movement`). HUD section only. |
+| `category` | yes | `weapon` or `spell` (never `movement`). Picks the action-bar section, and **must equal `attack.damageType`** — the catalogue enforces it through the granting item's slot, a repo-data test checks it across the shipped catalogue, and the schema flags it as you type. |
 | `attack.damage` | yes, 0 or more | Flat base damage. |
 | `attack.damageType` | yes | The lane: `weapon` or `spell` (one of `rules.damageTypes`). Selects `power.<type>` and `defense.<type>` and is matched by modifiers. |
 | `attack.range` | yes, 1 or more | Maximum hex distance to the target. |

@@ -85,3 +85,4 @@ Small editor/authoring tools, in the order they are likely to be worth building.
 | Core test count / runtime | 137 / 0.06 s (+ ability icon and category fields) | 15 Sep 2026 |
 | Core test count / runtime | 169 / 0.26 s (+ stats, attacks, modifiers, match state, bot games) | 15 Sep 2026 |
 | Core test count / runtime | 197 / 0.30 s (+ items, loadouts, base stats, ability sources, shipped-data conventions) | 16 Sep 2026 |
+| Core test count / runtime | 203 / 0.27 s (+ item slot vs ability category, schema tolerance, attack lane conventions) | 16 Sep 2026 |

@@ -360,6 +360,30 @@ namespace Mimas.Core.Tests
         }
 
         [Fact]
+        public void ShippedAttacks_CategoryMatchesTheDamageLane()
+        {
+            var catalog = ContentFixtures.RepoCatalog();
+            foreach (var ability in catalog.Abilities.All)
+            {
+                var attack = ability as AttackDef;
+                if (attack == null) continue;
+                Assert.Equal(attack.DamageType, attack.Category);
+            }
+        }
+
+        [Fact]
+        public void ShippedAttacks_DeclareTheirRangeBand()
+        {
+            var catalog = ContentFixtures.RepoCatalog();
+            foreach (var ability in catalog.Abilities.All)
+            {
+                var attack = ability as AttackDef;
+                if (attack == null) continue;
+                Assert.InRange(attack.MinRange, 1, attack.Range);
+            }
+        }
+
+        [Fact]
         public void ShippedItems_NoItemHasNegativeStats()
         {
             var catalog = ContentFixtures.RepoCatalog();
