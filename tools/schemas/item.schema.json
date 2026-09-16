@@ -1,0 +1,53 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://mimas.game/schemas/item.schema.json",
+  "title": "Mimas item",
+  "description": "One piece of gear (items/*.json). A hero is rules.baseStats plus four of these.",
+  "type": "object",
+  "required": ["version", "id", "slot", "kind", "stats", "abilities"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "const": 1 },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+      "description": "Lowercase kebab-case, unique across items/."
+    },
+    "name": { "type": "string", "minLength": 1, "description": "Display name; defaults to the id." },
+    "slot": {
+      "enum": ["weapon", "crown", "boots", "armour"],
+      "description": "One item per slot, all four mandatory on a hero."
+    },
+    "kind": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Family the boons match on: bow, gun, circlet, leaping, blink, leather, ..."
+    },
+    "description": { "type": "string" },
+    "icon": { "type": "string", "description": "Presentation key resolved to a sprite by the client." },
+    "stats": {
+      "type": "object",
+      "description": "Added to rules.baseStats. Never negative; a lane key must name a declared lane.",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^(hp|ap|power\\.(weapon|spell)|defense\\.(weapon|spell))$": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "abilities": {
+      "type": "array",
+      "uniqueItems": true,
+      "description": "Ability ids this item grants, in HUD order. A weapon needs at least one attack; no id may repeat rules.innateAbilities.",
+      "items": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" }
+    },
+    "tags": {
+      "type": "array",
+      "uniqueItems": true,
+      "description": "Free strings modifiers match on.",
+      "items": { "type": "string", "minLength": 1 }
+    }
+  }
+}

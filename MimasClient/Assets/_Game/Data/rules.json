@@ -1,4 +1,5 @@
 {
+  "$schema": "../../../../tools/schemas/rules.schema.json",
   "version": 1,
   "damageTypes": ["weapon", "spell"],
   "globalModifiers": ["high-ground"],

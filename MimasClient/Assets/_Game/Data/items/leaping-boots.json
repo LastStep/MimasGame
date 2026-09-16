@@ -1,4 +1,5 @@
 {
+  "$schema": "../../../../../tools/schemas/item.schema.json",
   "version": 1,
   "id": "leaping-boots",
   "name": "Leaping Boots",

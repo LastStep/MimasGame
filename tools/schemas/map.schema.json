@@ -1,0 +1,68 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://mimas.game/schemas/map.schema.json",
+  "title": "Mimas map",
+  "description": "One map (maps/*.json). The catalogue also checks symmetry, spawn distance and connectivity at boot, which a schema cannot.",
+  "type": "object",
+  "required": ["version", "id", "name", "symmetry", "ladderPosition", "spawns", "hexes"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "const": 1 },
+    "id": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+    "name": { "type": "string", "minLength": 1 },
+    "description": {
+      "type": "string",
+      "description": "Authoring prose. Core parses it away: MapData has no Description, so nothing reads this yet."
+    },
+    "symmetry": {
+      "enum": ["rotational-180", "mirror-q"],
+      "description": "Only rotational-180 is implemented; mirror-q throws at build time."
+    },
+    "ladderPosition": { "type": "integer", "description": "Where the map sits in the ladder of maps." },
+    "spawns": {
+      "type": "object",
+      "required": ["p1", "p2"],
+      "additionalProperties": false,
+      "properties": {
+        "p1": { "$ref": "#/definitions/hex" },
+        "p2": { "$ref": "#/definitions/hex" }
+      }
+    },
+    "hexes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["q", "r", "terrain"],
+        "additionalProperties": false,
+        "properties": {
+          "q": { "type": "integer" },
+          "r": { "type": "integer" },
+          "terrain": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+          "height": {
+            "type": "integer",
+            "default": 0,
+            "description": "A rules value, not a visual one: walking climbs at most maxClimb, and tall tiles block sight."
+          },
+          "effect": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+            "description": "Modifier id this single hex grants to whoever stands on it."
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "hex": {
+      "type": "object",
+      "required": ["q", "r"],
+      "additionalProperties": false,
+      "properties": {
+        "q": { "type": "integer" },
+        "r": { "type": "integer" }
+      }
+    }
+  }
+}

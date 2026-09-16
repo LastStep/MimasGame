@@ -125,6 +125,16 @@ namespace Mimas.Core.Tests
         }
 
         [Fact]
+        public void Schemas_AreIgnoredByTheLoader()
+        {
+            var files = ContentFixtures.Minimal()
+                .Select(f => new ContentFile(f.Path, @"{ ""$schema"": ""../../tools/schemas/x.schema.json"", " + f.Text.Substring(f.Text.IndexOf('{') + 1)))
+                .ToList();
+            var catalog = ContentCatalog.Load(files);
+            Assert.NotNull(catalog.GetMovement("move"));
+        }
+
+        [Fact]
         public void Catalogue_UnknownInnateAbility_IsAnError()
         {
             var files = CombatFixtures.Files();
@@ -241,7 +251,7 @@ namespace Mimas.Core.Tests
 
             // Reformat one file: different whitespace, CRLF, and key order must not change the hash.
             var reformatted = files.Select(f => f.Path == "abilities/move.json"
-                ? new ContentFile(f.Path, "{\r\n \"movement\": {\"maxClimb\":1,\"range\":1,\"mode\":\"walk\"},\r\n\"type\":\"movement\",\"icon\":\"move\",\"description\":\"Walk to an adjacent tile. The default movement every unit has.\",\"name\":\"Move\",\"id\":\"move\",\"version\":1}")
+                ? new ContentFile(f.Path, "{\r\n \"movement\": {\"maxClimb\":1,\"range\":1,\"mode\":\"walk\"},\r\n\"type\":\"movement\",\"icon\":\"move\",\"description\":\"Walk to an adjacent tile. The default movement every unit has.\",\"name\":\"Move\",\"id\":\"move\",\"version\":1,\"$schema\":\"../../../../../tools/schemas/ability.schema.json\"}")
                 : f).ToList();
             string c = ContentCatalog.Load(reformatted).Hash;
 

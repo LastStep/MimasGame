@@ -1,4 +1,5 @@
 {
+  "$schema": "../../../../../tools/schemas/map.schema.json",
   "version": 1,
   "id": "arena-4",
   "name": "Arena",

@@ -1,4 +1,5 @@
 {
+  "$schema": "../../../../../tools/schemas/modifier.schema.json",
   "version": 1,
   "id": "stone-skin",
   "name": "Stone Skin",

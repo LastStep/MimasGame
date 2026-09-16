@@ -1,0 +1,37 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://mimas.game/schemas/terrains.schema.json",
+  "title": "Mimas terrains",
+  "description": "The terrain catalogue (terrains.json). Maps reference terrain by id; walkability and cost live here.",
+  "type": "object",
+  "required": ["version", "terrains"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "const": 1 },
+    "terrains": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "walkable"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+          "walkable": { "type": "boolean" },
+          "moveCost": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Defaults to 1 for walkable terrain, 0 for unwalkable."
+          },
+          "modifiers": {
+            "type": "array",
+            "uniqueItems": true,
+            "description": "Modifier ids a unit standing on this terrain carries for combat.",
+            "items": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" }
+          }
+        }
+      }
+    }
+  }
+}

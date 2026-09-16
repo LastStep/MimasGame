@@ -50,6 +50,21 @@ lists every JSON under `Assets/_Game/Data` as TextAsset references and is regene
 - Effects are a small expression list, e.g. `{ "type": "damage", "amount": 30, "element": "fire" }` — Core has one handler per `type`. Add new types in Core + document here.
 - Maps must be symmetrical: the loader validates the declared symmetry (`"symmetry": "rotational-180"` / `"mirror-q"`) and that `p1`/`p2` spawns are at maximal hex distance.
 
+## Editor-time schemas (`tools/schemas/`)
+
+Every data file starts with a `"$schema"` line pointing at a JSON Schema in `tools/schemas/`, and
+`.vscode/settings.json` maps the same schemas by glob. Editors then autocomplete fields and flag typos
+**while you type**, instead of at boot. Core ignores the key (no loader rejects unknown top-level keys;
+`Schemas_AreIgnoredByTheLoader` locks that in), but it *is* part of the content hash, like every other
+byte in the file.
+
+The schemas are deliberately stricter than the loader in two places: `additionalProperties: false`, so a
+misspelled optional key (`"icons"`, `"minrange"`) is flagged rather than silently ignored, and the damage
+lanes are written out as enums (`weapon`, `spell`) with a rule that an attack's `category` must equal its
+`attack.damageType`. The lane list really lives in `rules.json` and the engine stays lane-agnostic, so
+**a change to `rules.damageTypes` means updating `item.schema.json` and `ability.schema.json` too**.
+See `tools/schemas/README.md`.
+
 ## Terrains (`terrains.json`)
 
 Maps reference terrain by id; walkability and movement cost live here, not in the map file. Load this

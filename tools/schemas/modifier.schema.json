@@ -1,0 +1,66 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://mimas.game/schemas/modifier.schema.json",
+  "title": "Mimas modifier",
+  "description": "A flat damage modifier (modifiers/*.json). Who owns it is the attachment (unit, terrain, map hex, rules.globalModifiers), never this file.",
+  "type": "object",
+  "required": ["version", "id", "trigger", "effect"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "const": 1 },
+    "id": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+    "name": { "type": "string", "minLength": 1 },
+    "description": {
+      "type": "string",
+      "description": "What it does. Do not describe the reveal rule here; 'visibility' carries that and the HUD writes its own copy."
+    },
+    "icon": { "type": "string" },
+    "trigger": {
+      "enum": ["dealDamage", "takeDamage"],
+      "description": "dealDamage: consulted on the attacker's side. takeDamage: the target's side."
+    },
+    "visibility": {
+      "enum": ["public", "hidden"],
+      "default": "public",
+      "description": "hidden: unknown to the opponent until it first changes a result. Tile and global modifiers should stay public."
+    },
+    "when": {
+      "type": "object",
+      "description": "All conditions must hold.",
+      "additionalProperties": false,
+      "properties": {
+        "damageTypes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "description": "The attack's lane is one of these.",
+          "items": { "enum": ["weapon", "spell"] }
+        },
+        "tags": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "description": "The attack carries any of these tags.",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "heightAdvantage": {
+          "type": "boolean",
+          "description": "The attacker's tile is higher than the target's."
+        }
+      }
+    },
+    "effect": {
+      "type": "object",
+      "required": ["damage"],
+      "additionalProperties": false,
+      "properties": {
+        "damage": {
+          "type": "integer",
+          "not": { "const": 0 },
+          "description": "Flat amount added to the damage. Must not be 0."
+        }
+      }
+    }
+  }
+}

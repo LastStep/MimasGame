@@ -1,0 +1,123 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://mimas.game/schemas/ability.schema.json",
+  "title": "Mimas ability",
+  "description": "One ability (abilities/*.json). 'type' picks the schema: movement or attack.",
+  "type": "object",
+  "required": ["version", "id", "type"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "const": 1 },
+    "id": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+    "name": { "type": "string", "minLength": 1, "description": "Display name; defaults to the id." },
+    "type": { "enum": ["movement", "attack"] },
+    "description": { "type": "string" },
+    "icon": { "type": "string" },
+    "cost": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 1,
+      "description": "Action points one use spends."
+    },
+    "category": {
+      "enum": ["movement", "weapon", "spell"],
+      "description": "Action-bar section. Movement abilities must omit it or say 'movement'; an attack must match its lane."
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "type": { "const": "movement" } }, "required": ["type"] },
+      "then": {
+        "required": ["movement"],
+        "additionalProperties": false,
+        "properties": {
+          "$schema": true, "version": true, "id": true, "name": true, "type": true,
+          "description": true, "icon": true, "cost": true,
+          "category": { "const": "movement" },
+          "movement": {
+            "type": "object",
+            "required": ["mode", "range"],
+            "additionalProperties": false,
+            "properties": {
+              "mode": {
+                "enum": ["walk", "jump", "teleport"],
+                "description": "Resolver key. A new mode is one IMovementResolver plus one Register line."
+              },
+              "range": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "walk: movement points spent on terrain cost. jump/teleport: maximum hex distance."
+              },
+              "maxClimb": { "type": "integer", "minimum": 0, "default": 1, "description": "walk: maximum height gained per step." },
+              "jumpHeight": { "type": "integer", "minimum": 0, "default": 1, "description": "jump: clearance above the origin tile." },
+              "ignoreHeight": { "type": "boolean", "default": false },
+              "requiresLineOfSight": { "type": "boolean", "default": false },
+              "terrainCosts": {
+                "type": "object",
+                "description": "Per-terrain override: an integer >= 1 makes the terrain enterable at that cost, null makes it impassable.",
+                "additionalProperties": {
+                  "oneOf": [{ "type": "integer", "minimum": 1 }, { "type": "null" }]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "type": { "const": "attack" } }, "required": ["type"] },
+      "then": {
+        "required": ["attack", "category"],
+        "additionalProperties": false,
+        "properties": {
+          "$schema": true, "version": true, "id": true, "name": true, "type": true,
+          "description": true, "icon": true, "cost": true,
+          "category": { "enum": ["weapon", "spell"] },
+          "tags": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "attack": {
+            "type": "object",
+            "required": ["damage", "damageType", "range"],
+            "additionalProperties": false,
+            "properties": {
+              "damage": { "type": "integer", "minimum": 0, "description": "Flat base damage before stats and modifiers." },
+              "damageType": {
+                "enum": ["weapon", "spell"],
+                "description": "The lane, one of rules.damageTypes. Picks power.<lane> and defense.<lane>."
+              },
+              "range": { "type": "integer", "minimum": 1, "description": "Maximum hex distance to the target." },
+              "minRange": { "type": "integer", "minimum": 1, "default": 1, "description": "Minimum hex distance; 1..range." }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "category": { "const": "weapon" } },
+        "required": ["category"]
+      },
+      "then": {
+        "properties": {
+          "attack": { "properties": { "damageType": { "const": "weapon" } } }
+        },
+        "description": "An attack in the weapon section must resolve in the weapon lane (design: #attacks)."
+      }
+    },
+    {
+      "if": {
+        "properties": { "category": { "const": "spell" } },
+        "required": ["category"]
+      },
+      "then": {
+        "properties": {
+          "attack": { "properties": { "damageType": { "const": "spell" } } }
+        },
+        "description": "An attack in the spell section must resolve in the spell lane (design: #attacks)."
+      }
+    }
+  ]
+}

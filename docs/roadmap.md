@@ -63,6 +63,16 @@ gear rather than classes. Before or alongside it, a short balance pass on the sh
 1 AP 3 dmg, aimed shot 2 AP 6, quick shot 1 AP 2, heavy shot 2 AP 5, fire bolt 2 AP 6, arcane spark 1 AP 2)
 by letting two random bots play a few hundred seeded games.
 
+## Tooling backlog
+
+Small editor/authoring tools, in the order they are likely to be worth building.
+
+| Tool | What | Why it is not built yet |
+|---|---|---|
+| JSON data Inspector (`ScriptedImporter`) | A `ScriptedImporter` for `Assets/_Game/Data/**/*.json` with a custom Inspector, so clicking `longbow.json` in the Project window shows typed fields and dropdowns and writes back to the JSON. The real answer to "gear is easier to edit as a ScriptableObject" without giving up the format the server and the content hash need (ADR-004, ADR-014). | The schemas in `tools/schemas/` cover typo-prevention for now; Inspector *editing* is the remaining gap. Maybe a day or two. |
+| Content browser window | A `Mimas/Content` window over `ContentCatalog`: every item and ability with resolved numbers, plus any link errors, without entering Play Mode. | `ContentBootstrap` already logs the summary; the window is convenience. |
+| Balance sim harness | Run N seeded random-bot games over a matrix of loadouts and print win rates and average turn counts. | Wanted before the first real balance pass on the shipped numbers. |
+
 ## Baselines
 
 | Metric | Value | Date |

@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://mimas.game/schemas/timecontrols.schema.json",
+  "title": "Mimas time controls",
+  "description": "Clock presets (timecontrols.json).",
+  "type": "object",
+  "required": ["version", "timeControls"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "const": 1 },
+    "timeControls": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "baseMs", "turnCapMs"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "name": { "type": "string", "minLength": 1, "description": "Defaults to the id." },
+          "baseMs": { "type": "integer", "minimum": 1, "description": "Starting clock in milliseconds." },
+          "incrementMs": { "type": "integer", "minimum": 0, "default": 0 },
+          "turnCapMs": { "type": "integer", "minimum": 1, "description": "Per-turn cap; the turn length unless the client overrides it." }
+        }
+      }
+    }
+  }
+}

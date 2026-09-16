@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://mimas.game/schemas/rules.schema.json",
+  "title": "Mimas rules",
+  "description": "Match-wide rules (rules.json): the damage lanes, the stats and abilities every hero has before gear, and the modifiers that apply to every attack.",
+  "type": "object",
+  "required": ["version", "damageTypes", "baseStats", "innateAbilities"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "const": 1 },
+    "damageTypes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "description": "The damage lanes. Changing this list means updating the enums in item.schema.json and ability.schema.json too.",
+      "items": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" }
+    },
+    "globalModifiers": {
+      "type": "array",
+      "uniqueItems": true,
+      "description": "Modifier ids evaluated for every attack (high ground is the shipped example).",
+      "items": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" }
+    },
+    "baseStats": {
+      "type": "object",
+      "description": "The numbers every hero starts with before gear. hp and ap are required; no value may be negative.",
+      "required": ["hp", "ap"],
+      "additionalProperties": false,
+      "patternProperties": {
+        "^(power\\.(weapon|spell)|defense\\.(weapon|spell))$": { "type": "integer", "minimum": 0 }
+      },
+      "properties": {
+        "hp": { "type": "integer", "minimum": 1 },
+        "ap": { "type": "integer", "minimum": 0, "description": "Action points granted every turn." }
+      }
+    },
+    "innateAbilities": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "description": "Ability ids every hero has whatever it wears. At least one must be a movement ability; no item may grant one of these.",
+      "items": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" }
+    }
+  }
+}

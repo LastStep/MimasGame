@@ -1,4 +1,5 @@
 {
+  "$schema": "../../../../../tools/schemas/item.schema.json",
   "version": 1,
   "id": "leather-jerkin",
   "name": "Leather Jerkin",

@@ -1,4 +1,5 @@
 {
+  "$schema": "../../../../../tools/schemas/ability.schema.json",
   "version": 1,
   "id": "move",
   "name": "Move",

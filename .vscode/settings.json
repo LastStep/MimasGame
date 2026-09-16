@@ -1,0 +1,33 @@
+{
+  "//": "Maps the game data folders to tools/schemas/*. Each data file also carries its own $schema line (which Rider and Visual Studio honour); this covers a new file before that line is written.",
+  "json.schemas": [
+    {
+      "fileMatch": ["/MimasClient/Assets/_Game/Data/rules.json"],
+      "url": "./tools/schemas/rules.schema.json"
+    },
+    {
+      "fileMatch": ["/MimasClient/Assets/_Game/Data/terrains.json"],
+      "url": "./tools/schemas/terrains.schema.json"
+    },
+    {
+      "fileMatch": ["/MimasClient/Assets/_Game/Data/timecontrols.json"],
+      "url": "./tools/schemas/timecontrols.schema.json"
+    },
+    {
+      "fileMatch": ["/MimasClient/Assets/_Game/Data/items/*.json"],
+      "url": "./tools/schemas/item.schema.json"
+    },
+    {
+      "fileMatch": ["/MimasClient/Assets/_Game/Data/abilities/*.json"],
+      "url": "./tools/schemas/ability.schema.json"
+    },
+    {
+      "fileMatch": ["/MimasClient/Assets/_Game/Data/modifiers/*.json"],
+      "url": "./tools/schemas/modifier.schema.json"
+    },
+    {
+      "fileMatch": ["/MimasClient/Assets/_Game/Data/maps/*.json"],
+      "url": "./tools/schemas/map.schema.json"
+    }
+  ]
+}
