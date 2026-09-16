@@ -111,8 +111,11 @@ namespace Mimas.Core.Match
 
             for (int player = 0; player < MatchSetup.PlayerCount; player++)
             {
-                ClassDef cls = catalog.Classes.Get(setup.ClassIdOf(player));
-                var unit = new Unit(player, player, player == 0 ? MapData.SpawnP1 : MapData.SpawnP2, cls);
+                Loadout loadout = setup.LoadoutOf(player);
+                var items = new List<ItemDef>(ItemSlots.All.Length);
+                for (int s = 0; s < ItemSlots.All.Length; s++)
+                    items.Add(catalog.GetItemForSlot(ItemSlots.All[s], loadout.IdForSlot(ItemSlots.All[s])));
+                var unit = new Unit(player, player, player == 0 ? MapData.SpawnP1 : MapData.SpawnP2, catalog.Rules, items);
                 IReadOnlyList<string> modifiers = setup.ModifierIdsOf(player);
                 for (int i = 0; i < modifiers.Count; i++)
                 {

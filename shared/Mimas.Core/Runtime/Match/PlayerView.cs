@@ -6,19 +6,33 @@ using Mimas.Core.Units;
 
 namespace Mimas.Core.Match
 {
-    /// <summary>One ability or modifier as one player sees it on a unit. <see cref="Id"/> is null while hidden.</summary>
+    /// <summary>
+    /// One ability or modifier as one player sees it on a unit. <see cref="Id"/> is null while hidden.
+    /// <see cref="SourceItemId"/> is set even for a hidden ability: which item grants it is public, what it
+    /// does is not (design: #hidden-info).
+    /// </summary>
     public sealed class KnownEntry
     {
         public string Id { get; }
+
+        /// <summary>The item that granted this ability, or null when innate or when this is a modifier.</summary>
+        public string SourceItemId { get; }
+
         public bool Revealed => Id != null;
 
         public KnownEntry(string id)
         {
             Id = id;
         }
+
+        public KnownEntry(string id, string sourceItemId)
+        {
+            Id = id;
+            SourceItemId = sourceItemId;
+        }
     }
 
-    /// <summary>A unit as one player sees it. Position, class and numbers are public; abilities and hidden modifiers are not.</summary>
+    /// <summary>A unit as one player sees it. Position, gear and numbers are public; abilities and hidden modifiers are not.</summary>
     public sealed class UnitView
     {
         private readonly List<KnownEntry> _abilities;
@@ -26,7 +40,9 @@ namespace Mimas.Core.Match
 
         public int Id { get; }
         public int Owner { get; }
-        public string ClassId { get; }
+
+        /// <summary>Equipped item ids in slot order (weapon, crown, boots, armour). Always public.</summary>
+        public IReadOnlyList<string> ItemIds { get; }
         public Hex Position { get; }
         public int Hp { get; }
         public int MaxHp { get; }
@@ -43,12 +59,12 @@ namespace Mimas.Core.Match
         /// <summary>Modifiers in grant order; hidden, unrevealed entries have a null id.</summary>
         public IReadOnlyList<KnownEntry> Modifiers => _modifiers;
 
-        public UnitView(int id, int owner, string classId, Hex position, int hp, int maxHp, int ap, int apPerTurn, bool isMine,
+        public UnitView(int id, int owner, IReadOnlyList<string> itemIds, Hex position, int hp, int maxHp, int ap, int apPerTurn, bool isMine,
             List<KnownEntry> abilities, List<KnownEntry> modifiers)
         {
             Id = id;
             Owner = owner;
-            ClassId = classId;
+            ItemIds = itemIds ?? new List<string>();
             Position = position;
             Hp = hp;
             MaxHp = maxHp;
@@ -125,7 +141,7 @@ namespace Mimas.Core.Match
                 {
                     string id = unit.AbilityIds[a];
                     bool known = mine || state.Knows(viewer, unit.Id, id);
-                    abilities.Add(new KnownEntry(known ? id : null));
+                    abilities.Add(new KnownEntry(known ? id : null, unit.AbilitySourceOf(id)));
                 }
 
                 var modifiers = new List<KnownEntry>(unit.ModifierIds.Count);
@@ -138,7 +154,7 @@ namespace Mimas.Core.Match
                     modifiers.Add(new KnownEntry(known ? id : null));
                 }
 
-                units.Add(new UnitView(unit.Id, unit.Owner, unit.ClassId, unit.Position, unit.Hp, unit.MaxHp, unit.Ap, unit.ApPerTurn, mine, abilities, modifiers));
+                units.Add(new UnitView(unit.Id, unit.Owner, unit.ItemIds, unit.Position, unit.Hp, unit.MaxHp, unit.Ap, unit.ApPerTurn, mine, abilities, modifiers));
             }
 
             return new PlayerView(viewer, state.ActivePlayer, state.TurnNumber, state.ActedThisTurn, state.IsOver, state.Winner, state.MapData.Id, units);
