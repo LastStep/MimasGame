@@ -130,6 +130,8 @@ namespace Mimas.Client.Presentation
                 // The same unlit overlay the aim line uses: a flat, readable dot that terrain can hide.
                 _material = new Material(shader) { name = "Projectile (runtime)" };
                 _material.SetFloat(Shader.PropertyToID("_DashDuty"), 1f);
+                // Unlike the preview line, a projectile is an object in the world: terrain may hide it.
+                _material.SetFloat(Shader.PropertyToID("_ZTest"), (float)UnityEngine.Rendering.CompareFunction.LessEqual);
                 renderer.sharedMaterial = _material;
             }
 

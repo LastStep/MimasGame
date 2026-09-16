@@ -11,6 +11,9 @@ namespace Mimas.Client.Presentation
         public readonly string Name;
         public readonly string Description;
 
+        /// <summary>One line of rules shorthand above the description ("Lobbed · no sight needed · range 1-5"), or null.</summary>
+        public readonly string Detail;
+
         /// <summary>Presentation icon key from the ability JSON, or null (the HUD then draws a glyph).</summary>
         public readonly string Icon;
 
@@ -26,11 +29,12 @@ namespace Mimas.Client.Presentation
         /// <summary>True when clicking it arms it: the player's turn, nothing playing, and affordable.</summary>
         public readonly bool Enabled;
 
-        public HudAction(string id, string name, string description, string icon, string category, int cost, bool affordable, bool enabled)
+        public HudAction(string id, string name, string description, string detail, string icon, string category, int cost, bool affordable, bool enabled)
         {
             Id = id;
             Name = name;
             Description = description;
+            Detail = detail;
             Icon = icon;
             Category = category;
             Cost = cost;
@@ -83,6 +87,10 @@ namespace Mimas.Client.Presentation
     {
         public int Id;
         public bool IsMine;
+
+        /// <summary>True for a destructible prop: a shorter, neutral bar and no action points. Walls get no tag at all.</summary>
+        public bool IsProp;
+
         public bool IsAlive = true;
         public int Hp;
         public int MaxHp;
@@ -117,6 +125,17 @@ namespace Mimas.Client.Presentation
         public string AbilityName;
         public int Total;
         public bool IsExact;
+
+        /// <summary>
+        /// Why this shot would be refused ("No line of sight", "Trajectory blocked", "Out of range",
+        /// "Cannot be hit"), or null when it is legal. The damage below it is then what the shot <em>would</em>
+        /// do, and the target's bar shows no ghost.
+        /// </summary>
+        public string BlockedReason;
+
+        /// <summary>True when the target is a prop rather than a hero; <see cref="TargetUnitId"/> is then its body id.</summary>
+        public bool TargetIsProp;
+
         public List<HudPreviewLine> Lines = new List<HudPreviewLine>();
     }
 
@@ -175,8 +194,17 @@ namespace Mimas.Client.Presentation
         /// <summary>Every unit's overlay, living or dead. Same objects across frames; numbers change in place.</summary>
         IReadOnlyList<HudUnit> Units { get; }
 
-        /// <summary>Damage preview for the hovered legal target of the armed attack, or null.</summary>
+        /// <summary>Damage preview for the hovered target of the armed attack, or null.</summary>
         HudPreview Preview { get; }
+
+        /// <summary>
+        /// A short label pinned next to the cursor ("Out of range", "Cannot be hit"), or null. It answers the
+        /// question the player is asking with the cursor, where they are looking, rather than in a panel.
+        /// </summary>
+        string CursorTag { get; }
+
+        /// <summary>Cursor position in screen pixels, for placing <see cref="CursorTag"/>.</summary>
+        Vector2 CursorScreenPosition { get; }
 
         /// <summary>Centre-screen text once the match is over ("VICTORY" / "DEFEAT"), else null.</summary>
         string Banner { get; }

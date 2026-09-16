@@ -13,6 +13,11 @@ Shader "Mimas/AimLine"
         _DashCount("Dashes along the line", Float) = 20
         _DashDuty("Lit fraction of a dash", Range(0.05, 1)) = 0.55
         _DashSpeed("Dash scroll, dashes per second", Float) = 1.2
+
+        // Always (8) for the preview: a line that is blocked by a plateau would otherwise be hidden inside the
+        // very thing blocking it, which is the one moment the player needs to see it. LEqual (4) for the
+        // projectile, which should duck behind terrain like a real object.
+        [Enum(UnityEngine.Rendering.CompareFunction)] _ZTest("Depth test", Float) = 8
     }
 
     SubShader
@@ -27,7 +32,7 @@ Shader "Mimas/AimLine"
 
         Blend SrcAlpha OneMinusSrcAlpha
         ZWrite Off
-        ZTest LEqual
+        ZTest [_ZTest]
         Cull Off
 
         Pass
@@ -48,6 +53,7 @@ Shader "Mimas/AimLine"
                 float _DashCount;
                 float _DashDuty;
                 float _DashSpeed;
+                float _ZTest;
             CBUFFER_END
 
             struct Attributes

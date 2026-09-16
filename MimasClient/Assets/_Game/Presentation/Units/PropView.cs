@@ -45,6 +45,12 @@ namespace Mimas.Client.Presentation
         /// <summary>Height of the placeholder body in world units, for anything that wants to sit above it.</summary>
         public float BodyWorldHeight { get; private set; }
 
+        /// <summary>Where shots land on this prop, in Core's height units above the tile top.</summary>
+        public int AimHeightUnits { get; private set; }
+
+        /// <summary>How tall this prop stands, in Core's height units above the tile top.</summary>
+        public int BodyHeightUnits { get; private set; }
+
         /// <summary>
         /// Places and builds the placeholder from the projection. Safe to call once per prop, right after the
         /// board is built; <paramref name="worldPerUnit"/> comes from <see cref="BoardView.WorldPerHeightUnit"/>
@@ -59,6 +65,8 @@ namespace Mimas.Client.Presentation
             DefId = view.DefId;
             CurrentHex = view.Position;
             IsDamageable = view.IsDamageable;
+            AimHeightUnits = view.AimHeight;
+            BodyHeightUnits = view.BodyHeight;
             BodyWorldHeight = view.BodyHeight * worldPerUnit;
 
             transform.position = board.HexToSurface(view.Position);

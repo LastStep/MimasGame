@@ -46,6 +46,16 @@ namespace Mimas.Client.Presentation
         [Tooltip("View for the bot's unit (player 1).")]
         [SerializeField] private UnitView _opponent;
 
+        [Header("Aiming")]
+        [Tooltip("Draws the path preview. Empty falls back to the component on the board.")]
+        [SerializeField] private AimPreview _aimPreview;
+
+        [Tooltip("Draws the range band. Empty falls back to the component on the board.")]
+        [SerializeField] private RangeCircles _rangeCircles;
+
+        [Tooltip("Flies the projectile on a resolved attack. Empty falls back to the component on the board.")]
+        [SerializeField] private ProjectilePlayback _projectiles;
+
         [Header("Playback")]
         [SerializeField] private MovePlaybackSettings _playback = MovePlaybackSettings.Default;
 
@@ -69,6 +79,13 @@ namespace Mimas.Client.Presentation
         private RandomBot _bot;
         private PlayerView _view;
         private int _localUnitId = None;
+
+        /// <summary>
+        /// The same calculator the rules use (ADR-017: preview and actual share one function). The session owns
+        /// one so it can also ask what a <em>refused</em> shot would have done — the number the tooltip shows
+        /// behind a "No line of sight" line. The networked session will get that number from the server instead.
+        /// </summary>
+        private DamageCalculator _damage;
 
         // Views.
         private readonly Dictionary<int, UnitView> _unitViews = new Dictionary<int, UnitView>();
@@ -95,8 +112,10 @@ namespace Mimas.Client.Presentation
         private MovementOptions _moveOptions = MovementOptions.Empty;
         private HudExamine _examine;
         private int _examinedUnitId = None;
+        private int _examinedPropId = None;
         private HudPreview _preview;
         private HudUnit _previewUnit;
+        private string _cursorTag;
         private string _banner;
         private bool _ready;
 
@@ -127,6 +146,8 @@ namespace Mimas.Client.Presentation
         public HudExamine Examine => _examine;
         public IReadOnlyList<HudUnit> Units => _hudUnits;
         public HudPreview Preview => _preview;
+        public string CursorTag => _cursorTag;
+        public Vector2 CursorScreenPosition => _input != null ? _input.PointerPosition : Vector2.zero;
         public string Banner => _banner;
         public Camera WorldCamera => _input != null ? _input.ActiveCamera : Camera.main;
 
@@ -138,7 +159,9 @@ namespace Mimas.Client.Presentation
 
         private Mimas.Core.Match.UnitView LocalUnitView => _view != null && _localUnitId != None ? _view.FindUnit(_localUnitId) : null;
 
-        private bool IsPlaying => _movingUnitId != None || Time.time < _pauseUntil || _pending.Count > 0;
+        private bool IsPlaying => _movingUnitId != None || Time.time < _pauseUntil || _pending.Count > 0 || ProjectileInFlight;
+
+        private bool ProjectileInFlight => _projectiles != null && _projectiles.IsPlaying;
 
         /// <summary>The local player may arm an action or pick a target right now.</summary>
         private bool CanAct => _ready && !_state.IsOver && _state.ActivePlayer == LocalPlayer && !IsPlaying;
@@ -155,6 +178,7 @@ namespace Mimas.Client.Presentation
 
             _armed = index;
             _examinedUnitId = None;                      // arming replaces examine; the board is now targeting
+            _examinedPropId = None;
             PaintOptions();
             RaiseStateChanged();
         }
@@ -167,8 +191,10 @@ namespace Mimas.Client.Presentation
 
         public void CloseExamine()
         {
-            if (_examinedUnitId == None) return;
+            if (_examinedUnitId == None && _examinedPropId == None) return;
             _examinedUnitId = None;
+            _examinedPropId = None;
+            RefreshView();
             RaiseStateChanged();
         }
 
@@ -188,13 +214,18 @@ namespace Mimas.Client.Presentation
                 Debug.LogWarning("[LocalMatchSession] No MatchSettings assigned; using built-in defaults.", this);
                 _settings = ScriptableObject.CreateInstance<MatchSettings>();
             }
+
+            // The aiming layer lives on the board object; taking it from there keeps the scene wiring to one field.
+            if (_aimPreview == null) _aimPreview = _board.GetComponent<AimPreview>();
+            if (_rangeCircles == null) _rangeCircles = _board.GetComponent<RangeCircles>();
+            if (_projectiles == null) _projectiles = _board.GetComponent<ProjectilePlayback>();
         }
 
         private void OnEnable()
         {
             if (_board == null || _input == null) return;
             _board.BoardBuilt += HandleBoardBuilt;
-            _input.TileClicked += HandleTileClicked;
+            _input.Clicked += HandleClicked;
             _input.HoverChanged += HandleHoverChanged;
             _input.RightClicked += HandleRightClicked;
             if (_unit != null) _unit.Mover.Arrived += HandleArrived;
@@ -205,7 +236,7 @@ namespace Mimas.Client.Presentation
         {
             if (_board == null || _input == null) return;
             _board.BoardBuilt -= HandleBoardBuilt;
-            _input.TileClicked -= HandleTileClicked;
+            _input.Clicked -= HandleClicked;
             _input.HoverChanged -= HandleHoverChanged;
             _input.RightClicked -= HandleRightClicked;
             if (_unit != null) _unit.Mover.Arrived -= HandleArrived;
@@ -286,6 +317,7 @@ namespace Mimas.Client.Presentation
             }
 
             _bot = new RandomBot(_settings.Seed ^ 0x9E3779B9u);
+            _damage = new DamageCalculator(_catalog);
 
             _unitViews.Clear();
             _propViews.Clear();
@@ -368,7 +400,33 @@ namespace Mimas.Client.Presentation
                 PropView view = go.AddComponent<PropView>();
                 view.Configure(prop, _board, worldPerUnit, PropColor(prop.DefId));
                 _propViews[prop.Id] = view;
+
+                // Only something that can be destroyed gets a bar: a wall has no hit points to show.
+                if (!prop.IsDamageable) continue;
+
+                var hud = new HudUnit
+                {
+                    Id = prop.Id,
+                    IsMine = false,
+                    IsProp = true,
+                    Hp = prop.Hp,
+                    MaxHp = prop.MaxHp,
+                    Anchor = view.transform,
+                    AnchorOffset = new Vector3(0f, view.BodyWorldHeight + 0.25f, 0f),
+                };
+                _hudUnits.Add(hud);
+                _hudUnitsById[prop.Id] = hud;
             }
+        }
+
+        /// <summary>Drops a body's floating tag, in place, when it leaves the board.</summary>
+        private void RemoveHudUnit(int id)
+        {
+            HudUnit hud;
+            if (!_hudUnitsById.TryGetValue(id, out hud)) return;
+            _hudUnitsById.Remove(id);
+            _hudUnits.Remove(hud);
+            if (_previewUnit == hud) _previewUnit = null;
         }
 
         /// <summary>Placeholder colours until props have models: a wall is stone-dark, a pillar sandstone.</summary>
@@ -421,7 +479,7 @@ namespace Mimas.Client.Presentation
         {
             while (_pending.Count > 0)
             {
-                if (_movingUnitId != None || Time.time < _pauseUntil) return;
+                if (_movingUnitId != None || Time.time < _pauseUntil || ProjectileInFlight) return;
                 Play(_pending.Dequeue());
             }
         }
@@ -471,6 +529,9 @@ namespace Mimas.Client.Presentation
                         _propViews.Remove(destroyed.PropId);
                         if (prop != null) prop.PlayDestroyed(null);
                     }
+                    RemoveHudUnit(destroyed.PropId);
+                    if (_examinedPropId == destroyed.PropId) _examinedPropId = None;
+                    // Occupancy and sight are Core's: the tile is already walkable and already lets shots through.
                     RefreshView();
                     RaiseStateChanged();
                     break;
@@ -494,6 +555,7 @@ namespace Mimas.Client.Presentation
                         _penaltyPending = _idleTurnSeconds > 0f;
                     Disarm();
                     _examinedUnitId = None;
+                    _examinedPropId = None;
                     RefreshView();
                     RaiseStateChanged();
                     break;
@@ -514,6 +576,7 @@ namespace Mimas.Client.Presentation
             for (int i = 0; i < _hudUnits.Count; i++)
             {
                 HudUnit hud = _hudUnits[i];
+                if (hud.IsProp) continue;               // a prop's id is a body id, not a unit id, and it has no turn
                 Unit unit = _state.Units.Get(hud.Id);
                 if (unit.Owner == started.Player) hud.Ap = unit.IsAlive ? unit.ApPerTurn : 0;
             }
@@ -565,37 +628,137 @@ namespace Mimas.Client.Presentation
             _movingPlan = null;
         }
 
+        /// <summary>
+        /// Plays one resolved attack: the projectile flies the same curve the preview drew, and only when it
+        /// lands does the target's bar drop and the flyover fire. Nothing about the shot is recomputed here —
+        /// the damage is the event's, the geometry is the two bodies' aim points.
+        /// </summary>
         private void PlayAttack(AttackResolvedEvent attack)
         {
-            HudUnit target;
-            if (_hudUnitsById.TryGetValue(attack.TargetId, out target))
-            {
-                target.Hp = attack.TargetHpAfter;
-                target.GhostDamage = 0;
-            }
-
             string detail = DescribeSurprise(attack);
             _revealedThisBatch.Clear();
 
-            UnitView view;
-            if (_unitViews.TryGetValue(attack.TargetId, out view))
+            ClearAim();
+
+            var def = _catalog.Abilities.TryGet(attack.AbilityId, out AbilityDef ability) ? ability as AttackDef : null;
+            Func<float, Vector3> curve = BuildResolvedCurve(attack, def);
+            float duration = def != null ? ProjectilePlayback.DurationFor(def.Trajectory, ResolvedDistance(attack)) : 0f;
+
+            int targetId = attack.TargetId;
+            int damage = attack.Damage;
+            int hpAfter = attack.TargetHpAfter;
+            Vector3 impact = TargetOverlayPosition(attack);
+
+            Action onImpact = () =>
             {
+                HudUnit target;
+                if (_hudUnitsById.TryGetValue(targetId, out target))
+                {
+                    target.Hp = hpAfter;
+                    target.GhostDamage = 0;
+                }
+
                 var handler = Flyover;
                 if (handler != null)
                 {
                     handler(new HudFlyover
                     {
-                        UnitId = attack.TargetId,
-                        WorldPosition = view.transform.position + new Vector3(0f, _overlayHeight, 0f),
-                        Headline = "-" + attack.Damage,
+                        UnitId = targetId,
+                        WorldPosition = impact,
+                        Headline = "-" + damage,
                         Detail = detail,
                     });
                 }
+
+                _pauseUntil = Time.time + _settings.HitPauseSeconds;
+                RefreshView();
+                RaiseStateChanged();
+            };
+
+            if (_projectiles == null || curve == null || duration <= 0f)
+            {
+                onImpact();
+                return;
             }
 
-            _pauseUntil = Time.time + _settings.HitPauseSeconds;
-            RefreshView();
+            _projectiles.Play(curve, duration, _projectiles.ColorFor(def.Category), onImpact);
             RaiseStateChanged();
+        }
+
+        /// <summary>The curve of an attack that has already happened: attacker aim point to victim aim point.</summary>
+        private Func<float, Vector3> BuildResolvedCurve(AttackResolvedEvent attack, AttackDef def)
+        {
+            UnitView attacker;
+            if (def == null || !_unitViews.TryGetValue(attack.AttackerId, out attacker)) return null;
+
+            Transform target = TargetAimPoint(attack);
+            if (target == null) return null;
+
+            int fromUnits = _board.TileTopUnits(attacker.CurrentHex) + attacker.AimHeightUnits;
+            int toUnits = _board.TileTopUnits(TargetHex(attack)) + TargetAimHeightUnits(attack);
+
+            return FlightCurve.Build(def.Trajectory, attacker.AimPoint.position, target.position,
+                fromUnits, toUnits, def.Apex, _board.WorldPerHeightUnit, 3 * _catalog.Rules.Heights.Body);
+        }
+
+        private Transform TargetAimPoint(AttackResolvedEvent attack)
+        {
+            if (attack.TargetIsProp)
+            {
+                PropView prop;
+                return _propViews.TryGetValue(attack.TargetId, out prop) && prop != null ? prop.AimPoint : null;
+            }
+            UnitView unit;
+            return _unitViews.TryGetValue(attack.TargetId, out unit) ? unit.AimPoint : null;
+        }
+
+        private Hex TargetHex(AttackResolvedEvent attack)
+        {
+            if (attack.TargetIsProp)
+            {
+                PropView prop;
+                if (_propViews.TryGetValue(attack.TargetId, out prop) && prop != null) return prop.CurrentHex;
+                return default;
+            }
+            UnitView unit;
+            return _unitViews.TryGetValue(attack.TargetId, out unit) ? unit.CurrentHex : default;
+        }
+
+        private int TargetAimHeightUnits(AttackResolvedEvent attack)
+        {
+            if (attack.TargetIsProp)
+            {
+                PropView prop;
+                if (_propViews.TryGetValue(attack.TargetId, out prop) && prop != null) return prop.AimHeightUnits;
+                return _catalog.Rules.Heights.Aim;
+            }
+            UnitView unit;
+            return _unitViews.TryGetValue(attack.TargetId, out unit) ? unit.AimHeightUnits : _catalog.Rules.Heights.Aim;
+        }
+
+        private int ResolvedDistance(AttackResolvedEvent attack)
+        {
+            UnitView attacker;
+            if (!_unitViews.TryGetValue(attack.AttackerId, out attacker)) return 0;
+            return Hex.Distance(attacker.CurrentHex, TargetHex(attack));
+        }
+
+        /// <summary>Where the damage number pops: above the body that was hit.</summary>
+        private Vector3 TargetOverlayPosition(AttackResolvedEvent attack)
+        {
+            if (attack.TargetIsProp)
+            {
+                PropView prop;
+                if (_propViews.TryGetValue(attack.TargetId, out prop) && prop != null)
+                    return prop.transform.position + new Vector3(0f, prop.BodyWorldHeight + 0.25f, 0f);
+            }
+            else
+            {
+                UnitView unit;
+                if (_unitViews.TryGetValue(attack.TargetId, out unit))
+                    return unit.transform.position + new Vector3(0f, _overlayHeight, 0f);
+            }
+            return _board.HexToSurface(TargetHex(attack)) + new Vector3(0f, _overlayHeight, 0f);
         }
 
         /// <summary>"BLOCKED 4 · WARD OF FEATHERS REVEALED" when a hidden line changed the number, else null.</summary>
@@ -657,7 +820,8 @@ namespace Mimas.Client.Presentation
             {
                 AbilityDef def = _abilities[i];
                 bool affordable = me != null && me.Ap >= def.Cost;
-                _actions.Add(new HudAction(def.Id, def.Name, def.Description, def.Icon, def.Category, def.Cost, affordable, canAct && affordable));
+                _actions.Add(new HudAction(def.Id, def.Name, def.Description, DescribeAttackRules(def as AttackDef),
+                    def.Icon, def.Category, def.Cost, affordable, canAct && affordable));
             }
         }
 
@@ -673,6 +837,13 @@ namespace Mimas.Client.Presentation
 
         private void RefreshExamine()
         {
+            if (_examinedPropId != None)
+            {
+                _examine = ExamineProp(_examinedPropId);
+                if (_examine != null) return;
+                _examinedPropId = None;            // it was destroyed while the panel was open
+            }
+
             Mimas.Core.Match.UnitView unit = _examinedUnitId == None || _view == null ? null : _view.FindUnit(_examinedUnitId);
             if (unit == null)
             {
@@ -724,6 +895,38 @@ namespace Mimas.Client.Presentation
             }
 
             _examine = examine;
+        }
+
+        /// <summary>
+        /// The examine panel for a prop: what it is, what it is made of and what it costs to remove. Props are
+        /// neutral and entirely public (design: #props), so there is nothing here to hide and no gear or
+        /// abilities to list. Null when that prop is no longer on the board.
+        /// </summary>
+        private HudExamine ExamineProp(int propId)
+        {
+            if (_view == null) return null;
+            Mimas.Core.Match.PropView prop = _view.FindProp(propId);
+            if (prop == null) return null;
+
+            PropDef def;
+            bool known = _catalog.Props.TryGet(prop.DefId, out def);
+
+            var examine = new HudExamine
+            {
+                Title = known ? def.Name : prop.DefId,
+                Subtitle = "Terrain",
+                Description = known ? def.Description : null,
+                Hp = prop.Hp,
+                MaxHp = prop.MaxHp,
+            };
+            examine.Modifiers.Add(new HudExamineEntry
+            {
+                Name = "Blocks sight and movement",
+                Description = prop.IsDamageable
+                    ? "Shots stop on it and nothing walks through it, until it comes down."
+                    : "Shots stop on it and nothing walks through it. It cannot be destroyed.",
+            });
+            return examine;
         }
 
         /// <summary>Adds every ability the given item grants (or every innate one when <paramref name="itemId"/> is null).</summary>
@@ -792,6 +995,28 @@ namespace Mimas.Client.Presentation
             }
         }
 
+        /// <summary>
+        /// The one rules line above an attack's description: how it travels, whether the attacker has to see the
+        /// target, and the range band — the three things that decide whether this shot is even possible from here
+        /// (design: #trajectories, #attacks). Null for anything that is not an attack.
+        /// </summary>
+        private static string DescribeAttackRules(AttackDef attack)
+        {
+            if (attack == null) return null;
+
+            string travel;
+            if (attack.Trajectory == Trajectories.Arc) travel = "Lobbed";
+            else if (attack.Trajectory == Trajectories.Sky) travel = "From above";
+            else travel = "Straight shot";
+
+            string sight = attack.LineOfSight ? "needs sight" : "no sight needed";
+            string range = attack.MinRange == attack.Range
+                ? "range " + attack.Range
+                : "range " + attack.MinRange + "-" + attack.Range;
+
+            return travel + "  ·  " + sight + "  ·  " + range;
+        }
+
         private static string DescribeAbility(AbilityDef def)
         {
             var attack = def as AttackDef;
@@ -830,15 +1055,39 @@ namespace Mimas.Client.Presentation
                 _moveOptions = _state.MoveOptions(_localUnitId, def.Id);
                 for (int i = 0; i < _moveOptions.Plans.Count; i++) _highlight.Add(_moveOptions.Plans[i].Destination);
                 _board.HighlightReachable(_highlight);
+                ClearAim();
             }
-            else if (def is AttackDef)
+            else
             {
+                var attack = def as AttackDef;
+                if (attack == null) return;
+
                 _state.AttackTargets(_localUnitId, def.Id, _targetScratch);
                 for (int i = 0; i < _targetScratch.Count; i++) _highlight.Add(_targetScratch[i].Position);
                 _targetScratch.Clear();
                 _board.HighlightTargets(_highlight);
+                ShowRangeBand(attack);
             }
             RefreshEmphasis();
+
+            // Arming is itself a hover: the cursor is usually already sitting on what the player wants to shoot,
+            // and making them jiggle the mouse to see the line would be a silly way to find that out.
+            if (_input != null) HandleHoverChanged(_input.Hover);
+        }
+
+        /// <summary>
+        /// Draws the attack's range band as two circles centred on the hero. The rule is Euclidean
+        /// (<c>minRange² ≤ q²+qr+r² ≤ range²</c>), and the world distance between two hex centres is exactly
+        /// <c>spacing · √(q²+qr+r²)</c>, so a circle of <c>range · spacing</c> is that rule drawn — not an
+        /// approximation of it, which is why the band needs no tile list to dim.
+        /// </summary>
+        private void ShowRangeBand(AttackDef attack)
+        {
+            UnitView me;
+            if (_rangeCircles == null || _localUnitId == None || !_unitViews.TryGetValue(_localUnitId, out me)) return;
+
+            float spacing = _board.Spacing;
+            _rangeCircles.Show(me.transform.position, attack.MinRange * spacing, attack.Range * spacing);
         }
 
         /// <summary>After an action, keep the same ability armed while it is still usable (three steps are three clicks).</summary>
@@ -854,20 +1103,21 @@ namespace Mimas.Client.Presentation
             PaintOptions();
         }
 
-        private void HandleTileClicked(TileView tile)
+        private void HandleClicked(BoardHover hover)
         {
             if (!_ready) return;
 
-            if (tile == null)
+            if (!hover.Any)
             {
-                bool changed = _armed != None || _examinedUnitId != None;
+                bool changed = _armed != None || _examinedUnitId != None || _examinedPropId != None;
                 Disarm();
                 _examinedUnitId = None;
+                _examinedPropId = None;
                 if (changed) { RefreshView(); RaiseStateChanged(); }
                 return;
             }
 
-            Hex coord = tile.Coord;
+            Hex coord = hover.Hex;
 
             if (_armed != None)
             {
@@ -899,9 +1149,11 @@ namespace Mimas.Client.Presentation
                 return;
             }
 
-            // Nothing armed: clicks on units open examine, anything else closes it.
+            // Nothing armed: clicks on a body open examine, anything else closes it. A prop is worth examining
+            // too — "can I bring this down, and what does it block?" is a real question (design: #props).
             Unit clicked;
             _examinedUnitId = _state.Units.TryGetUnitAt(coord, out clicked) ? clicked.Id : None;
+            _examinedPropId = _examinedUnitId == None && hover.Prop != null ? hover.Prop.Id : None;
             RefreshView();
             RaiseStateChanged();
         }
@@ -915,7 +1167,12 @@ namespace Mimas.Client.Presentation
             if (def == null || IsPlaying || !hover.Any)
             {
                 _board.ShowPathPreview(null);
-                if (ClearPreview()) RaiseStateChanged();
+                // The band stays lit while the cursor is off the board — it belongs to the armed ability, not the
+                // cursor — but there is nothing left to aim at, so the line and the tag go.
+                if (_aimPreview != null) _aimPreview.Hide();
+                bool changed = _cursorTag != null;
+                _cursorTag = null;
+                if (ClearPreview() || changed) RaiseStateChanged();
                 return;
             }
 
@@ -926,22 +1183,93 @@ namespace Mimas.Client.Presentation
                 return;
             }
 
-            if (def is AttackDef)
-            {
-                // Aiming is local presentation: the hero turns towards whatever the cursor snapped to, and no
-                // command, event or byte on the wire ever says so (design: #presentation).
-                FaceAim(SnappedAimPoint(hover));
+            var attack = def as AttackDef;
+            if (attack != null) ShowAim(attack, hover);
+        }
 
-                DamageBreakdown breakdown = _state.PreviewAttack(LocalPlayer, _localUnitId, def.Id, hover.Hex);
-                Unit target;
-                if (breakdown == null || !_state.Units.TryGetUnitAt(hover.Hex, out target))
+        /// <summary>
+        /// The aim state machine (design: #presentation). One <see cref="MatchState.CheckTarget"/> answers what
+        /// would happen, and the answer decides the line, the tooltip and the cursor tag together — so the board
+        /// and the HUD can never tell the player two different stories.
+        /// </summary>
+        private void ShowAim(AttackDef attack, BoardHover hover)
+        {
+            // Aiming is local presentation: the hero turns towards whatever the cursor snapped to, and no
+            // command, event or byte on the wire ever says so (design: #presentation).
+            Vector3 aimPoint = SnappedAimPoint(hover);
+            FaceAim(aimPoint);
+
+            TargetCheck check = _state.CheckTarget(_localUnitId, attack.Id, hover.Hex);
+            Func<float, Vector3> curve = BuildCurve(attack, hover, aimPoint);
+            int samples = FlightCurve.Samples(attack.Trajectory);
+
+            ClearPreview();
+            _cursorTag = null;
+
+            switch (check.Reason)
+            {
+                case TargetRejectReason.None:
+                    _aimPreview.ShowClear(curve, aimPoint, samples);
+                    ShowPreview(attack, check.Victim, null);
+                    break;
+
+                case TargetRejectReason.NoLineOfSight:
+                case TargetRejectReason.TrajectoryBlocked:
                 {
-                    if (ClearPreview()) RaiseStateChanged();
-                    return;
+                    Vector3 blocked = check.HasBlockedAt ? _board.HexToAimPoint(check.BlockedAt, 0) : aimPoint;
+                    _aimPreview.ShowBlocked(curve, blocked, samples);
+                    ShowPreview(attack, check.Victim,
+                        check.Reason == TargetRejectReason.NoLineOfSight ? "No line of sight" : "Trajectory blocked");
+                    break;
                 }
-                ShowPreview(def, target, breakdown);
-                RaiseStateChanged();
+
+                case TargetRejectReason.OutOfRange:
+                    _aimPreview.ShowOutOfRange(curve, samples);
+                    _cursorTag = "Out of range";
+                    ShowPreview(attack, check.Victim, "Out of range");
+                    break;
+
+                case TargetRejectReason.NotDamageable:
+                    _aimPreview.ShowNotTargetable(curve, aimPoint, samples);
+                    _cursorTag = "Cannot be hit";
+                    break;
+
+                case TargetRejectReason.OwnUnit:
+                case TargetRejectReason.TargetDead:
+                    _aimPreview.Hide();
+                    break;
+
+                default:
+                    // NoBody, and anything added to the enum later: an empty tile gets the grey path and no words.
+                    _aimPreview.ShowOutOfRange(curve, samples);
+                    break;
             }
+
+            RaiseStateChanged();
+        }
+
+        /// <summary>
+        /// The world curve for a shot at this hover, from the attacker's aim point to the snapped one, with both
+        /// ends also expressed in Core's height units because that is what the arc's shape depends on.
+        /// </summary>
+        private Func<float, Vector3> BuildCurve(AttackDef attack, BoardHover hover, Vector3 aimPoint)
+        {
+            UnitView me;
+            if (_localUnitId == None || !_unitViews.TryGetValue(_localUnitId, out me)) return null;
+
+            int fromUnits = _board.TileTopUnits(me.CurrentHex) + me.AimHeightUnits;
+            int toUnits = _board.TileTopUnits(hover.Hex) + TargetAimHeightUnits(hover);
+
+            return FlightCurve.Build(attack.Trajectory, me.AimPoint.position, aimPoint,
+                fromUnits, toUnits, attack.Apex, _board.WorldPerHeightUnit, 3 * _catalog.Rules.Heights.Body);
+        }
+
+        /// <summary>The aim height of whatever the cursor snapped to, in height units above its tile top.</summary>
+        private int TargetAimHeightUnits(BoardHover hover)
+        {
+            if (hover.Unit != null) return hover.Unit.AimHeightUnits;
+            if (hover.Prop != null) return hover.Prop.AimHeightUnits;
+            return _catalog.Rules.Heights.Aim;
         }
 
         /// <summary>
@@ -1002,9 +1330,28 @@ namespace Mimas.Client.Presentation
             return best;
         }
 
-        private void ShowPreview(AbilityDef def, Unit target, DamageBreakdown breakdown)
+        /// <summary>
+        /// Fills the damage tooltip for a body the cursor is on. A refused shot still shows the number it
+        /// <em>would</em> do under <paramref name="blockedReason"/> — the player is choosing between shots, and
+        /// "this one is worth moving for" is the decision — but the target's bar shows no ghost, because nothing
+        /// is going to happen.
+        /// </summary>
+        private void ShowPreview(AttackDef attack, IBody target, string blockedReason)
         {
-            var preview = new HudPreview { TargetUnitId = target.Id, AbilityName = def.Name, Total = breakdown.Total, IsExact = breakdown.IsExact };
+            if (target == null) return;
+
+            DamageBreakdown breakdown = PreviewDamage(attack, target);
+            if (breakdown == null) return;
+
+            var preview = new HudPreview
+            {
+                TargetUnitId = target.Id,
+                TargetIsProp = !(target is Unit),
+                AbilityName = attack.Name,
+                Total = breakdown.Total,
+                IsExact = breakdown.IsExact,
+                BlockedReason = blockedReason,
+            };
             for (int i = 0; i < breakdown.Lines.Count; i++)
             {
                 DamageLine line = breakdown.Lines[i];
@@ -1016,8 +1363,20 @@ namespace Mimas.Client.Presentation
             _preview = preview;
             HudUnit hud;
             _previewUnit = _hudUnitsById.TryGetValue(target.Id, out hud) ? hud : null;
-            if (_previewUnit != null) _previewUnit.GhostDamage = Mathf.Min(breakdown.Total, _previewUnit.Hp);
+            if (_previewUnit != null && blockedReason == null) _previewUnit.GhostDamage = Mathf.Min(breakdown.Total, _previewUnit.Hp);
             RefreshEmphasis();
+        }
+
+        /// <summary>
+        /// What this attack would do to this body, from what the local player knows. The same
+        /// <see cref="DamageCalculator"/> the rules resolve with (ADR-017), asked directly rather than through
+        /// <c>MatchState.PreviewAttack</c> so that a shot which is refused can still show its number.
+        /// </summary>
+        private DamageBreakdown PreviewDamage(AttackDef attack, IBody target)
+        {
+            Unit attacker;
+            if (_damage == null || target == null || !_state.Units.TryGet(_localUnitId, out attacker)) return null;
+            return _damage.Compute(_state.Map, attacker, target, attack, Knowledge.For(LocalPlayer, _state));
         }
 
         private bool ClearPreview()
@@ -1028,6 +1387,14 @@ namespace Mimas.Client.Presentation
             _previewUnit = null;
             RefreshEmphasis();
             return true;
+        }
+
+        /// <summary>Drops everything the aiming layer is drawing: line, circles and the cursor tag.</summary>
+        private void ClearAim()
+        {
+            if (_aimPreview != null) _aimPreview.Hide();
+            if (_rangeCircles != null) _rangeCircles.Hide();
+            _cursorTag = null;
         }
 
         private string DescribeLine(DamageLine line)
@@ -1050,9 +1417,10 @@ namespace Mimas.Client.Presentation
         private void HandleRightClicked()
         {
             if (!_ready) return;
-            bool changed = _armed != None || _examinedUnitId != None;
+            bool changed = _armed != None || _examinedUnitId != None || _examinedPropId != None;
             Disarm();
             _examinedUnitId = None;
+            _examinedPropId = None;
             if (changed) { RefreshView(); RaiseStateChanged(); }
         }
 
@@ -1062,6 +1430,7 @@ namespace Mimas.Client.Presentation
             _moveOptions = MovementOptions.Empty;
             _highlight.Clear();
             ClearPreview();
+            ClearAim();
             if (_board != null)
             {
                 _board.ClearHighlights();

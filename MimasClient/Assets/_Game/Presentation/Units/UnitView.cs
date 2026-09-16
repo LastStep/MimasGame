@@ -79,6 +79,12 @@ namespace Mimas.Client.Presentation
         /// <summary>Current tint applied to the placeholder renderers.</summary>
         public Color Tint => _tint;
 
+        /// <summary>Where shots leave from and land on this unit, in Core's height units above the tile top.</summary>
+        public int AimHeightUnits { get; private set; }
+
+        /// <summary>How tall this unit stands, in Core's height units above the tile top.</summary>
+        public int BodyHeightUnits { get; private set; }
+
         private void Awake()
         {
             _mover = GetComponent<UnitMover>();
@@ -99,6 +105,9 @@ namespace Mimas.Client.Presentation
         public void Configure(int aimHeight, int bodyHeight, float worldPerUnit)
         {
             if (worldPerUnit <= 0f) return;
+
+            AimHeightUnits = aimHeight;
+            BodyHeightUnits = bodyHeight;
 
             EnsureAimPoint();
             _aimPoint.localPosition = new Vector3(0f, aimHeight * worldPerUnit, 0f);

@@ -50,6 +50,7 @@ namespace Mimas.Client.UI
         private readonly List<string> _groupOrder = new List<string>();
         private readonly StringBuilder _signature = new StringBuilder();
         private readonly Dictionary<int, UnitTag> _unitTags = new Dictionary<int, UnitTag>();
+        private readonly List<int> _staleTags = new List<int>();
         private readonly List<FlyoverInstance> _flyovers = new List<FlyoverInstance>();
 
         private UIDocument _document;
@@ -73,6 +74,7 @@ namespace Mimas.Client.UI
         private VisualElement _flyLayer;
         private Label _turnOwner;
         private Label _tooltipTitle;
+        private Label _tooltipDetail;
         private Label _tooltipBody;
         private Label _examineTitle;
         private Label _examineSubtitle;
@@ -82,6 +84,8 @@ namespace Mimas.Client.UI
         private Label _examineModifiersCaption;
         private Label _previewTitle;
         private Label _previewTotal;
+        private Label _previewBlocked;
+        private Label _cursorTag;
         private Label _banner;
         private Button _examineClose;
         private Button _endTurn;
@@ -165,6 +169,7 @@ namespace Mimas.Client.UI
             if (!_bound) return;
             UpdateUnitTags();
             UpdatePreviewPosition();
+            UpdateCursorTag();
             UpdateFlyovers();
         }
 
@@ -184,6 +189,7 @@ namespace Mimas.Client.UI
             _actionBar = root.Q<VisualElement>("action-bar");
             _tooltip = root.Q<VisualElement>("tooltip");
             _tooltipTitle = root.Q<Label>("tooltip-title");
+            _tooltipDetail = root.Q<Label>("tooltip-detail");
             _tooltipBody = root.Q<Label>("tooltip-body");
             _examine = root.Q<VisualElement>("examine");
             _examineTitle = root.Q<Label>("examine-title");
@@ -201,16 +207,19 @@ namespace Mimas.Client.UI
             _preview = root.Q<VisualElement>("preview");
             _previewTitle = root.Q<Label>("preview-title");
             _previewTotal = root.Q<Label>("preview-total");
+            _previewBlocked = root.Q<Label>("preview-blocked");
             _previewLines = root.Q<VisualElement>("preview-lines");
+            _cursorTag = root.Q<Label>("cursor-tag");
             _flyLayer = root.Q<VisualElement>("fly-layer");
             _banner = root.Q<Label>("banner");
 
             if (_root == null || _turnPanel == null || _turnOwner == null || _rope == null || _ropeFill == null || _ropeEmber == null
-                || _actionBar == null || _tooltip == null || _tooltipTitle == null || _tooltipBody == null
+                || _actionBar == null || _tooltip == null || _tooltipTitle == null || _tooltipDetail == null || _tooltipBody == null
                 || _examine == null || _examineTitle == null || _examineSubtitle == null || _examineStats == null || _examineDescription == null
                 || _examineItemsCaption == null || _examineItems == null
                 || _examineAbilities == null || _examineModifiersCaption == null || _examineModifiers == null || _examineClose == null || _endTurn == null
-                || _unitLayer == null || _preview == null || _previewTitle == null || _previewTotal == null || _previewLines == null
+                || _unitLayer == null || _preview == null || _previewTitle == null || _previewTotal == null
+                || _previewBlocked == null || _previewLines == null || _cursorTag == null
                 || _flyLayer == null || _banner == null)
             {
                 Debug.LogError("[MatchHudView] MatchHud.uxml is missing one of the named elements.", this);
@@ -320,7 +329,9 @@ namespace Mimas.Client.UI
 
             _examineTitle.text = examine.Title ?? string.Empty;
             _examineSubtitle.text = (examine.Subtitle ?? string.Empty).ToUpperInvariant();
-            _examineStats.text = "HP " + examine.Hp + " / " + examine.MaxHp + "     AP " + examine.Ap + " / " + examine.ApPerTurn;
+            _examineStats.text = examine.ApPerTurn > 0
+                ? "HP " + examine.Hp + " / " + examine.MaxHp + "     AP " + examine.Ap + " / " + examine.ApPerTurn
+                : "HP " + examine.Hp + " / " + examine.MaxHp;
             _examineDescription.text = examine.Description ?? string.Empty;
             _examineDescription.style.display = string.IsNullOrEmpty(examine.Description) ? DisplayStyle.None : DisplayStyle.Flex;
             _examine.EnableInClassList("examine--theirs", examine.Subtitle != null && examine.Subtitle.StartsWith("Opp", StringComparison.Ordinal));
@@ -395,8 +406,11 @@ namespace Mimas.Client.UI
                 return;
             }
 
+            bool blocked = !string.IsNullOrEmpty(preview.BlockedReason);
             _previewTitle.text = preview.AbilityName ?? string.Empty;
             _previewTotal.text = preview.IsExact ? preview.Total.ToString() : preview.Total + "?";
+            _preview.EnableInClassList("preview--blocked", blocked);
+            _previewBlocked.text = preview.BlockedReason ?? string.Empty;
             _previewLines.Clear();
             for (int i = 0; i < preview.Lines.Count; i++)
             {
@@ -490,6 +504,29 @@ namespace Mimas.Client.UI
 
                 SyncMarkers(tag, unit);
             }
+
+            // A destroyed prop leaves the list entirely (a dead hero only goes grey), so drop its tag with it.
+            if (_unitTags.Count == units.Count) return;
+            _staleTags.Clear();
+            foreach (KeyValuePair<int, UnitTag> pair in _unitTags)
+            {
+                bool present = false;
+                for (int i = 0; i < units.Count; i++)
+                {
+                    if (units[i].Id != pair.Key) continue;
+                    present = true;
+                    break;
+                }
+                if (!present) _staleTags.Add(pair.Key);
+            }
+            for (int i = 0; i < _staleTags.Count; i++)
+            {
+                UnitTag tag;
+                if (!_unitTags.TryGetValue(_staleTags[i], out tag)) continue;
+                tag.Root.RemoveFromHierarchy();
+                _unitTags.Remove(_staleTags[i]);
+            }
+            _staleTags.Clear();
         }
 
         private UnitTag CreateUnitTag(HudUnit unit)
@@ -497,7 +534,8 @@ namespace Mimas.Client.UI
             var tag = new UnitTag();
             tag.Root = new VisualElement { name = "unit-" + unit.Id, pickingMode = PickingMode.Ignore, usageHints = UsageHints.DynamicTransform };
             tag.Root.AddToClassList("unit-tag");
-            tag.Root.EnableInClassList("unit-tag--theirs", !unit.IsMine);
+            tag.Root.EnableInClassList("unit-tag--theirs", !unit.IsMine && !unit.IsProp);
+            tag.Root.EnableInClassList("unit-tag--prop", unit.IsProp);
 
             tag.Bar = new VisualElement { pickingMode = PickingMode.Ignore };
             tag.Bar.AddToClassList("unit-bar");
@@ -579,6 +617,26 @@ namespace Mimas.Client.UI
             _preview.style.left = tag.Root.style.left;
             float top = tag.Root.style.top.value.value - tag.Root.resolvedStyle.height - 10f;
             _preview.style.top = top;
+        }
+
+        /// <summary>
+        /// Pins the refusal label just past the pointer. Screen pixels are bottom-left origin and the panel is
+        /// top-left, so the y flips through the same helper the flyovers use.
+        /// </summary>
+        private void UpdateCursorTag()
+        {
+            string text = _source.CursorTag;
+            bool visible = !string.IsNullOrEmpty(text);
+            _cursorTag.EnableInClassList("cursor-tag--visible", visible);
+            if (!visible) return;
+
+            IPanel panel = _root.panel;
+            if (panel == null) return;
+
+            _cursorTag.text = text;
+            Vector2 position = RuntimePanelUtils.ScreenToPanel(panel, _source.CursorScreenPosition);
+            _cursorTag.style.left = position.x + 16f;
+            _cursorTag.style.top = position.y + 16f;
         }
 
         private void SpawnFlyover(HudFlyover flyover)
@@ -773,6 +831,8 @@ namespace Mimas.Client.UI
             HudAction action = actions[index];
             _hoveredSlot = index;
             _tooltipTitle.text = (action.Name ?? action.Id) + "   ·   " + action.Cost + " AP";
+            _tooltipDetail.text = action.Detail ?? string.Empty;
+            _tooltipDetail.style.display = string.IsNullOrEmpty(action.Detail) ? DisplayStyle.None : DisplayStyle.Flex;
             _tooltipBody.text = action.Description ?? string.Empty;
             _tooltipBody.style.display = string.IsNullOrEmpty(action.Description) ? DisplayStyle.None : DisplayStyle.Flex;
             _tooltip.AddToClassList("tooltip--visible");

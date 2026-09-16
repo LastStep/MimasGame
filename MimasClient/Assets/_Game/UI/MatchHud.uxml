@@ -11,11 +11,15 @@
                 <ui:Label name="preview-title" class="preview-title" text="Fire Bolt" picking-mode="Ignore" />
                 <ui:Label name="preview-total" class="preview-total" text="11" picking-mode="Ignore" />
             </ui:VisualElement>
+            <ui:Label name="preview-blocked" class="preview-blocked" text="No line of sight" picking-mode="Ignore" />
             <ui:VisualElement name="preview-lines" class="preview-lines" picking-mode="Ignore" />
         </ui:VisualElement>
 
         <!-- Damage flyovers spawn here. -->
         <ui:VisualElement name="fly-layer" class="fly-layer" picking-mode="Ignore" />
+
+        <!-- Rides next to the pointer while aiming: why this shot cannot be taken. -->
+        <ui:Label name="cursor-tag" class="cursor-tag" text="Out of range" picking-mode="Ignore" />
 
         <!-- Top centre: whose turn. No numbers; a rope burns down for the last seconds (ADR-015). -->
         <ui:VisualElement name="turn-panel" class="turn-panel">
@@ -53,6 +57,7 @@
         <!-- Bottom centre: action points, then one section per category, filled at runtime from IMatchHudSource. -->
         <ui:VisualElement name="tooltip" class="tooltip" picking-mode="Ignore">
             <ui:Label name="tooltip-title" class="tooltip-title" text="Move" />
+            <ui:Label name="tooltip-detail" class="tooltip-detail" text="Lobbed · no sight needed · range 1-5" />
             <ui:Label name="tooltip-body" class="tooltip-body" text="Walk to an adjacent tile." />
         </ui:VisualElement>
         <ui:VisualElement name="action-bar" class="action-bar" />

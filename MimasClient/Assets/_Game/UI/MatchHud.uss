@@ -89,6 +89,32 @@
     background-color: var(--hud-hp-ghost);
 }
 
+.unit-tag--prop {
+    width: 40px;
+}
+
+.unit-tag--prop .unit-seg {
+    height: 4px;
+    background-color: rgb(200, 180, 138);
+}
+
+.unit-tag--prop .unit-bar {
+    height: 4px;
+}
+
+.unit-tag--prop .unit-seg--empty {
+    background-color: var(--hud-hp-empty);
+}
+
+.unit-tag--prop .unit-seg--ghost {
+    background-color: var(--hud-hp-ghost);
+}
+
+.unit-tag--prop .unit-number {
+    font-size: 10px;
+    color: var(--hud-text-dim);
+}
+
 .unit-number {
     color: var(--hud-text);
     font-size: 11px;
@@ -208,6 +234,45 @@
 
 .preview-line--unknown .preview-line-amount {
     color: var(--hud-unknown);
+}
+
+/* The refusal reads first and the damage below it is hypothetical, so the total loses its shout. */
+.preview-blocked {
+    color: var(--hud-minus);
+    font-size: 12px;
+    -unity-font-style: bold;
+    white-space: normal;
+    margin: 0 0 4px 0;
+    padding: 0;
+    display: none;
+}
+
+.preview--blocked .preview-blocked {
+    display: flex;
+}
+
+.preview--blocked .preview-total {
+    color: var(--hud-text-faint);
+}
+
+/* ---- cursor tag ------------------------------------------------------------------------------ */
+
+.cursor-tag {
+    position: absolute;
+    color: var(--hud-text);
+    font-size: 12px;
+    -unity-font-style: bold;
+    padding: 3px 7px;
+    background-color: var(--hud-panel-solid);
+    border-radius: 5px;
+    border-width: 1px;
+    border-color: var(--hud-edge);
+    margin: 0;
+    display: none;
+}
+
+.cursor-tag--visible {
+    display: flex;
 }
 
 /* ---- flyovers -------------------------------------------------------------------------------- */
@@ -666,6 +731,14 @@
     font-size: 14px;
     -unity-font-style: bold;
     margin: 0;
+    padding: 0;
+}
+
+.tooltip-detail {
+    color: var(--hud-accent);
+    font-size: 11px;
+    white-space: normal;
+    margin: 3px 0 0 0;
     padding: 0;
 }
 
