@@ -477,7 +477,7 @@ figure{margin:12px 0} figure svg{width:100%; height:auto; display:block} figcapt
 <!-- ============================================================ -->
 <div class="grp-title" data-group="Character">Character</div>
 
-<section class="concept" id="character" data-design="decided" data-impl="drift" data-title="Character">
+<section class="concept" id="character" data-design="decided" data-impl="implemented" data-title="Character">
 <header><h2>Character</h2></header>
 <p class="lead">A player's hero is defined by three things and nothing else: <b>gear</b> (four items), a <b>divine lineage</b>, and the <b>boons</b> drafted during the session. There are no classes.</p>
 <figure>
@@ -498,18 +498,17 @@ figure{margin:12px 0} figure svg{width:100%; height:auto; display:block} figcapt
   <li>One hero per player. The unit model stays multi-unit ready (per-unit ids and AP).</li>
   <li>Nothing about the character is random. Same picks = same character.</li>
 </ol>
-<div class="drift-note"><b>Drift.</b> Code defines characters by <code>classes/*.json</code> (warrior, mage) that own abilities and stats directly. Plan: replace <code>classes/</code> with <code>items/</code> + <code>lineages/</code> and a <code>Loadout</code> in <code>MatchSetup</code>; warrior/mage become UI presets. Class stats table in <code>docs/data.md</code> will be superseded.</div>
 <h3>Depends on</h3><ul><li><a href="#equipment">Equipment</a>, <a href="#lineage">Lineage</a>, <a href="#boons">Boons</a>, <a href="#stats">Stats</a></li></ul>
 <p class="src">Source: notebook 16 Sep 2026; round-1 answer "choose your gear… then pick a divine lineage".</p>
 </section>
 
-<section class="concept" id="classes" data-design="superseded" data-impl="drift" data-title="Classes (superseded)">
+<section class="concept" id="classes" data-design="superseded" data-impl="implemented" data-title="Classes (superseded)">
 <header><h2>Classes (superseded)</h2></header>
 <p class="lead">Superseded on 16 Sep 2026 by <a href="#character">Character</a> = gear + lineage + boons. Kept so the drift is visible. "Warrior" and "Mage" live on as presets in <a href="#character-select">character select</a>.</p>
-<div class="drift-note"><b>Drift.</b> <code>classes/warrior.json</code>, <code>classes/mage.json</code>, <code>ClassDef</code>, the catalogue's class linking rule "a class needs a movement ability" and <code>MatchSettings.PlayerClassId</code> still exist. Remove with the loadout work (M3).</div>
+<div class="note"><b>Removed 16 Sep 2026.</b> <code>classes/</code>, <code>ClassDef</code> and <code>MatchSettings.PlayerClassId</code> are gone; loadouts live in <code>MatchSetup</code>.</div>
 </section>
 
-<section class="concept" id="stats" data-design="decided" data-impl="drift" data-title="Stats">
+<section class="concept" id="stats" data-design="decided" data-impl="implemented" data-title="Stats">
 <header><h2>Stats</h2></header>
 <p class="lead">Six numbers describe a hero. Display names on the left, engine keys on the right. All integers; all public knowledge except where a hidden boon changed them.</p>
 <table>
@@ -528,14 +527,13 @@ figure{margin:12px 0} figure svg{width:100%; height:auto; display:block} figcapt
   <li>No item carries a negative stat at launch (the loader rejects them). <code>hp</code> is at least 1, <code>ap</code> at least 0. Negative effects, if ever, come from boons and need a floor rule first.</li>
   <li>Enemy stats are public because gear is public. A hidden Blessing that changed a stat is <a href="#hidden-info">revealed</a> the first time the changed stat alters a result (for hp: at round start, since max health is visible on the bar; so hp Blessings are effectively public).</li>
 </ol>
-<div class="drift-note"><b>Drift.</b> Code lanes are <code>melee / ranged / magic</code> (<code>rules.json</code>) and stats sit on classes. Migration: <code>damageTypes</code> becomes <code>["weapon","spell"]</code>, attack <code>damageType</code> values are remapped (jab, strike, bow shots = weapon; fire-bolt = spell), stats move to items. Display names are a client concern.</div>
 <div class="open-q"><h3>Open questions</h3><ul>
 <li id="q-stats-negative">Can Enchants or Blessings ever lower an enemy's stats (debuffs), or only the owner's?</li>
 </ul></div>
 <p class="src">Source: notebook page 1 (Health, Strength, Magic; armour negates damage); round-2 answer "separate weapon and spell reduction"; ADR-017.</p>
 </section>
 
-<section class="concept" id="equipment" data-design="decided" data-impl="not-started" data-title="Equipment (gear)">
+<section class="concept" id="equipment" data-design="decided" data-impl="implemented" data-title="Equipment (gear)">
 <header><h2>Equipment (gear)</h2></header>
 <p class="lead">Four slots, one item each, all mandatory, locked for the session: <a href="#weapon">Weapon</a>, <a href="#crown">Crown</a>, <a href="#boots">Boots</a>, <a href="#armour">Armour</a>. Items are the only source of stats and abilities besides the lineage.</p>
 <h3>Rules</h3>
@@ -561,7 +559,7 @@ figure{margin:12px 0} figure svg{width:100%; height:auto; display:block} figcapt
 <p class="src">Source: notebook page 1 (Equippables); round-2 answers "locked; only boons change it", "gear visible".</p>
 </section>
 
-<section class="concept" id="weapon" data-design="decided" data-impl="drift" data-title="Weapon slot">
+<section class="concept" id="weapon" data-design="decided" data-impl="implemented" data-title="Weapon slot">
 <header><h2>Weapon slot</h2></header>
 <p class="lead">The weapon grants the hero's two weapon-lane <a href="#attacks">attacks</a> and some Strength. Every weapon has a minimum and a maximum range. Kinds at launch: <b>bow</b> and <b>gun</b>. Both hit adjacent enemies; the gun reaches further, the bow hits slightly harder.</p>
 <table>
@@ -570,12 +568,11 @@ figure{margin:12px 0} figure svg{width:100%; height:auto; display:block} figcapt
 <tr><td>Gun</td><td>1..7</td><td>Whole-field reach, lighter hits</td><td>Quick Shot (1 AP, 2), Heavy Shot (2 AP, 5)</td><td>Triple Shot (sigil); cheaper shot</td></tr>
 <tr><td>Blade (deferred)</td><td>1..1</td><td>Adjacent only, cheap repeats, most Strength</td><td>Jab, Strike (files kept, unreferenced)</td><td>Cleave (sigil)</td></tr>
 </table>
-<div class="drift-note"><b>Drift.</b> Jab and Strike exist as class abilities with <code>damageType: melee</code>; no bow or gun abilities or items exist yet. Spec: <code>docs/specs/2026-09-16-loadout-slice.md</code>.</div>
 <div class="open-q"><h3>Open questions</h3><ul><li id="q-weapon-ammo">Do guns have ammo / reload as a state, or is AP cost the only limiter? Proposed: AP only.</li><li id="q-weapon-blade">When does blade (melee) join the catalogue, and with what identity beyond "adjacent, cheap"?</li></ul></div>
 <p class="src">Source: notebook page 1 (Weapon: Bow, Gun).</p>
 </section>
 
-<section class="concept" id="crown" data-design="decided" data-impl="drift" data-title="Crown slot">
+<section class="concept" id="crown" data-design="decided" data-impl="implemented" data-title="Crown slot">
 <header><h2>Crown slot</h2></header>
 <p class="lead">"This is where spells come from and are used." The crown grants the hero's spell-lane <a href="#attacks">attacks</a> and Magic. A crown may also carry an innate <a href="#elements">element</a>.</p>
 <ol>
@@ -583,12 +580,11 @@ figure{margin:12px 0} figure svg{width:100%; height:auto; display:block} figcapt
   <li>An <a href="#enchant">Enchant</a> on the crown can add an element to every spell it grants ("fire on crown" = all crown spells are tagged fire and gain a fire rider).</li>
   <li>Spells are attacks in the spell lane; they may ignore some targeting rules by data (e.g. <code>minRange</code>), but always need <a href="#line-of-sight">line of sight</a>.</li>
 </ol>
-<div class="drift-note"><b>Drift.</b> Fire Bolt is a mage class ability with lane <code>magic</code>. Becomes a crown ability with lane <code>spell</code> and <code>element: fire</code>.</div>
 <div class="open-q"><h3>Open questions</h3><ul><li id="q-crown-utility">Can crowns grant non-damage spells (heal, shield, slow)? Needs an effect vocabulary beyond damage. Proposed: not at launch.</li></ul></div>
 <p class="src">Source: notebook page 1 (Crown).</p>
 </section>
 
-<section class="concept" id="boots" data-design="decided" data-impl="drift" data-title="Boots slot">
+<section class="concept" id="boots" data-design="decided" data-impl="implemented" data-title="Boots slot">
 <header><h2>Boots slot</h2></header>
 <p class="lead">"Gives different kinds of movement." Every hero can <b>walk</b> innately (1 hex per AP, climb 1); boots grant one extra <a href="#movement">movement mode</a> (jump, teleport, later fly or dash) and may alter walk parameters.</p>
 <ol>
@@ -596,11 +592,10 @@ figure{margin:12px 0} figure svg{width:100%; height:auto; display:block} figcapt
   <li>Boots grant <code>abilities[]</code> (movement kind) and may set <code>walkRange</code> / <code>maxClimb</code> overrides via stats (proposed keys <code>walk.range</code>, <code>walk.climb</code>).</li>
   <li><a href="#sigil">Sigils</a> can add a second movement mode to boots ("teleport on boots").</li>
 </ol>
-<div class="drift-note"><b>Drift.</b> Jump and teleport are class abilities; walk is granted by classes listing <code>move</code>. Boots do not exist.</div>
 <p class="src">Source: notebook page 1 (Boots).</p>
 </section>
 
-<section class="concept" id="armour" data-design="decided" data-impl="drift" data-title="Armour slot">
+<section class="concept" id="armour" data-design="decided" data-impl="implemented" data-title="Armour slot">
 <header><h2>Armour slot</h2></header>
 <p class="lead">Armour negates damage with two separate numbers: <code>defense.weapon</code> and <code>defense.spell</code>. It is also the main source of Health. Plate can be great against weapons and weak against spells; robes the reverse.</p>
 <ol>
@@ -608,7 +603,6 @@ figure{margin:12px 0} figure svg{width:100%; height:auto; display:block} figcapt
   <li>Elemental resistances and immunities are <em>not</em> armour numbers; they are <a href="#modifiers">modifiers</a> from Blessings or Enchants on the armour.</li>
   <li>Armour has no HP pool of its own (ablative armour rejected).</li>
 </ol>
-<div class="drift-note"><b>Drift.</b> Defence values sit on classes as <code>defense.melee/ranged/magic</code>.</div>
 <p class="src">Source: notebook page 1 (Armour negates damage); round-2 answer "separate weapon and spell reduction".</p>
 </section>
 
@@ -624,7 +618,7 @@ figure{margin:12px 0} figure svg{width:100%; height:auto; display:block} figcapt
   <li>Abilities are <a href="#hidden-info">hidden</a> from the opponent until first used, even when the granting item is public.</li>
   <li>Enchants may alter an ability's numbers (range, damage, cost) through the item they attach to; the ability definition itself is immutable.</li>
 </ol>
-<div class="drift-note"><b>Partial.</b> Abilities load and resolve; the "owner item" link and enchant overrides do not exist (abilities are referenced straight from classes).</div>
+<div class="drift-note"><b>Partial.</b> Abilities load and resolve and know their source item; enchant overrides do not exist.</div>
 <h3>Depends on</h3><ul><li><a href="#turns">Turns and AP</a>, <a href="#equipment">Equipment</a>, <a href="#sigil">Sigil</a></li></ul>
 <p class="src">Source: ADR-012, ADR-016; docs/data.md.</p>
 </section>
@@ -642,7 +636,7 @@ figure{margin:12px 0} figure svg{width:100%; height:auto; display:block} figcapt
 <p class="src">Source: pillar 12; ADR-012; docs/data.md "Movement abilities".</p>
 </section>
 
-<section class="concept" id="attacks" data-design="decided" data-impl="drift" data-title="Attacks">
+<section class="concept" id="attacks" data-design="decided" data-impl="partial" data-title="Attacks">
 <header><h2>Attacks</h2></header>
 <p class="lead">An attack targets one living enemy unit inside a <code>minRange..range</code> band with clear <a href="#line-of-sight">line of sight</a>, always, even at range 1. It declares its <b>lane</b> (weapon or spell), a flat base damage, optional <a href="#elements">element</a> and tags.</p>
 <pre><code>{ "version": 1, "id": "fire-bolt", "name": "Fire Bolt", "type": "attack", "category": "spell", "cost": 2,
@@ -653,14 +647,14 @@ figure{margin:12px 0} figure svg{width:100%; height:auto; display:block} figcapt
   <li>Targeting and legality come from one function used by HUD, server and bots.</li>
   <li>Multi-target shapes (cone, line, area) are <mark>not designed</mark>; Sigils like Triple Shot will need a <code>shape</code> or a multi-hit count. See open question.</li>
 </ol>
-<div class="drift-note"><b>Drift.</b> Lane values in code are <code>melee / ranged / magic</code>; there is no <code>element</code> field. See <a href="#stats">Stats</a> for the migration.</div>
+<div class="drift-note"><b>Partial.</b> Lanes are weapon / spell; the <code>element</code> field does not exist yet.</div>
 <div class="open-q"><h3>Open questions</h3><ul>
 <li id="q-attacks-multi">Multi-hit and area attacks (Triple Shot, Cleave): repeated single resolution vs a shape. Proposed: <code>hits: 3</code> repeats the single-target resolution; shapes later.</li>
 </ul></div>
 <p class="src">Source: ADR-017; design v0.1 targeting decision.</p>
 </section>
 
-<section class="concept" id="damage" data-design="decided" data-impl="drift" data-title="Damage">
+<section class="concept" id="damage" data-design="decided" data-impl="partial" data-title="Damage">
 <header><h2>Damage</h2></header>
 <p class="lead">Deterministic. No dice, no hit chance. Two lanes, weapon and spell; each lane has a power stat (Strength or Magic) and an armour defence. Elements and everything else are flat modifiers on top.</p>
 <pre><code>damage = max(0,  base
@@ -674,7 +668,7 @@ figure{margin:12px 0} figure svg{width:100%; height:auto; display:block} figcapt
   <li>Percentages are not allowed. If ever needed they are computed in integer basis points, never floats.</li>
   <li>Enemy health is fully visible (pillar 8 surprise lives in abilities and modifiers, not in the health bar).</li>
 </ol>
-<div class="drift-note"><b>Drift.</b> Formula and calculator exist exactly like this, but lanes are melee/ranged/magic and there is no <code>nullify</code> effect.</div>
+<div class="drift-note"><b>Partial.</b> Two lanes in code; <code>nullify</code> (immunity) does not exist yet.</div>
 <h3>Depends on</h3><ul><li><a href="#stats">Stats</a>, <a href="#modifiers">Modifiers</a>, <a href="#elements">Elements</a>, <a href="#hidden-info">Hidden information</a></li></ul>
 <p class="src">Source: ADR-017; round-1 answer "everything is either WP or SP".</p>
 </section>
@@ -895,21 +889,21 @@ figure{margin:12px 0} figure svg{width:100%; height:auto; display:block} figcapt
 <p class="src">Source: pillars 9-13; ADR-015, ADR-019.</p>
 </section>
 
-<section class="concept" id="data-model" data-design="decided" data-impl="drift" data-title="Data model (JSON folders)">
+<section class="concept" id="data-model" data-design="decided" data-impl="partial" data-title="Data model (JSON folders)">
 <header><h2>Data model (JSON folders)</h2></header>
 <p class="lead">All content is JSON under <code>MimasClient/Assets/_Game/Data/</code>, loaded by one fail-closed catalogue on every peer. This table is the target layout; field-level schemas live in <code>docs/data.md</code>.</p>
 <table>
 <tr><th>File / folder</th><th>Contents</th><th>Design</th><th>Code</th></tr>
-<tr><td><code>rules.json</code></td><td><code>damageTypes</code> (weapon, spell), <code>elements[]</code>, <code>globalModifiers[]</code>, <code>baseStats</code>, <code>innateAbilities[]</code>, <code>series</code> (best of)</td><td><a href="#stats">Stats</a>, <a href="#elements">Elements</a></td><td>drift (lanes), missing fields</td></tr>
+<tr><td><code>rules.json</code></td><td><code>damageTypes</code> (weapon, spell), <code>elements[]</code>, <code>globalModifiers[]</code>, <code>baseStats</code>, <code>innateAbilities[]</code>, <code>series</code> (best of)</td><td><a href="#stats">Stats</a>, <a href="#elements">Elements</a></td><td>partial (no elements, no series)</td></tr>
 <tr><td><code>terrains.json</code></td><td>terrain catalogue</td><td><a href="#board">Board</a></td><td>in code</td></tr>
 <tr><td><code>timecontrols.json</code></td><td>time controls</td><td><a href="#time-controls">Time controls</a></td><td>in code</td></tr>
 <tr><td><code>abilities/</code></td><td>movement and attack abilities (attack gains <code>element</code>)</td><td><a href="#abilities">Abilities</a></td><td>partial</td></tr>
-<tr><td><code>items/</code></td><td>gear: slot, kind, stats, abilities, tags</td><td><a href="#equipment">Equipment</a></td><td>not started</td></tr>
+<tr><td><code>items/</code></td><td>gear: slot, kind, stats, abilities, tags</td><td><a href="#equipment">Equipment</a></td><td>in code</td></tr>
 <tr><td><code>lineages/</code></td><td>starting blessing, pool</td><td><a href="#lineage">Lineage</a></td><td>not started</td></tr>
 <tr><td><code>boons/</code></td><td>blessings, enchants, sigils</td><td><a href="#boons">Boons</a></td><td>not started (empty folder)</td></tr>
 <tr><td><code>modifiers/</code></td><td>flat damage modifiers (gain <code>elements</code>, <code>itemKinds</code>, <code>nullify</code>)</td><td><a href="#modifiers">Modifiers</a></td><td>partial</td></tr>
 <tr><td><code>maps/</code></td><td>hex lists, spawns, ladder position</td><td><a href="#maps">Maps</a></td><td>in code</td></tr>
-<tr><td><code>classes/</code></td><td><s>class definitions</s></td><td><a href="#classes">superseded</a></td><td>drift: to be removed</td></tr>
+<tr><td><code>classes/</code></td><td><s>class definitions</s></td><td><a href="#classes">superseded</a></td><td>removed</td></tr>
 <tr><td><code>presets/</code> (client only)</td><td>suggested kits for character select</td><td><a href="#character-select">Character select</a></td><td>not started</td></tr>
 </table>
 <p class="src">Source: ADR-004, ADR-014; docs/data.md.</p>
@@ -964,6 +958,7 @@ figure{margin:12px 0} figure svg{width:100%; height:auto; display:block} figcapt
 <header><h2>Changelog</h2></header>
 <table>
 <tr><th>Date</th><th>Change</th></tr>
+<tr><td>2026-09-16</td><td>Loadout slice shipped: items replace classes, two lanes, base stats, innate walk, examine shows gear.</td></tr>
 <tr><td>2026-09-16</td><td>v0.2.1. Loadout question round: base stats, boots, two abilities per weapon/crown, no negative stats, launch catalogue, bow/gun ranges, "?" ability slots. Five open questions closed, two added. Spec written for the next session.</td></tr>
 <tr><td>2026-09-16</td><td>v0.2. First HTML edition. Migrated design.md v0.1 (pillars, win conditions, resolved questions). Added from the notebook: character = gear + lineage + boons, four equipment slots, stats (Health / Strength / Magic / Armour per lane), two damage lanes + elements, lineages (Greek, Norse, Hindu), boon kinds Blessing / Enchant / Sigil, draft rules, hidden-information table, character select flow. Marked classes superseded and recorded drift against the M1 code.</td></tr>
 </table>

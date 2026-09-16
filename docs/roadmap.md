@@ -31,18 +31,37 @@ server loads the same content, and, in the second 15 Sep session (ADR-016..019):
 Not done / deferred: tile-effect `OnEnter` hooks (no tile effects exist yet; the `effect` field now names a
 combat modifier), an attack animation (flyover + hp change only), boons (M3), the network session (M2).
 
-Playtest 16 Sep 2026 (Rohan, warrior vs bot mage): clean console, won by elimination. Not yet exercised and
-worth a pass first thing: the bot attacking (its flyover, an "EXTRA" reveal, its ability appearing in
-examine) since the random bot rarely picks attacks; Fire Bolt and line of sight from the player's side
-(set `PlayerClassId` to `mage`); the DEFEAT banner; the height-advantage preview line from the ramp; a
-Web build of the new HUD. Tuning thoughts: the 7 s idle penalty bites on a first turn; a refused far
+Playtest 16 Sep 2026 (Rohan, warrior vs bot mage, before the loadout slice): clean console, won by
+elimination. Not yet exercised and worth a pass first thing: the bot attacking (its flyover, an "EXTRA"
+reveal, its ability appearing in examine) since the random bot rarely picks attacks; Fire Bolt and line of
+sight from the player's side (give `PlayerLoadout` the crown's spells); the DEFEAT banner; the
+height-advantage preview line from the ramp; a Web build of the new HUD. Tuning thoughts: the 7 s idle penalty bites on a first turn; a refused far
 click while Move is armed is silent on screen.
 
-Next (decided 16 Sep 2026): the **loadout slice** before M2, so the wire format is built around gear rather
-than classes. Work order: `docs/specs/2026-09-16-loadout-slice.md`. Then M2 (WebSocket rooms, guest auth,
-matchmaking, server-side clocks that submit `EndTurnCommand(Timeout)`, reconnect via `PlayerView` resync). Before that, a short balance pass on the
-shipped numbers (warrior 20 hp / mage 16 hp, jab 1 AP 2 dmg, strike 2 AP 5 dmg, fire bolt 2 AP 6 dmg) by
-letting two random bots play a few hundred seeded games.
+## M3 progress (16 Sep 2026): the loadout slice
+
+Done, from `docs/specs/2026-09-16-loadout-slice.md` (design: `index.html#character`, `#equipment`,
+`#stats`): `classes/` is gone. A hero is `rules.baseStats` plus four items (`items/*.json`: weapon, crown,
+boots, armour), and its abilities are `rules.innateAbilities` (the walk) plus each item's. Damage lanes are
+`weapon` and `spell`; `melee` / `ranged` / `magic` have left the shipped data. Core gained `ItemDef`,
+`ItemSlots`, `Loadout`, `RulesDef.BaseStats` / `InnateAbilityIds`, `Unit.ItemIds` /
+`AbilitySourceOf`, `ContentCatalog.Items` / `GetItemForSlot`, and `PlayerView` now publishes each unit's
+item ids and each ability's source item (identity public, ability hidden). The launch catalogue is longbow
+and flintlock, one crown, leaping and blink boots, one jerkin; `/health` reports `items`; `MatchSettings`
+holds two loadouts; the examine panel lists gear with stat summaries and groups `?` ability rows under the
+item that grants them (`artifacts/loadout-examine-opponent.png`). 197 Core tests.
+
+Any kit is hp 28, ap 3, Strength 3, Magic 4, armour 2 / 2; a full turn deals about 12, so two heroes that
+stand still trade for about three turns each. The numbers are hand-set placeholders.
+
+Not done / deferred: elements and the `element` field, `nullify`, boons, lineages, the draft, the session
+wrapper, character select, gear on the 3D model, the blade weapon, presets.
+
+Next: **M2** (WebSocket rooms, guest auth, matchmaking, server-side clocks that submit
+`EndTurnCommand(Timeout)`, reconnect via `PlayerView` resync), now that the wire format is built around
+gear rather than classes. Before or alongside it, a short balance pass on the shipped numbers (arrow shot
+1 AP 3 dmg, aimed shot 2 AP 6, quick shot 1 AP 2, heavy shot 2 AP 5, fire bolt 2 AP 6, arcane spark 1 AP 2)
+by letting two random bots play a few hundred seeded games.
 
 ## Baselines
 
@@ -55,3 +74,4 @@ letting two random bots play a few hundred seeded games.
 | Core test count / runtime | 131 / 0.05 s (+ content catalogue, classes, hash parity) | 15 Sep 2026 |
 | Core test count / runtime | 137 / 0.06 s (+ ability icon and category fields) | 15 Sep 2026 |
 | Core test count / runtime | 169 / 0.26 s (+ stats, attacks, modifiers, match state, bot games) | 15 Sep 2026 |
+| Core test count / runtime | 197 / 0.30 s (+ items, loadouts, base stats, ability sources, shipped-data conventions) | 16 Sep 2026 |

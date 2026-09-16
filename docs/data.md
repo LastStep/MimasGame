@@ -8,10 +8,10 @@ Numbers are integers (no floats in rules).
 | File | Contents | Status |
 |---|---|---|
 | `terrains.json` | Terrain catalogue: `id`, `walkable`, `moveCost`, `modifiers[]` | loaded |
-| `rules.json` | Match-wide rules: `damageTypes[]`, `globalModifiers[]` (height advantage lives here as data) | loaded |
+| `rules.json` | Match-wide rules: `damageTypes[]` (the two lanes), `globalModifiers[]` (height advantage lives here as data), `baseStats` (every hero's numbers before gear), `innateAbilities[]` (the walk) | loaded |
 | `timecontrols.json` | `{ "version": 1, "timeControls": [ { "id": "3+2", "name", "baseMs", "incrementMs", "turnCapMs" } ] }` | loaded |
 | `abilities/*.json` | One ability per file; `type` picks the schema (`movement`, `attack`). Every ability has an AP `cost` (default 1) | loaded |
-| `classes/*.json` | One class per file: `id`, `name`, `description`, `abilities` (ids), `stats` (`hp`, `ap`, `power.<type>`, `defense.<type>`) | loaded |
+| `items/*.json` | One item per file: `id`, `slot`, `kind`, `stats`, `abilities`, `tags` | loaded |
 | `maps/*.json` | Map: name, hexes[] (`q,r,terrain,height,effect?`), spawns (`p1`,`p2`), symmetry type, ladder position | loaded |
 | `modifiers/*.json` | Flat damage modifiers: `trigger`, `when` conditions, `effect.damage`, `visibility`. Attached by terrains, map hexes (`effect`), `rules.globalModifiers` and (later) boons | loaded |
 | `boons/*.json` | Boon offers: tier, effects, exclusivity tags | not yet (same) |
@@ -23,13 +23,15 @@ or throws one `ContentLoadException` listing **every** problem, each tagged with
 an unrecognised file or folder is an error, never ignored.
 
 1. **Parse.** Each file is parsed on its own by path: `terrains.json`, `rules.json`, `timecontrols.json`,
-   `abilities/`, `classes/`, `maps/`, `modifiers/`. Duplicate ids across files are reported with both file names.
-2. **Link.** Class ability ids must exist; a class needs at least one movement ability; a movement's
-   `terrainCosts` keys must be real terrains; class stat keys, attack `damageType`s and modifier
+   `abilities/`, `items/`, `maps/`, `modifiers/`. Duplicate ids across files are reported with both file names.
+2. **Link.** Item ability ids must exist and must not repeat an innate one; an item in the `weapon` slot
+   needs at least one attack ability; item stat keys must name a lane. `rules.innateAbilities` ids must
+   exist and at least one of them must be a movement ability (the walk). A movement's `terrainCosts` keys
+   must be real terrains; `rules.baseStats` keys, item stat keys, attack `damageType`s and modifier
    `damageTypes` conditions must name a type in `rules.damageTypes`; terrain `modifiers`, map hex `effect`s
    and `rules.globalModifiers` must be real modifiers; every map must pass `BuildTileMap` (symmetry, spawns,
    connectivity). So a map that would fail at match start fails at boot instead.
-3. **Tables.** `Abilities`, `Classes`, `Maps`, `TimeControls`, `Modifiers` are `DefinitionTable<T>`: sorted by ordinal id,
+3. **Tables.** `Abilities`, `Items`, `Maps`, `TimeControls`, `Modifiers` are `DefinitionTable<T>`: sorted by ordinal id,
    `Get` / `TryGet` / `IndexOf` / `ByIndex`. Indices are stable small integers for wire encoding.
    `Terrains` is the existing `TerrainSet`; `Movements` is the movement subset; `GetMovement(id)`.
 4. **Hash.** `Hash` is SHA-256 over path + canonical JSON (sorted keys, no whitespace) of every file, in path
@@ -70,27 +72,71 @@ standing on the terrain carries for combat (see *Modifiers*); the catalogue reje
 ## Rules (`rules.json`, required)
 
 ```json
-{ "version": 1, "damageTypes": ["melee", "ranged", "magic"], "globalModifiers": ["high-ground"] }
-```
-
-`damageTypes` are the damage lanes: every `power.<type>` / `defense.<type>` stat key, every attack's
-`damageType` and every modifier `damageTypes` condition must name one, so adding a lane is one line here.
-`globalModifiers` apply to every attack (height advantage is the shipped example); they are ordinary
-modifier ids.
-
-## Class stats (`classes/*.json`, `stats`)
-
-```json
 {
-  "version": 1, "id": "warrior", "name": "Warrior", "abilities": ["move", "jump", "jab", "strike"],
-  "stats": { "hp": 20, "ap": 3, "power.melee": 3, "defense.melee": 2, "defense.ranged": 1, "defense.magic": 1 }
+  "version": 1,
+  "damageTypes": ["weapon", "spell"],
+  "globalModifiers": ["high-ground"],
+  "baseStats": { "hp": 20, "ap": 3, "power.weapon": 1, "power.spell": 1, "defense.weapon": 0, "defense.spell": 0 },
+  "innateAbilities": ["move"]
 }
 ```
 
-`stats` is required. `hp` (at least 1) and `ap` (0 or more, action points granted every turn) are required;
-every other key must be `power.<type>` or `defense.<type>`. Missing keys read as 0; unknown keys are load
-errors. Base stats are public knowledge (the class is visible), so the opponent's defense appears in your
-damage preview. See ADR-016 for the AP economy and ADR-017 for the damage formula.
+`damageTypes` are the two damage lanes: every `power.<type>` / `defense.<type>` stat key, every attack's
+`damageType` and every modifier `damageTypes` condition must name one, so adding a lane is one line here.
+`globalModifiers` apply to every attack (height advantage is the shipped example); they are ordinary
+modifier ids. `baseStats` and `innateAbilities` are both required and are described below.
+
+## Base stats (`rules.json`, `baseStats`)
+
+```json
+{ "hp": 20, "ap": 3, "power.weapon": 1, "power.spell": 1, "defense.weapon": 0, "defense.spell": 0 }
+```
+
+Every hero starts from the same block; gear is what makes them different. `hp` (at least 1) and `ap`
+(0 or more, action points granted every turn) are required; every other key must be `power.<type>` or
+`defense.<type>` naming a declared lane. No value may be negative. Missing keys read as 0; unknown keys
+are load errors.
+
+A hero's numbers are `baseStats` **plus the sum of its four items' `stats`** (`StatBlock.Add`), so the
+shipped bow kit is hp 28, ap 3, `power.weapon` 3, `power.spell` 4, `defense.weapon` 2, `defense.spell` 2.
+Strength, Magic and Armour are the display names for `power.weapon`, `power.spell` and `defense.*`;
+Core only knows the keys. Stats are public knowledge (gear is visible), so the opponent's defence appears
+in your damage preview. See ADR-016 for the AP economy and ADR-017 for the damage formula.
+
+`innateAbilities` are the ability ids every hero has whatever it wears — the walk, today `["move"]`. The
+list must be non-empty, every id must exist, at least one must be a movement ability, and no item may
+grant an id that is already innate.
+
+## Items (`items/*.json`)
+
+```json
+{
+  "version": 1,
+  "id": "longbow",
+  "name": "Longbow",
+  "slot": "weapon",
+  "kind": "bow",
+  "description": "A tall yew bow. Reaches five hexes and hits harder than a gun.",
+  "stats": { "power.weapon": 2 },
+  "abilities": ["arrow-shot", "aimed-shot"],
+  "tags": ["bow", "ranged"],
+  "icon": "longbow"
+}
+```
+
+| Field | Required | Meaning |
+|---|---|---|
+| `slot` | yes | `weapon`, `crown`, `boots` or `armour`. One item per slot, all four mandatory. |
+| `kind` | yes | Free string naming the family (`bow`, `gun`, `circlet`, `leaping`, `blink`, `leather`); boons match on it. |
+| `stats` | yes (may be `{}`) | Added to the base block. Keys as in `baseStats`; **never negative** (the loader rejects it). |
+| `abilities` | yes (may be `[]`) | Ability ids this item grants, in HUD order. Unique, must exist, must not be innate. A `weapon` needs at least one attack. |
+| `tags` | no | Free strings modifiers match on. Unique. |
+| `name` / `description` / `icon` | no | Presentation. `name` defaults to the id. |
+
+Items are pure additions: no negative stats, no set bonuses. Every shipped weapon and crown carries
+exactly two abilities, boots one movement mode and armour none — an authoring convention enforced by a
+repo-data test (`ShippedItemConventionTests`), not by the loader, because in-memory test fixtures need
+smaller items.
 
 ## Ability cost (every ability type)
 
@@ -104,8 +150,7 @@ end of turn.
 {
   "version": 1, "id": "fire-bolt", "name": "Fire Bolt", "type": "attack", "category": "spell",
   "icon": "fire-bolt", "cost": 2,
-  "attack": { "damage": 6, "damageType": "magic", "range": 3, "minRange": 1 },
-  "tags": ["fire"]
+  "attack": { "damage": 6, "damageType": "spell", "range": 3, "minRange": 1 }
 }
 ```
 
@@ -113,14 +158,14 @@ end of turn.
 |---|---|---|
 | `category` | yes | `weapon` or `spell` (never `movement`). HUD section only. |
 | `attack.damage` | yes, 0 or more | Flat base damage. |
-| `attack.damageType` | yes | One of `rules.damageTypes`; selects `power.<type>` and `defense.<type>` and is matched by modifiers. |
+| `attack.damageType` | yes | The lane: `weapon` or `spell` (one of `rules.damageTypes`). Selects `power.<type>` and `defense.<type>` and is matched by modifiers. |
 | `attack.range` | yes, 1 or more | Maximum hex distance to the target. |
 | `attack.minRange` | no, default 1 | Minimum hex distance (`1..range`). |
-| `tags` | no | Free strings (elements, weapon kinds) for modifiers to match. Unique. |
+| `tags` | no | Free strings (weapon kinds, later elements) for modifiers to match. Unique. |
 
 Targeting (Core, `Mimas.Core.Combat.AttackTargeting`): the target hex must hold a living enemy unit inside
 the range band, and the line of sight (`LineOfSight.IsClear`, the teleport rule) must be clear, always,
-even for melee. `Enumerate` and `Check` agree by construction.
+even at range 1. `Enumerate` and `Check` agree by construction.
 
 Damage (`Mimas.Core.Combat.DamageCalculator`):
 
@@ -140,9 +185,9 @@ opponent learns it (`ModifierRevealedEvent`) and it appears in every later previ
 ```json
 {
   "version": 1, "id": "ward-of-feathers", "name": "Ward of Feathers",
-  "description": "Takes 4 less damage from ranged and magic attacks.",
+  "description": "Takes 4 less damage from spell attacks.",
   "trigger": "takeDamage",
-  "when": { "damageTypes": ["ranged", "magic"] },
+  "when": { "damageTypes": ["spell"] },
   "effect": { "damage": -4 },
   "visibility": "hidden"
 }
@@ -163,8 +208,8 @@ every attack (`rules.globalModifiers`). The same id twice on one unit does not s
 
 ## Match flow (Core, `Mimas.Core.Match`)
 
-`MatchState(catalog, MatchSetup, seed)` builds the map, spawns one unit per player on `spawns.p1` / `p2`,
-then `Start()` begins turn 1. Commands: `MoveCommand`, `AttackCommand`, `EndTurnCommand` (reason
+`MatchState(catalog, MatchSetup, seed)` builds the map, spawns one hero per player from that player's
+`Loadout` (four item ids, each checked against its slot) on `spawns.p1` / `p2`, then `Start()` begins turn 1. Commands: `MoveCommand`, `AttackCommand`, `EndTurnCommand` (reason
 `Player` or `Timeout`; the server submits the latter when the clock runs out, so replays need no clock).
 `Validate` is pure; `Apply` is the only mutator and returns `MatchEvent`s; `EnumerateLegal` lists every
 legal command (bots, highlights). Each turn refreshes the active player's units to `stats.ap`; a unit at 0
@@ -225,9 +270,9 @@ holes in the map, and enter only their destination.
 
 Loading: through the catalogue (`catalog.GetMovement(id)` / `catalog.Movements`). `MovementDef.FromJson`
 and `AbilityDef.FromJson` exist for single files and throw `MapLoadException`. A `MovementDef` is an
-`AbilityDef` with `type: "movement"`. Units get their movement ids from their class (`classes/*.json`
-`abilities`), so "every unit can move one tile" is simply every class listing `move`; the catalogue
-rejects a class with no movement ability.
+`AbilityDef` with `type: "movement"`. Walking is innate: `rules.innateAbilities` lists `move`, so every
+hero has it whatever it wears, and the catalogue rejects an innate list with no movement ability. Boots
+add the second mode (`jump` or `teleport`).
 
 Querying (Core, `Mimas.Core.Movement`): build a `MovementContext(map, terrains, occupancy, origin, def)`,
 then `MovementResolverRegistry.CreateDefault().Enumerate(ctx)` for every legal `MovePlan` (UI highlight,
