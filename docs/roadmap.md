@@ -84,9 +84,42 @@ now, not terrain. `board-3.json` is untouched and its stone still blocks. Core g
 `Prop`, `PropDef`, `HeightsDef`, `Ballistics`, the trajectory resolvers and `TargetCheck`; `PlayerView`
 lists props and every `UnitView` carries its body and aim heights; `/health` reports `props`. 287 Core tests.
 
-Not done / deferred: the whole client half (range circles, trajectory preview, projectiles, facing) —
-spec `docs/specs/2026-09-16-aiming-client.md`; enchant or boon overrides of a trajectory (only the seam
-exists); area and multi-target shapes; owned props, rubble, units-as-cover penalties; a beam trajectory.
+Not done / deferred: enchant or boon overrides of a trajectory (only the seam exists); area and
+multi-target shapes; owned props, rubble, units-as-cover penalties; a beam trajectory.
+
+## M3 progress (16 Sep 2026): the aiming slice, client half
+
+Arming an attack now turns the board into an answer to "what happens if I shoot there?". The range band is
+**two true circles** computed per fragment in a hand-written tile shader (`Mimas/HexTile`), so the band is
+the Euclidean rule drawn rather than approximated and it bends over steps and plateaus for free — the
+Decal Projector does not render on WebGL2 (Unity IN-90245) and a ring mesh would seam at every height
+change. One `CheckTarget` per resolved hover drives everything else together: a dashed green path with a
+ring on the point it will hit, red stopping at the blocker with an X and the reason as the tooltip's first
+line, grey with an "Out of range" tag beside the cursor, or grey with a dimmed ring for a wall. A refused
+shot still lists the damage it would do — the same `DamageCalculator` the rules resolve with, no ghost on
+the bar. On resolution a placeholder projectile flies the *same* curve the preview drew and the hit lands
+on impact, not when the event arrives. The hero faces whatever the cursor snapped to, and the nearest
+living enemy when nothing is armed; none of that leaves the client.
+
+**Props** are on the board: code-built boxes with a hit-mark ring at their aim height, hp tags, examine
+("Blocks sight and movement"), and they shrink away when destroyed. Hover resolves bodies before the tile
+they stand on, by component rather than by layer, so `ProjectSettings` stayed untouched. New: `BoardHover`,
+`PropView`, `UnitFacing`, `RangeCircles`, `AimPreview`, `FlightCurve`, `ProjectilePlayback`, the
+`Mimas/HexTile` and `Mimas/AimLine` shaders, and the HUD's cursor tag, blocked reasons and prop tags.
+`BoardView.WorldPerHeightUnit` is the single conversion from Core's body units to world units.
+
+Verified in play on arena-4 (`artifacts/aim-*.png`): circles, a clear arc over a wall onto the bot, a
+blocked direct shot at the bot and at a pillar behind a wall, out of range, a prop target, and a projectile
+in flight. A pillar was shot down and its tile walked onto; the bot shot two more down by itself. Console
+clean; Core and the server untouched.
+
+Two things the play test caught: props in the HUD list broke the turn-start loop (their ids are body ids,
+not unit ids), and arming an attack while the cursor already sat on a target drew nothing until the mouse
+moved.
+
+Not done / deferred: real art (models, VFX, sounds) — props, the projectile and the heroes are all
+placeholders; a prop prefab library; tile tinting for movement is unchanged; the `sky` trajectory has a
+placeholder drop and no ability uses it; touch input; a Web build of this slice.
 
 ## Tooling backlog
 
@@ -96,6 +129,7 @@ Small editor/authoring tools, in the order they are likely to be worth building.
 |---|---|---|
 | JSON data Inspector (`ScriptedImporter`) | A `ScriptedImporter` for `Assets/_Game/Data/**/*.json` with a custom Inspector, so clicking `longbow.json` in the Project window shows typed fields and dropdowns and writes back to the JSON. The real answer to "gear is easier to edit as a ScriptableObject" without giving up the format the server and the content hash need (ADR-004, ADR-014). | The schemas in `tools/schemas/` cover typo-prevention for now; Inspector *editing* is the remaining gap. Maybe a day or two. |
 | Content browser window | A `Mimas/Content` window over `ContentCatalog`: every item and ability with resolved numbers, plus any link errors, without entering Play Mode. | `ContentBootstrap` already logs the summary; the window is convenience. |
+| Projectile and impact VFX | Shuriken emitters for a shot in flight and its impact, driven from the same `FlightCurve` evaluator the preview uses, replacing the flat sphere. | The placeholder reads well enough to play; art direction for the whole board comes first (M4). |
 | Balance sim harness | Run N seeded random-bot games over a matrix of loadouts and print win rates and average turn counts. | Wanted before the first real balance pass on the shipped numbers. |
 
 ## Baselines
