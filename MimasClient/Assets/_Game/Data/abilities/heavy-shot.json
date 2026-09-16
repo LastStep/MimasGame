@@ -6,7 +6,7 @@
   "type": "attack",
   "category": "weapon",
   "icon": "heavy-shot",
-  "description": "A braced, full-charge shot across the whole field.",
+  "description": "A heavy straight shot at any enemy you can see within seven tiles. Two action points.",
   "cost": 2,
-  "attack": { "damage": 5, "damageType": "weapon", "range": 7 }
+  "attack": { "damage": 5, "damageType": "weapon", "range": 7, "trajectory": "direct", "lineOfSight": true }
 }

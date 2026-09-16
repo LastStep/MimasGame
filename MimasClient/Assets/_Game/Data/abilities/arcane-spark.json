@@ -8,5 +8,5 @@
   "icon": "arcane-spark",
   "description": "A cheap flick of raw magic at a nearby foe.",
   "cost": 1,
-  "attack": { "damage": 2, "damageType": "spell", "range": 2 }
+  "attack": { "damage": 2, "damageType": "spell", "range": 2, "trajectory": "direct", "lineOfSight": true }
 }

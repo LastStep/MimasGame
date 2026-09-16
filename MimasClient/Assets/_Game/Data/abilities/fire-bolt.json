@@ -6,11 +6,13 @@
   "type": "attack",
   "category": "spell",
   "icon": "fire-bolt",
-  "description": "Hurl a bolt of fire at an enemy up to three hexes away that you can see.",
+  "description": "A bolt of fire at any enemy you can see within three tiles.",
   "cost": 2,
   "attack": {
     "damage": 6,
     "damageType": "spell",
-    "range": 3
+    "range": 3,
+    "trajectory": "direct",
+    "lineOfSight": true
   }
 }

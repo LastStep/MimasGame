@@ -4,7 +4,7 @@
   "title": "Mimas rules",
   "description": "Match-wide rules (rules.json): the damage lanes, the stats and abilities every hero has before gear, and the modifiers that apply to every attack.",
   "type": "object",
-  "required": ["version", "damageTypes", "baseStats", "innateAbilities"],
+  "required": ["version", "damageTypes", "heights", "baseStats", "innateAbilities"],
   "additionalProperties": false,
   "properties": {
     "$schema": { "type": "string" },
@@ -21,6 +21,17 @@
       "uniqueItems": true,
       "description": "Modifier ids evaluated for every attack (high ground is the shipped example).",
       "items": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" }
+    },
+    "heights": {
+      "type": "object",
+      "description": "Converts a map's integer height levels into the body units sight and trajectories are measured in (design: #board, #line-of-sight).",
+      "required": ["unitsPerLevel", "body", "aim"],
+      "additionalProperties": false,
+      "properties": {
+        "unitsPerLevel": { "type": "integer", "minimum": 1, "description": "Height units one map level is worth." },
+        "body": { "type": "integer", "minimum": 1, "description": "A hero's body height in units above the tile top; this is what blocks a shot." },
+        "aim": { "type": "integer", "minimum": 1, "description": "Where attacks leave from and land, in units above the tile top. 1..body." }
+      }
     },
     "baseStats": {
       "type": "object",

@@ -40,14 +40,14 @@ namespace Mimas.Core.Tests
                     { ""id"": ""forest"", ""walkable"": true, ""moveCost"": 2, ""modifiers"": [ ""forest-cover"" ] },
                     { ""id"": ""stone"", ""walkable"": false } ] }"),
                 new ContentFile("rules.json", @"{ ""version"": 1, ""damageTypes"": [ ""melee"", ""ranged"", ""magic"" ], ""globalModifiers"": [ ""high-ground"" ],
-                    ""baseStats"": { ""hp"": 2, ""ap"": 3 }, ""innateAbilities"": [ ""move"" ] }"),
+                    ""heights"": { ""unitsPerLevel"": 3, ""body"": 6, ""aim"": 4 }, ""baseStats"": { ""hp"": 2, ""ap"": 3 }, ""innateAbilities"": [ ""move"" ] }"),
                 new ContentFile("abilities/move.json", @"{ ""version"": 1, ""id"": ""move"", ""type"": ""movement"", ""movement"": { ""mode"": ""walk"", ""range"": 1 } }"),
                 new ContentFile("abilities/bow.json", @"{ ""version"": 1, ""id"": ""bow"", ""type"": ""attack"", ""category"": ""weapon"", ""cost"": 2,
-                    ""attack"": { ""damage"": 5, ""damageType"": ""ranged"", ""range"": 3 }, ""tags"": [ ""arrow"" ] }"),
+                    ""attack"": { ""damage"": 5, ""damageType"": ""ranged"", ""range"": 3, ""trajectory"": ""direct"", ""lineOfSight"": true }, ""tags"": [ ""arrow"" ] }"),
                 new ContentFile("abilities/strike.json", @"{ ""version"": 1, ""id"": ""strike"", ""type"": ""attack"", ""category"": ""weapon"", ""cost"": 2,
-                    ""attack"": { ""damage"": 4, ""damageType"": ""melee"", ""range"": 1 } }"),
+                    ""attack"": { ""damage"": 4, ""damageType"": ""melee"", ""range"": 1, ""trajectory"": ""direct"", ""lineOfSight"": true } }"),
                 new ContentFile("abilities/jab.json", @"{ ""version"": 1, ""id"": ""jab"", ""type"": ""attack"", ""category"": ""weapon"", ""cost"": 1,
-                    ""attack"": { ""damage"": 2, ""damageType"": ""melee"", ""range"": 1 } }"),
+                    ""attack"": { ""damage"": 2, ""damageType"": ""melee"", ""range"": 1, ""trajectory"": ""direct"", ""lineOfSight"": true } }"),
                 new ContentFile("items/archer-bow.json", @"{ ""version"": 1, ""id"": ""archer-bow"", ""slot"": ""weapon"", ""kind"": ""bow"",
                     ""stats"": { ""power.ranged"": 2, ""defense.ranged"": 1, ""defense.melee"": 0 }, ""abilities"": [ ""bow"" ] }"),
                 new ContentFile("items/brute-club.json", @"{ ""version"": 1, ""id"": ""brute-club"", ""slot"": ""weapon"", ""kind"": ""club"",
@@ -111,14 +111,14 @@ namespace Mimas.Core.Tests
 
         /// <summary>A rules file whose only interesting part is its <c>baseStats</c> object.</summary>
         private static RulesDef Rules(string baseStats) => RulesDef.FromJson(
-            @"{ ""version"": 1, ""damageTypes"": [ ""melee"", ""magic"" ], ""baseStats"": " + baseStats + @", ""innateAbilities"": [ ""move"" ] }");
+            @"{ ""version"": 1, ""damageTypes"": [ ""melee"", ""magic"" ], ""heights"": { ""unitsPerLevel"": 3, ""body"": 6, ""aim"": 4 }, ""baseStats"": " + baseStats + @", ""innateAbilities"": [ ""move"" ] }");
 
         [Fact]
         public void Catalogue_RejectsStatKeysAndAttacksWithUndeclaredDamageTypes()
         {
             var files = CombatFixtures.Files();
             files.Add(new ContentFile("items/odd.json", @"{ ""version"": 1, ""id"": ""odd"", ""slot"": ""armour"", ""kind"": ""odd"", ""stats"": { ""power.psychic"": 1 }, ""abilities"": [] }"));
-            files.Add(new ContentFile("abilities/mind.json", @"{ ""version"": 1, ""id"": ""mind"", ""type"": ""attack"", ""category"": ""spell"", ""attack"": { ""damage"": 1, ""damageType"": ""psychic"", ""range"": 2 } }"));
+            files.Add(new ContentFile("abilities/mind.json", @"{ ""version"": 1, ""id"": ""mind"", ""type"": ""attack"", ""category"": ""spell"", ""attack"": { ""damage"": 1, ""damageType"": ""psychic"", ""range"": 2, ""trajectory"": ""direct"", ""lineOfSight"": true } }"));
             string errors = ContentFixtures.ErrorsOf(files);
             Assert.Contains("items/odd.json: item 'odd' stat 'power.psychic' uses undeclared damage type 'psychic'", errors);
             Assert.Contains("abilities/mind.json: attack 'mind' uses undeclared damage type 'psychic'", errors);
@@ -151,18 +151,18 @@ namespace Mimas.Core.Tests
         public void AttackDef_ParsesRangeBandAndCost_AndRequiresCategory()
         {
             var attack = (AttackDef)AbilityDef.FromJson(@"{ ""version"": 1, ""id"": ""volley"", ""type"": ""attack"", ""category"": ""weapon"", ""cost"": 3,
-                ""attack"": { ""damage"": 3, ""damageType"": ""ranged"", ""range"": 4, ""minRange"": 2 }, ""tags"": [ ""arrow"" ] }");
+                ""attack"": { ""damage"": 3, ""damageType"": ""ranged"", ""range"": 4, ""minRange"": 2, ""trajectory"": ""direct"", ""lineOfSight"": true }, ""tags"": [ ""arrow"" ] }");
             Assert.Equal(3, attack.Cost);
             Assert.Equal(2, attack.MinRange);
             Assert.Equal(4, attack.Range);
-            Assert.False(attack.InRange(1));
-            Assert.True(attack.InRange(4));
+            Assert.False(attack.InRangeSquared(1));
+            Assert.True(attack.InRangeSquared(16));
             Assert.Equal(new[] { "arrow" }, attack.Tags);
             Assert.Equal(AbilityCategories.Weapon, attack.Category);
 
-            Assert.Throws<MapLoadException>(() => AbilityDef.FromJson(@"{ ""version"": 1, ""id"": ""x"", ""type"": ""attack"", ""attack"": { ""damage"": 3, ""damageType"": ""ranged"", ""range"": 1 } }"));
-            Assert.Throws<MapLoadException>(() => AbilityDef.FromJson(@"{ ""version"": 1, ""id"": ""x"", ""type"": ""attack"", ""category"": ""movement"", ""attack"": { ""damage"": 3, ""damageType"": ""ranged"", ""range"": 1 } }"));
-            Assert.Throws<MapLoadException>(() => AbilityDef.FromJson(@"{ ""version"": 1, ""id"": ""x"", ""type"": ""attack"", ""category"": ""spell"", ""attack"": { ""damage"": 3, ""damageType"": ""ranged"", ""range"": 2, ""minRange"": 3 } }"));
+            Assert.Throws<MapLoadException>(() => AbilityDef.FromJson(@"{ ""version"": 1, ""id"": ""x"", ""type"": ""attack"", ""attack"": { ""damage"": 3, ""damageType"": ""ranged"", ""range"": 1, ""trajectory"": ""direct"", ""lineOfSight"": true } }"));
+            Assert.Throws<MapLoadException>(() => AbilityDef.FromJson(@"{ ""version"": 1, ""id"": ""x"", ""type"": ""attack"", ""category"": ""movement"", ""attack"": { ""damage"": 3, ""damageType"": ""ranged"", ""range"": 1, ""trajectory"": ""direct"", ""lineOfSight"": true } }"));
+            Assert.Throws<MapLoadException>(() => AbilityDef.FromJson(@"{ ""version"": 1, ""id"": ""x"", ""type"": ""attack"", ""category"": ""spell"", ""attack"": { ""damage"": 3, ""damageType"": ""ranged"", ""range"": 2, ""minRange"": 3, ""trajectory"": ""direct"", ""lineOfSight"": true } }"));
         }
 
         [Fact]

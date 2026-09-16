@@ -108,6 +108,112 @@ namespace Mimas.Core.Tests
         }
     }
 
+    /// <summary>
+    /// Heights in rules.json and the two aiming fields on an attack: both required, both fail closed
+    /// (spec A, D1/D5/D6).
+    /// </summary>
+    public class HeightsAndTrajectoryParsingTests
+    {
+        private const string RulesHead = @"{ ""version"": 1, ""damageTypes"": [ ""weapon"" ], ""baseStats"": { ""hp"": 20, ""ap"": 3 }, ""innateAbilities"": [ ""move"" ]";
+
+        private static RulesDef Rules(string heights) => RulesDef.FromJson(RulesHead + @", ""heights"": " + heights + " }");
+
+        private static AttackDef Attack(string attack) => (AttackDef)AbilityDef.FromJson(
+            @"{ ""version"": 1, ""id"": ""shot"", ""type"": ""attack"", ""category"": ""weapon"", ""attack"": " + attack + " }");
+
+        [Fact]
+        public void Rules_MissingHeights_Throws()
+        {
+            var e = Assert.Throws<MapLoadException>(() => RulesDef.FromJson(RulesHead + " }"));
+            Assert.Contains("'heights'", e.Message);
+        }
+
+        [Fact]
+        public void Rules_AimAboveBody_Throws()
+        {
+            Assert.Throws<MapLoadException>(() => Rules(@"{ ""unitsPerLevel"": 3, ""body"": 6, ""aim"": 7 }"));
+            Assert.Throws<MapLoadException>(() => Rules(@"{ ""unitsPerLevel"": 0, ""body"": 6, ""aim"": 4 }"));
+
+            var ok = Rules(@"{ ""unitsPerLevel"": 3, ""body"": 6, ""aim"": 4 }");
+            Assert.Equal(3, ok.Heights.UnitsPerLevel);
+            Assert.Equal(6, ok.Heights.Body);
+            Assert.Equal(4, ok.Heights.Aim);
+            Assert.Equal(6, ok.Heights.TileTop(new Tile(Hex.Zero, "grass", 2)));
+        }
+
+        [Fact]
+        public void Attack_MissingTrajectory_Throws()
+        {
+            var e = Assert.Throws<MapLoadException>(() => Attack(@"{ ""damage"": 1, ""damageType"": ""weapon"", ""range"": 3, ""lineOfSight"": true }"));
+            Assert.Contains("'trajectory'", e.Message);
+        }
+
+        [Fact]
+        public void Attack_MissingLineOfSight_Throws()
+        {
+            var e = Assert.Throws<MapLoadException>(() => Attack(@"{ ""damage"": 1, ""damageType"": ""weapon"", ""range"": 3, ""trajectory"": ""direct"" }"));
+            Assert.Contains("'lineOfSight'", e.Message);
+        }
+
+        [Fact]
+        public void Attack_ArcWithoutApex_Throws()
+        {
+            var e = Assert.Throws<MapLoadException>(() => Attack(@"{ ""damage"": 1, ""damageType"": ""weapon"", ""range"": 3, ""trajectory"": ""arc"", ""lineOfSight"": false }"));
+            Assert.Contains("apex is required for trajectory 'arc'", e.Message);
+        }
+
+        [Fact]
+        public void Attack_ApexOnDirect_Throws()
+        {
+            var e = Assert.Throws<MapLoadException>(() => Attack(@"{ ""damage"": 1, ""damageType"": ""weapon"", ""range"": 3, ""trajectory"": ""direct"", ""apex"": 2, ""lineOfSight"": true }"));
+            Assert.Contains("only allowed for trajectory 'arc'", e.Message);
+        }
+
+        [Fact]
+        public void Attack_UnknownTrajectory_Throws()
+        {
+            var e = Assert.Throws<MapLoadException>(() => Attack(@"{ ""damage"": 1, ""damageType"": ""weapon"", ""range"": 3, ""trajectory"": ""lob"", ""lineOfSight"": true }"));
+            Assert.Contains("trajectory is 'lob'", e.Message);
+        }
+
+        [Fact]
+        public void Attack_ArcParsesApex()
+        {
+            var arc = Attack(@"{ ""damage"": 1, ""damageType"": ""weapon"", ""range"": 5, ""trajectory"": ""arc"", ""apex"": 3, ""lineOfSight"": false }");
+            Assert.Equal(Trajectories.Arc, arc.Trajectory);
+            Assert.Equal(3, arc.Apex);
+            Assert.False(arc.LineOfSight);
+        }
+
+        [Fact]
+        public void InRangeSquared_IsACircle_NotAHexDistanceBand()
+        {
+            var gun = Attack(@"{ ""damage"": 1, ""damageType"": ""weapon"", ""range"": 7, ""trajectory"": ""direct"", ""lineOfSight"": true }");
+
+            // (4,4) is 8 hexes away but only sqrt(48) < 7 spacings from the centre.
+            Assert.Equal(8, Hex.Distance(Hex.Zero, new Hex(4, 4)));
+            Assert.True(gun.InRangeSquared(Hex.EuclideanSquared(Hex.Zero, new Hex(4, 4))));
+            Assert.False(gun.InRangeSquared(Hex.EuclideanSquared(Hex.Zero, new Hex(8, 0))));
+        }
+
+        [Fact]
+        public void WithTrajectory_KeepsEveryOtherField()
+        {
+            var gun = Attack(@"{ ""damage"": 2, ""damageType"": ""weapon"", ""range"": 7, ""minRange"": 2, ""trajectory"": ""direct"", ""lineOfSight"": true }");
+            var lobbed = gun.WithTrajectory(Trajectories.Arc, 4, false);
+
+            Assert.Equal(Trajectories.Arc, lobbed.Trajectory);
+            Assert.Equal(4, lobbed.Apex);
+            Assert.False(lobbed.LineOfSight);
+            Assert.Equal(gun.Id, lobbed.Id);
+            Assert.Equal(gun.Damage, lobbed.Damage);
+            Assert.Equal(gun.Range, lobbed.Range);
+            Assert.Equal(gun.MinRange, lobbed.MinRange);
+            Assert.Equal(gun.Cost, lobbed.Cost);
+            Assert.Equal(Trajectories.Direct, gun.Trajectory);      // the original is untouched
+        }
+    }
+
     public class MapDataTests
     {
         private static TerrainSet Terrains() => TerrainSet.FromJson(RepoData.TerrainsJson);

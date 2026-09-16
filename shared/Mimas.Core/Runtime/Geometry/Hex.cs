@@ -54,6 +54,17 @@ namespace Mimas.Core.Geometry
 
         public int DistanceTo(Hex other) => Distance(this, other);
 
+        /// <summary>
+        /// Squared Euclidean distance between two hex centres, in units of the centre-to-centre spacing.
+        /// For a pointy-top layout the world offset of (dq, dr) has |v|^2 = 3 s^2 (dq^2 + dq dr + dr^2), so this
+        /// integer is exact and layout-independent. Used for circular range bands (design: #attacks).
+        /// </summary>
+        public static int EuclideanSquared(Hex a, Hex b)
+        {
+            int dq = b.Q - a.Q, dr = b.R - a.R;
+            return dq * dq + dq * dr + dr * dr;
+        }
+
         /// <summary>Rotate 60° clockwise around the origin.</summary>
         public Hex RotateRight() => new Hex(-S, -Q);
 

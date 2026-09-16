@@ -70,21 +70,21 @@ namespace Mimas.Core.Tests
         public void RulesDef_FromJson_RequiresBaseStatsAndInnateAbilities()
         {
             Assert.Throws<MapLoadException>(() => RulesDef.FromJson(
-                @"{ ""version"": 1, ""damageTypes"": [ ""weapon"" ], ""innateAbilities"": [ ""move"" ] }"));
+                @"{ ""version"": 1, ""damageTypes"": [ ""weapon"" ], ""heights"": { ""unitsPerLevel"": 3, ""body"": 6, ""aim"": 4 }, ""innateAbilities"": [ ""move"" ] }"));
             Assert.Throws<MapLoadException>(() => RulesDef.FromJson(
-                @"{ ""version"": 1, ""damageTypes"": [ ""weapon"" ], ""baseStats"": { ""hp"": 20, ""ap"": 3 } }"));
+                @"{ ""version"": 1, ""damageTypes"": [ ""weapon"" ], ""heights"": { ""unitsPerLevel"": 3, ""body"": 6, ""aim"": 4 }, ""baseStats"": { ""hp"": 20, ""ap"": 3 } }"));
 
             var negative = Assert.Throws<MapLoadException>(() => RulesDef.FromJson(
-                @"{ ""version"": 1, ""damageTypes"": [ ""weapon"" ], ""baseStats"": { ""hp"": 20, ""ap"": 3, ""power.weapon"": -1 },
+                @"{ ""version"": 1, ""damageTypes"": [ ""weapon"" ], ""heights"": { ""unitsPerLevel"": 3, ""body"": 6, ""aim"": 4 }, ""baseStats"": { ""hp"": 20, ""ap"": 3, ""power.weapon"": -1 },
                     ""innateAbilities"": [ ""move"" ] }"));
             Assert.Contains("rules.baseStats['power.weapon'] must not be negative.", negative.Message);
 
             Assert.Throws<MapLoadException>(() => RulesDef.FromJson(
-                @"{ ""version"": 1, ""damageTypes"": [ ""weapon"" ], ""baseStats"": { ""hp"": 20, ""ap"": 3 },
+                @"{ ""version"": 1, ""damageTypes"": [ ""weapon"" ], ""heights"": { ""unitsPerLevel"": 3, ""body"": 6, ""aim"": 4 }, ""baseStats"": { ""hp"": 20, ""ap"": 3 },
                     ""innateAbilities"": [ ""move"", ""move"" ] }"));
 
             var rules = RulesDef.FromJson(
-                @"{ ""version"": 1, ""damageTypes"": [ ""weapon"" ], ""baseStats"": { ""hp"": 20, ""ap"": 3 }, ""innateAbilities"": [ ""move"" ] }");
+                @"{ ""version"": 1, ""damageTypes"": [ ""weapon"" ], ""heights"": { ""unitsPerLevel"": 3, ""body"": 6, ""aim"": 4 }, ""baseStats"": { ""hp"": 20, ""ap"": 3 }, ""innateAbilities"": [ ""move"" ] }");
             Assert.Equal(20, rules.BaseStats.Hp);
             Assert.Equal(new[] { "move" }, rules.InnateAbilityIds);
             Assert.True(rules.IsInnateAbility("move"));

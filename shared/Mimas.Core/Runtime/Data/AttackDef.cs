@@ -7,8 +7,9 @@ namespace Mimas.Core.Data
 {
     /// <summary>
     /// An attack as authored in <c>abilities/*.json</c> with <c>"type": "attack"</c>: flat base damage in one
-    /// damage lane, a hex range band, and free-form tags for modifiers to match. Line of sight is always
-    /// required (design decision, 15 Sep 2026), so there is no flag for it. Damage resolution lives in
+    /// damage lane, a circular range band, free-form tags for modifiers to match, and the two independent
+    /// aiming fields (design: #trajectories) — <see cref="LineOfSight"/>, must the attacker see the target, and
+    /// <see cref="Trajectory"/>, how the attack travels. Damage resolution lives in
     /// <c>Mimas.Core.Combat.DamageCalculator</c>; this class is data only.
     /// </summary>
     public sealed class AttackDef : AbilityDef
@@ -21,11 +22,20 @@ namespace Mimas.Core.Data
         /// <summary>Damage lane; picks <c>power.&lt;type&gt;</c> / <c>defense.&lt;type&gt;</c> and is a modifier condition.</summary>
         public string DamageType { get; }
 
-        /// <summary>Minimum hex distance to the target (1 = adjacent allowed).</summary>
+        /// <summary>Minimum Euclidean centre distance in tile spacings (1 = adjacent allowed).</summary>
         public int MinRange { get; }
 
-        /// <summary>Maximum hex distance to the target.</summary>
+        /// <summary>Maximum Euclidean centre distance in tile spacings.</summary>
         public int Range { get; }
+
+        /// <summary>How the attack travels: one of <see cref="Trajectories"/>. Never null.</summary>
+        public string Trajectory { get; }
+
+        /// <summary>How far above the higher endpoint an <c>arc</c> peaks. 0 for every other trajectory.</summary>
+        public int Apex { get; }
+
+        /// <summary>True when the attacker must see the target (design: #line-of-sight).</summary>
+        public bool LineOfSight { get; }
 
         /// <summary>Free-form tags (elements, weapon kinds) modifiers can match. Sorted, unique.</summary>
         public IReadOnlyList<string> Tags => _tags;
@@ -33,6 +43,7 @@ namespace Mimas.Core.Data
         public AttackDef(
             string id, string name, string category, int cost,
             int damage, string damageType, int range, int minRange = 1,
+            string trajectory = Trajectories.Direct, bool lineOfSight = true, int apex = 0,
             List<string> tags = null, string description = null, string icon = null)
             : base(id, name, TypeAttack, description, icon, category, cost)
         {
@@ -40,10 +51,16 @@ namespace Mimas.Core.Data
             if (string.IsNullOrEmpty(damageType)) throw new ArgumentException("Damage type must not be empty.", nameof(damageType));
             if (range < 1) throw new ArgumentOutOfRangeException(nameof(range));
             if (minRange < 1 || minRange > range) throw new ArgumentOutOfRangeException(nameof(minRange));
+            if (!Trajectories.IsKnown(trajectory)) throw new ArgumentException("Unknown trajectory '" + trajectory + "'.", nameof(trajectory));
+            if (apex < 0) throw new ArgumentOutOfRangeException(nameof(apex));
+            if (apex > 0 && trajectory != Trajectories.Arc) throw new ArgumentException("Only an 'arc' has an apex.", nameof(apex));
             Damage = damage;
             DamageType = damageType;
             Range = range;
             MinRange = minRange;
+            Trajectory = trajectory;
+            Apex = apex;
+            LineOfSight = lineOfSight;
             _tags = new List<string>();
             if (tags != null)
             {
@@ -55,8 +72,20 @@ namespace Mimas.Core.Data
 
         public bool HasTag(string tag) => tag != null && _tags.Contains(tag);
 
-        /// <summary>True when <paramref name="distance"/> lies inside the range band.</summary>
-        public bool InRange(int distance) => distance >= MinRange && distance <= Range;
+        /// <summary>
+        /// True when a squared Euclidean centre distance (<see cref="Mimas.Core.Geometry.Hex.EuclideanSquared"/>)
+        /// lies inside the range band. Squared throughout so the band stays a true circle with integer maths.
+        /// </summary>
+        public bool InRangeSquared(int distanceSquared)
+            => distanceSquared >= MinRange * MinRange && distanceSquared <= Range * Range;
+
+        /// <summary>
+        /// A copy with different aiming fields and everything else untouched: the one seam an enchant or boon
+        /// would swap a trajectory through (design: #trajectories). Exercised by tests only today.
+        /// </summary>
+        public AttackDef WithTrajectory(string trajectory, int apex, bool lineOfSight)
+            => new AttackDef(Id, Name, Category, Cost, Damage, DamageType, Range, MinRange,
+                trajectory, lineOfSight, apex, new List<string>(_tags), Description, Icon);
 
         public static AttackDef FromJson(string json)
         {
@@ -101,7 +130,23 @@ namespace Mimas.Core.Data
             int minRange = MapJson.OptionalInt(attack, "minRange", 1, attackWhere);
             if (minRange < 1 || minRange > range) throw new MapLoadException($"{attackWhere}.minRange must be between 1 and range ({range}).");
 
-            return new AttackDef(id, name, category, cost, damage, damageType, range, minRange, tags, description, icon);
+            string trajectory = MapJson.RequireString(attack, "trajectory", attackWhere);
+            if (!Trajectories.IsKnown(trajectory))
+                throw new MapLoadException($"{attackWhere}.trajectory is '{trajectory}' (known: {Trajectories.Direct}, {Trajectories.Arc}, {Trajectories.Sky}).");
+            bool lineOfSight = MapJson.RequireBool(attack, "lineOfSight", attackWhere);
+            int apex = MapJson.OptionalInt(attack, "apex", -1, attackWhere);
+            if (trajectory == Trajectories.Arc)
+            {
+                if (apex < 0) throw new MapLoadException($"{attackWhere}.apex is required for trajectory 'arc'.");
+            }
+            else if (apex >= 0)
+            {
+                throw new MapLoadException($"{attackWhere}.apex is only allowed for trajectory 'arc' (got '{trajectory}').");
+            }
+            if (apex < 0) apex = 0;
+
+            return new AttackDef(id, name, category, cost, damage, damageType, range, minRange,
+                trajectory, lineOfSight, apex, tags, description, icon);
         }
     }
 }

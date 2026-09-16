@@ -6,7 +6,7 @@
   "type": "attack",
   "category": "weapon",
   "icon": "aimed-shot",
-  "description": "A drawn, steady shot. Twice the cost, twice the arrow.",
+  "description": "A high, slow arrow that clears taller cover. Two action points.",
   "cost": 2,
-  "attack": { "damage": 6, "damageType": "weapon", "range": 5 }
+  "attack": { "damage": 6, "damageType": "weapon", "range": 5, "trajectory": "arc", "apex": 4, "lineOfSight": false }
 }

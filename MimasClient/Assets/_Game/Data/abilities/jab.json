@@ -11,6 +11,8 @@
   "attack": {
     "damage": 2,
     "damageType": "weapon",
-    "range": 1
+    "range": 1,
+    "trajectory": "direct",
+    "lineOfSight": true
   }
 }

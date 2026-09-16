@@ -26,16 +26,20 @@ namespace Mimas.Core.Data
         /// <summary>Stats every hero starts with before gear (rules.json baseStats).</summary>
         public StatBlock BaseStats { get; }
 
+        /// <summary>How map height levels convert to the body units sight and trajectories use (rules.json heights).</summary>
+        public HeightsDef Heights { get; }
+
         /// <summary>Ability ids every hero has regardless of gear (rules.json innateAbilities), authored order.</summary>
         public IReadOnlyList<string> InnateAbilityIds => _innateAbilityIds;
 
-        public RulesDef(List<string> damageTypes, List<string> globalModifierIds, StatBlock baseStats, List<string> innateAbilityIds)
+        public RulesDef(List<string> damageTypes, List<string> globalModifierIds, StatBlock baseStats, HeightsDef heights, List<string> innateAbilityIds)
         {
             if (damageTypes == null || damageTypes.Count == 0) throw new ArgumentException("At least one damage type is required.", nameof(damageTypes));
             if (innateAbilityIds == null || innateAbilityIds.Count == 0) throw new ArgumentException("At least one innate ability is required.", nameof(innateAbilityIds));
             _damageTypes = new List<string>(damageTypes);
             _globalModifierIds = globalModifierIds != null ? new List<string>(globalModifierIds) : new List<string>();
             BaseStats = baseStats ?? throw new ArgumentNullException(nameof(baseStats));
+            Heights = heights ?? throw new ArgumentNullException(nameof(heights));
             _innateAbilityIds = new List<string>(innateAbilityIds);
         }
 
@@ -68,10 +72,14 @@ namespace Mimas.Core.Data
                 throw new MapLoadException("rules field 'baseStats' must be an object.");
             StatBlock baseStats = StatBlock.FromJsonAt(baseStatsObj, "rules.baseStats", true);
 
+            if (!(MapJson.Require(root, "heights", "rules") is JObject heightsObj))
+                throw new MapLoadException("rules field 'heights' must be an object.");
+            HeightsDef heights = HeightsDef.FromJsonAt(heightsObj, "rules.heights");
+
             var innate = MapJson.RequireStringList(root, "innateAbilities", "rules");
             if (innate.Count == 0) throw new MapLoadException("rules field 'innateAbilities' must list at least one ability id.");
 
-            return new RulesDef(damageTypes, globals, baseStats, innate);
+            return new RulesDef(damageTypes, globals, baseStats, heights, innate);
         }
     }
 }

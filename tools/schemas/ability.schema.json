@@ -80,7 +80,7 @@
           },
           "attack": {
             "type": "object",
-            "required": ["damage", "damageType", "range"],
+            "required": ["damage", "damageType", "range", "trajectory", "lineOfSight"],
             "additionalProperties": false,
             "properties": {
               "damage": { "type": "integer", "minimum": 0, "description": "Flat base damage before stats and modifiers." },
@@ -88,9 +88,29 @@
                 "enum": ["weapon", "spell"],
                 "description": "The lane, one of rules.damageTypes. Picks power.<lane> and defense.<lane>."
               },
-              "range": { "type": "integer", "minimum": 1, "description": "Maximum hex distance to the target." },
-              "minRange": { "type": "integer", "minimum": 1, "default": 1, "description": "Minimum hex distance; 1..range." }
-            }
+              "range": { "type": "integer", "minimum": 1, "description": "Maximum Euclidean centre distance in tile spacings (see docs/data.md)." },
+              "minRange": { "type": "integer", "minimum": 1, "default": 1, "description": "Minimum Euclidean centre distance in tile spacings (see docs/data.md); 1..range." },
+              "trajectory": {
+                "enum": ["direct", "arc", "sky"],
+                "description": "How the attack travels: direct is the sight ray, arc is a parabola with an apex, sky is never blocked."
+              },
+              "apex": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Arc only, and required there: how far above the higher endpoint the flight peaks."
+              },
+              "lineOfSight": {
+                "type": "boolean",
+                "description": "Must the attacker see the target? Independent of trajectory; both must pass."
+              }
+            },
+            "allOf": [
+              {
+                "if": { "properties": { "trajectory": { "const": "arc" } }, "required": ["trajectory"] },
+                "then": { "required": ["apex"] },
+                "else": { "not": { "required": ["apex"] } }
+              }
+            ]
           }
         }
       }

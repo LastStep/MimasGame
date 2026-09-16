@@ -6,7 +6,7 @@
   "type": "attack",
   "category": "weapon",
   "icon": "quick-shot",
-  "description": "A snap shot from the hip. Long reach, light hit.",
+  "description": "A straight shot at any enemy you can see within seven tiles.",
   "cost": 1,
-  "attack": { "damage": 2, "damageType": "weapon", "range": 7 }
+  "attack": { "damage": 2, "damageType": "weapon", "range": 7, "trajectory": "direct", "lineOfSight": true }
 }

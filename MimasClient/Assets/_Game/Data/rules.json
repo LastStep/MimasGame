@@ -3,6 +3,7 @@
   "version": 1,
   "damageTypes": ["weapon", "spell"],
   "globalModifiers": ["high-ground"],
+  "heights": { "unitsPerLevel": 3, "body": 6, "aim": 4 },
   "baseStats": {
     "hp": 20,
     "ap": 3,

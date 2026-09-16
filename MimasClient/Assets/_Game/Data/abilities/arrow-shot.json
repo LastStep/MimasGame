@@ -6,7 +6,7 @@
   "type": "attack",
   "category": "weapon",
   "icon": "arrow-shot",
-  "description": "A quick arrow at any enemy you can see within five hexes.",
+  "description": "A quick arrow lobbed at an enemy within five tiles. It can drop behind cover you cannot see past.",
   "cost": 1,
-  "attack": { "damage": 3, "damageType": "weapon", "range": 5 }
+  "attack": { "damage": 3, "damageType": "weapon", "range": 5, "trajectory": "arc", "apex": 3, "lineOfSight": false }
 }

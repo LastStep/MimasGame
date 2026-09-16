@@ -83,6 +83,29 @@ namespace Mimas.Core.Tests
         }
 
         [Fact]
+        public void EuclideanSquared_StraightFive_Is25()
+        {
+            Assert.Equal(25, Hex.EuclideanSquared(Hex.Zero, new Hex(5, 0)));
+        }
+
+        [Fact]
+        public void EuclideanSquared_Diagonal33_Is27()
+        {
+            // Hex distance 6, but the centres are sqrt(27) spacings apart: a circular band reaches further here.
+            var far = new Hex(3, 3);
+            Assert.Equal(6, Hex.Distance(Hex.Zero, far));
+            Assert.Equal(27, Hex.EuclideanSquared(Hex.Zero, far));
+        }
+
+        [Fact]
+        public void EuclideanSquared_IsSymmetric()
+        {
+            var a = new Hex(-2, 3);
+            foreach (var b in Hex.Spiral(Hex.Zero, 4))
+                Assert.Equal(Hex.EuclideanSquared(a, b), Hex.EuclideanSquared(b, a));
+        }
+
+        [Fact]
         public void Equality_And_HashCode_AreValueBased()
         {
             Assert.Equal(new Hex(1, 2), new Hex(1, 2));

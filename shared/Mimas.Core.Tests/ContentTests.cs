@@ -23,7 +23,7 @@ namespace Mimas.Core.Tests
         {
             new ContentFile("terrains.json", @"{ ""version"": 1, ""terrains"": [ { ""id"": ""grass"", ""walkable"": true } ] }"),
             new ContentFile("rules.json", @"{ ""version"": 1, ""damageTypes"": [ ""melee"", ""ranged"", ""magic"" ],
-                ""baseStats"": { ""hp"": 10, ""ap"": 3 }, ""innateAbilities"": [ ""move"" ] }"),
+                ""heights"": { ""unitsPerLevel"": 3, ""body"": 6, ""aim"": 4 }, ""baseStats"": { ""hp"": 10, ""ap"": 3 }, ""innateAbilities"": [ ""move"" ] }"),
             new ContentFile("abilities/move.json", @"{ ""version"": 1, ""id"": ""move"", ""type"": ""movement"", ""movement"": { ""mode"": ""walk"", ""range"": 1 } }"),
         };
 
@@ -139,7 +139,7 @@ namespace Mimas.Core.Tests
         {
             var files = ContentFixtures.Minimal();
             files.Add(new ContentFile("abilities/zap.json", @"{ ""version"": 1, ""id"": ""zap"", ""type"": ""attack"", ""category"": ""spell"",
-                ""attack"": { ""damage"": 1, ""damageType"": ""magic"", ""range"": 2 } }"));
+                ""attack"": { ""damage"": 1, ""damageType"": ""magic"", ""range"": 2, ""trajectory"": ""direct"", ""lineOfSight"": true } }"));
             files.Add(new ContentFile("items/odd-bow.json", @"{ ""version"": 1, ""id"": ""odd-bow"", ""slot"": ""weapon"", ""kind"": ""bow"",
                 ""stats"": {}, ""abilities"": [ ""zap"" ] }"));
             Assert.Contains("item 'odd-bow' is a weapon but grants attack 'zap' with category 'spell'; a weapon may only grant 'weapon' attacks",
@@ -151,7 +151,7 @@ namespace Mimas.Core.Tests
         {
             var files = ContentFixtures.Minimal();
             files.Add(new ContentFile("abilities/whack.json", @"{ ""version"": 1, ""id"": ""whack"", ""type"": ""attack"", ""category"": ""weapon"",
-                ""attack"": { ""damage"": 1, ""damageType"": ""melee"", ""range"": 1 } }"));
+                ""attack"": { ""damage"": 1, ""damageType"": ""melee"", ""range"": 1, ""trajectory"": ""direct"", ""lineOfSight"": true } }"));
             files.Add(new ContentFile("items/odd-crown.json", @"{ ""version"": 1, ""id"": ""odd-crown"", ""slot"": ""crown"", ""kind"": ""circlet"",
                 ""stats"": {}, ""abilities"": [ ""whack"" ] }"));
             Assert.Contains("item 'odd-crown' is a crown but grants attack 'whack' with category 'weapon'; a crown may only grant 'spell' attacks",
@@ -163,7 +163,7 @@ namespace Mimas.Core.Tests
         {
             var files = ContentFixtures.Minimal();
             files.Add(new ContentFile("abilities/spikes.json", @"{ ""version"": 1, ""id"": ""spikes"", ""type"": ""attack"", ""category"": ""weapon"",
-                ""attack"": { ""damage"": 1, ""damageType"": ""melee"", ""range"": 1 } }"));
+                ""attack"": { ""damage"": 1, ""damageType"": ""melee"", ""range"": 1, ""trajectory"": ""direct"", ""lineOfSight"": true } }"));
             files.Add(new ContentFile("items/spiked-vest.json", @"{ ""version"": 1, ""id"": ""spiked-vest"", ""slot"": ""armour"", ""kind"": ""vest"",
                 ""stats"": {}, ""abilities"": [ ""spikes"" ] }"));
             var catalog = ContentCatalog.Load(files);
@@ -195,7 +195,7 @@ namespace Mimas.Core.Tests
         {
             var files = ContentFixtures.Minimal();
             files = files.Select(f => f.Path == "rules.json"
-                ? new ContentFile(f.Path, f.Text.Replace(@"{ ""hp"": 10, ""ap"": 3 }", @"{ ""hp"": 10, ""ap"": 3, ""power.psychic"": 1 }"))
+                ? new ContentFile(f.Path, f.Text.Replace(@"""baseStats"": { ""hp"": 10, ""ap"": 3 }", @"""baseStats"": { ""hp"": 10, ""ap"": 3, ""power.psychic"": 1 }"))
                 : f).ToList();
             Assert.Contains("rules.json: rules.baseStats 'power.psychic' uses undeclared damage type 'psychic'", ContentFixtures.ErrorsOf(files));
         }
@@ -315,6 +315,55 @@ namespace Mimas.Core.Tests
         {
             Assert.Equal("abilities/jump.json", new ContentFile(".\\abilities\\jump.json", "{}").Path);
             Assert.Equal("maps/x.json", new ContentFile("/maps/x.json", "{}").Path);
+        }
+    }
+
+    /// <summary>The shipped catalogue's aiming fields (spec A, D7): what each weapon and crown actually does.</summary>
+    public class ShippedAimingTests
+    {
+        [Fact]
+        public void ShippedAttacks_AllDeclareTrajectoryAndSight()
+        {
+            var catalog = ContentFixtures.RepoCatalog();
+            var attacks = catalog.Abilities.All.OfType<AttackDef>().ToList();
+            Assert.Equal(8, attacks.Count);
+            Assert.All(attacks, a => Assert.True(Trajectories.IsKnown(a.Trajectory), a.Id));
+            Assert.All(attacks, a => Assert.True(a.Apex == 0 || a.Trajectory == Trajectories.Arc, a.Id));
+        }
+
+        [Fact]
+        public void ShippedBow_IsArcWithoutSight()
+        {
+            var catalog = ContentFixtures.RepoCatalog();
+            Assert.Equal(Trajectories.Arc, catalog.GetAttack("arrow-shot").Trajectory);
+            Assert.Equal(3, catalog.GetAttack("arrow-shot").Apex);
+            Assert.False(catalog.GetAttack("arrow-shot").LineOfSight);
+
+            Assert.Equal(Trajectories.Arc, catalog.GetAttack("aimed-shot").Trajectory);
+            Assert.Equal(4, catalog.GetAttack("aimed-shot").Apex);
+            Assert.False(catalog.GetAttack("aimed-shot").LineOfSight);
+        }
+
+        [Fact]
+        public void ShippedGunAndSpells_AreDirectWithSight()
+        {
+            var catalog = ContentFixtures.RepoCatalog();
+            foreach (string id in new[] { "quick-shot", "heavy-shot", "fire-bolt", "arcane-spark" })
+            {
+                var attack = catalog.GetAttack(id);
+                Assert.Equal(Trajectories.Direct, attack.Trajectory);
+                Assert.True(attack.LineOfSight, id);
+                Assert.Equal(0, attack.Apex);
+            }
+        }
+
+        [Fact]
+        public void ShippedRules_CarryHeights()
+        {
+            var heights = ContentFixtures.RepoCatalog().Rules.Heights;
+            Assert.Equal(3, heights.UnitsPerLevel);
+            Assert.Equal(6, heights.Body);
+            Assert.Equal(4, heights.Aim);
         }
     }
 

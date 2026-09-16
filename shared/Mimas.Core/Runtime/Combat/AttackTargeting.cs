@@ -36,7 +36,7 @@ namespace Mimas.Core.Combat
             if (!units.TryGetUnitAt(target, out victim)) return TargetRejectReason.NoUnit;
             if (victim.Owner == attacker.Owner) return TargetRejectReason.NotEnemy;
             if (!victim.IsAlive) return TargetRejectReason.TargetDead;
-            if (!attack.InRange(Hex.Distance(attacker.Position, target))) return TargetRejectReason.OutOfRange;
+            if (!attack.InRangeSquared(Hex.EuclideanSquared(attacker.Position, target))) return TargetRejectReason.OutOfRange;
             if (!LineOfSight.IsClear(map, attacker.Position, target)) return TargetRejectReason.NoLineOfSight;
             return TargetRejectReason.None;
         }
