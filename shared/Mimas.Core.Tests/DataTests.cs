@@ -36,6 +36,7 @@ namespace Mimas.Core.Tests
 
         internal static string TerrainsJson => Read("terrains.json");
         internal static string Arena4Json => Read("maps/arena-4.json");
+        internal static string Board3Json => Read("maps/board-3.json");
     }
 
     public class TerrainSetTests
@@ -214,6 +215,64 @@ namespace Mimas.Core.Tests
         }
     }
 
+    /// <summary>Props as authored in <c>props/*.json</c> (spec A, D11): heights, hit points, and what a prop may not carry.</summary>
+    public class PropDefTests
+    {
+        private static PropDef Prop(string body) => PropDef.FromJson(
+            @"{ ""version"": 1, ""id"": ""thing"", " + body + " }");
+
+        [Fact]
+        public void Prop_ParsesWallWithoutStats_NotDestructible()
+        {
+            var wall = PropDef.FromJson(RepoData.Read("props/wall.json"));
+            Assert.Equal("wall", wall.Id);
+            Assert.Equal(6, wall.BodyHeight);
+            Assert.Equal(3, wall.AimHeight);
+            Assert.False(wall.IsDestructible);
+            Assert.Equal(0, wall.Stats.Hp);
+        }
+
+        [Fact]
+        public void Prop_PillarWithHp_Destructible()
+        {
+            var pillar = PropDef.FromJson(RepoData.Read("props/pillar.json"));
+            Assert.True(pillar.IsDestructible);
+            Assert.Equal(10, pillar.Stats.Hp);
+            Assert.Equal(0, pillar.Stats.Get("defense.weapon"));
+            Assert.Equal("Stone Pillar", pillar.Name);
+        }
+
+        [Fact]
+        public void Prop_AimAboveBody_Throws()
+        {
+            Assert.Throws<MapLoadException>(() => Prop(@"""bodyHeight"": 6, ""aimHeight"": 7"));
+            Assert.Throws<MapLoadException>(() => Prop(@"""bodyHeight"": 0, ""aimHeight"": 1"));
+            Assert.Throws<MapLoadException>(() => Prop(@"""bodyHeight"": 6"));
+            Assert.Equal(6, Prop(@"""bodyHeight"": 6, ""aimHeight"": 6").AimHeight);
+        }
+
+        [Fact]
+        public void Prop_PowerStat_Throws()
+        {
+            var e = Assert.Throws<MapLoadException>(() => Prop(@"""bodyHeight"": 6, ""aimHeight"": 3, ""stats"": { ""hp"": 5, ""power.weapon"": 1 }"));
+            Assert.Contains("unknown stat 'power.weapon'", e.Message);
+        }
+
+        [Fact]
+        public void Prop_ApStat_Throws()
+        {
+            var e = Assert.Throws<MapLoadException>(() => Prop(@"""bodyHeight"": 6, ""aimHeight"": 3, ""stats"": { ""hp"": 5, ""ap"": 3 }"));
+            Assert.Contains("unknown stat 'ap'", e.Message);
+        }
+
+        [Fact]
+        public void Prop_ZeroHp_Throws()
+        {
+            Assert.Throws<MapLoadException>(() => Prop(@"""bodyHeight"": 6, ""aimHeight"": 3, ""stats"": { ""hp"": 0 }"));
+            Assert.Throws<MapLoadException>(() => Prop(@"""bodyHeight"": 6, ""aimHeight"": 3, ""stats"": { ""defense.weapon"": -1 }"));
+        }
+    }
+
     public class MapDataTests
     {
         private static TerrainSet Terrains() => TerrainSet.FromJson(RepoData.TerrainsJson);
@@ -276,11 +335,21 @@ namespace Mimas.Core.Tests
         }
 
         [Fact]
-        public void BuildTileMap_Arena4_Yields61TilesWith12Unwalkable()
+        public void BuildTileMap_Arena4_Yields61WalkableTiles_CoverIsProps()
         {
-            var tiles = MapData.FromJson(RepoData.Arena4Json).BuildTileMap(Terrains());
+            var map = MapData.FromJson(RepoData.Arena4Json);
+            var tiles = map.BuildTileMap(Terrains());
             Assert.Equal(61, tiles.Count);
-            Assert.Equal(12, tiles.Tiles.Count(t => !t.Walkable));
+            Assert.All(tiles.Tiles, t => Assert.True(t.Walkable));
+            Assert.Equal(8, map.Hexes.Count(h => h.PropId != null));
+        }
+
+        [Fact]
+        public void BuildTileMap_Board3_StoneCentreIsUnwalkable()
+        {
+            var tiles = MapData.FromJson(RepoData.Board3Json).BuildTileMap(Terrains());
+            Assert.Equal(37, tiles.Count);
+            Assert.False(tiles[Hex.Zero].Walkable);
             Assert.All(tiles.Tiles, t => Assert.Equal(t.Terrain == "grass", t.Walkable));
         }
 
@@ -306,7 +375,7 @@ namespace Mimas.Core.Tests
         public void BuildTileMap_TerrainNotMirroredByItsTwin_ThrowsMapLoadException()
         {
             var tree = Arena4Tree();
-            HexAt(tree, 1, 1)["terrain"] = "grass";      // twin (-1,-1) stays stone
+            HexAt(tree, 1, 1)["terrain"] = "stone";      // twin (-1,-1) stays grass
             var map = MapData.FromJson(tree.ToString());
             Assert.Throws<MapLoadException>(() => map.BuildTileMap(Terrains()));
         }
@@ -325,10 +394,55 @@ namespace Mimas.Core.Tests
         public void BuildTileMap_SpawnOnUnwalkableTile_ThrowsMapLoadException()
         {
             var tree = Arena4Tree();
-            tree["spawns"]["p1"]["q"] = -3;             // (-3,0) is a stone pillar
-            tree["spawns"]["p2"]["q"] = 3;
+            HexAt(tree, -4, 0)["terrain"] = "stone";    // both spawn corners, so the map stays symmetric
+            HexAt(tree, 4, 0)["terrain"] = "stone";
             var map = MapData.FromJson(tree.ToString());
-            Assert.Throws<MapLoadException>(() => map.BuildTileMap(Terrains()));
+            var e = Assert.Throws<MapLoadException>(() => map.BuildTileMap(Terrains()));
+            Assert.Contains("spawn p1 Hex(-4,0) is not walkable", e.Message);
+        }
+
+        [Fact]
+        public void Map_PropOnSpawn_Throws()
+        {
+            var tree = Arena4Tree();
+            HexAt(tree, -4, 0)["prop"] = "pillar";
+            HexAt(tree, 4, 0)["prop"] = "pillar";
+            var map = MapData.FromJson(tree.ToString());
+            var e = Assert.Throws<MapLoadException>(() => map.BuildTileMap(Terrains()));
+            Assert.Contains("spawn p1 Hex(-4,0) carries a prop", e.Message);
+        }
+
+        [Fact]
+        public void Map_PropTwinMismatch_Throws()
+        {
+            var tree = Arena4Tree();
+            HexAt(tree, 3, 0)["prop"] = "pillar";       // the twin (-3,0) carries none
+            var map = MapData.FromJson(tree.ToString());
+            var e = Assert.Throws<MapLoadException>(() => map.BuildTileMap(Terrains()));
+            Assert.Contains("breaks rotational symmetry", e.Message);
+            Assert.Contains("has prop 'none' but its twin Hex(3,0) has 'pillar'", e.Message);
+        }
+
+        [Fact]
+        public void Arena4_PropsAreRotationallySymmetric()
+        {
+            var map = MapData.FromJson(RepoData.Arena4Json);
+            foreach (var hex in map.Hexes)
+            {
+                var twin = map.HexAt(hex.Position.Rotate180());
+                Assert.NotNull(twin);
+                Assert.Equal(hex.PropId, twin.PropId);
+                Assert.Equal(hex.Height, twin.Height);
+            }
+        }
+
+        [Fact]
+        public void Arena4_HasNoStone()
+        {
+            var map = MapData.FromJson(RepoData.Arena4Json);
+            Assert.All(map.Hexes, h => Assert.Equal("grass", h.Terrain));
+            Assert.Equal(4, map.Hexes.Count(h => h.PropId == "wall"));
+            Assert.Equal(4, map.Hexes.Count(h => h.PropId == "pillar"));
         }
 
         [Fact]
@@ -379,6 +493,9 @@ namespace Mimas.Core.Tests
         private static TileMap Arena4() =>
             MapData.FromJson(RepoData.Arena4Json).BuildTileMap(TerrainSet.FromJson(RepoData.TerrainsJson));
 
+        private static TileMap Board3() =>
+            MapData.FromJson(RepoData.Board3Json).BuildTileMap(TerrainSet.FromJson(RepoData.TerrainsJson));
+
         [Fact]
         public void FindPath_OnOpenBoard_HasLengthOfHexDistancePlusOne()
         {
@@ -413,11 +530,11 @@ namespace Mimas.Core.Tests
         [Fact]
         public void FindPath_BlockedDirectRoute_GoesAroundTheStone()
         {
-            var map = Arena4();
-            var start = new Hex(-4, 0);
-            var goal = new Hex(4, 0);
+            var map = Board3();                                             // board-3 keeps its stone centre
+            var start = new Hex(-3, 0);
+            var goal = new Hex(3, 0);
             var path = map.FindPath(start, goal);
-            Assert.Equal(11, path.Count);                                   // 10 steps vs a raw distance of 8
+            Assert.Equal(8, path.Count);                                    // 7 steps vs a raw distance of 6
             Assert.True(path.Count > Hex.Distance(start, goal) + 1);
             Assert.All(path, h => Assert.True(map[h].Walkable));
         }
@@ -435,8 +552,8 @@ namespace Mimas.Core.Tests
         [Fact]
         public void FindPath_UnwalkableGoal_ReturnsNull()
         {
-            var map = Arena4();
-            Assert.Null(map.FindPath(new Hex(-4, 0), new Hex(3, 0)));       // (3,0) is a stone pillar
+            var map = Board3();
+            Assert.Null(map.FindPath(new Hex(-3, 0), Hex.Zero));            // board-3's centre is stone
         }
 
         [Fact]

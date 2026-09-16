@@ -27,7 +27,8 @@ file can know about on its own.
 | `item.schema.json` | `items/*.json` |
 | `ability.schema.json` | `abilities/*.json` (movement and attack, chosen on `type`) |
 | `modifier.schema.json` | `modifiers/*.json` |
-| `map.schema.json` | `maps/*.json` |
+| `map.schema.json` | `maps/*.json` (a hex's `prop` names a `props/*.json` id) |
+| `prop.schema.json` | `props/*.json` |
 
 Two things the schemas deliberately go **stricter** than the loader:
 

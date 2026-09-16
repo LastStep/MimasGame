@@ -49,6 +49,11 @@
             "type": "string",
             "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
             "description": "Modifier id this single hex grants to whoever stands on it."
+          },
+          "prop": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+            "description": "Id of a props/*.json body standing on this hex. The terrain must be walkable, the 180-degree twin must carry the same prop, and a spawn may carry none."
           }
         }
       }

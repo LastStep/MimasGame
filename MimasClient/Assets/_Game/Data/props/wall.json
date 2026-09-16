@@ -1,0 +1,10 @@
+{
+  "$schema": "../../../../../tools/schemas/prop.schema.json",
+  "version": 1,
+  "id": "wall",
+  "name": "Wall",
+  "description": "A solid wall the height of a hero. Nothing goes through it and nothing brings it down.",
+  "icon": "wall",
+  "bodyHeight": 6,
+  "aimHeight": 3
+}

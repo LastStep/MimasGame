@@ -28,6 +28,10 @@
     {
       "fileMatch": ["/MimasClient/Assets/_Game/Data/maps/*.json"],
       "url": "./tools/schemas/map.schema.json"
+    },
+    {
+      "fileMatch": ["/MimasClient/Assets/_Game/Data/props/*.json"],
+      "url": "./tools/schemas/prop.schema.json"
     }
   ]
 }

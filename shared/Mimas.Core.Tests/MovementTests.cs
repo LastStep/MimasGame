@@ -54,8 +54,8 @@ namespace Mimas.Core.Tests
         internal static MovementContext Context(TileMap map, MovementDef def, Hex origin, params Hex[] others)
         {
             var units = new UnitSet();
-            units.Add(new Unit(0, 0, origin));
-            for (int i = 0; i < others.Length; i++) units.Add(new Unit(i + 1, 1, others[i]));
+            units.Add(new Unit(0, 0, origin, TestHeights.Default));
+            for (int i = 0; i < others.Length; i++) units.Add(new Unit(i + 1, 1, others[i], TestHeights.Default));
             return new MovementContext(map, Terrains, units, origin, def);
         }
 
@@ -575,8 +575,8 @@ namespace Mimas.Core.Tests
             var (map, data, defs) = Arena();
             var terrains = TerrainSet.FromJson(RepoData.TerrainsJson);
             var units = new UnitSet();
-            units.Add(new Unit(0, 0, data.SpawnP1));
-            units.Add(new Unit(1, 1, data.SpawnP2));
+            units.Add(new Unit(0, 0, data.SpawnP1, TestHeights.Default));
+            units.Add(new Unit(1, 1, data.SpawnP2, TestHeights.Default));
 
             // Test from several origins, not just the spawn, so the plateau and pillars are exercised.
             foreach (var origin in new[] { data.SpawnP1, new Hex(-2, 0), new Hex(0, 0), new Hex(-1, 2) })
@@ -612,17 +612,36 @@ namespace Mimas.Core.Tests
         }
 
         [Fact]
-        public void Arena4_JumpFromSpawn_ClearsLowPillar_WalkCannot()
+        public void Arena4_JumpFromSpawn_ReachesTheStep_WalkCannot()
         {
             var (map, data, defs) = Arena();
             var terrains = TerrainSet.FromJson(RepoData.TerrainsJson);
             var units = new UnitSet();
-            units.Add(new Unit(0, 0, data.SpawnP1));
+            units.Add(new Unit(0, 0, data.SpawnP1, TestHeights.Default));
 
             var jump = MoveFixtures.Registry.Enumerate(MovementContext.For(map, terrains, units, units.Get(0), defs.Get("jump")));
             var walk = MoveFixtures.Registry.Enumerate(MovementContext.For(map, terrains, units, units.Get(0), defs.Get("move")));
-            Assert.True(jump.Contains(new Hex(-2, 0)));    // over the height-1 pillar at (-3,0) onto the ramp
-            Assert.False(walk.Contains(new Hex(-3, 0)));   // stone
+            Assert.True(jump.Contains(new Hex(-2, 0)));    // two hexes out and one level up
+            Assert.False(walk.Contains(new Hex(-2, 0)));   // walk is one hex per point
+        }
+
+        [Fact]
+        public void Arena4_JumpOntoThePlateau_NeedsTheStep()
+        {
+            var (map, _, defs) = Arena();
+            var terrains = TerrainSet.FromJson(RepoData.TerrainsJson);
+            var units = new UnitSet();
+            units.Add(new Unit(0, 0, new Hex(-3, 0), TestHeights.Default));
+            var jump = defs.Get("jump");
+
+            // From the ground the level-2 plateau is two levels up: more than jumpHeight.
+            var fromGround = MovementContext.For(map, terrains, units, units.Get(0), jump);
+            Assert.Equal(MoveRejectReason.TooHigh, MoveFixtures.Registry.Validate(fromGround, new Hex(-1, 0)).Reason);
+
+            // From the level-1 step it is one level up: fine.
+            units.Get(0).MoveTo(new Hex(-2, 0));
+            var fromStep = MovementContext.For(map, terrains, units, units.Get(0), jump);
+            Assert.True(MoveFixtures.Registry.Validate(fromStep, new Hex(0, 0)).Ok);
         }
 
         [Fact]
@@ -631,7 +650,7 @@ namespace Mimas.Core.Tests
             var (map, data, defs) = Arena();
             var terrains = TerrainSet.FromJson(RepoData.TerrainsJson);
             var units = new UnitSet();
-            units.Add(new Unit(0, 0, new Hex(-2, 0)));
+            units.Add(new Unit(0, 0, new Hex(-2, 0), TestHeights.Default));
             foreach (var def in defs.All)
             {
                 var ctx = MovementContext.For(map, terrains, units, units.Get(0), def);

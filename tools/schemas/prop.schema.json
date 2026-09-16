@@ -1,0 +1,37 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://mimas.game/schemas/prop.schema.json",
+  "title": "Mimas prop",
+  "description": "One non-unit body a map hex can carry (props/*.json): a pillar, a wall. A prop with stats.hp is destructible and is a legal target; without, it is a permanent wall that cannot be hit.",
+  "type": "object",
+  "required": ["version", "id", "bodyHeight", "aimHeight"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "const": 1 },
+    "id": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+    "name": { "type": "string", "minLength": 1, "description": "Display name; defaults to the id." },
+    "description": { "type": "string" },
+    "icon": { "type": "string" },
+    "bodyHeight": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Height in units above the tile top: what this prop blocks sight and trajectories with."
+    },
+    "aimHeight": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Where attacks land on it, in units above the tile top. 1..bodyHeight, required even for a wall so a client can place a marker."
+    },
+    "stats": {
+      "type": "object",
+      "description": "Omit for an indestructible wall. hp makes the prop a legal target; defences are per lane, as in rules.baseStats. No ap, no power.",
+      "additionalProperties": false,
+      "properties": {
+        "hp": { "type": "integer", "minimum": 1 },
+        "defense.weapon": { "type": "integer", "minimum": 0 },
+        "defense.spell": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

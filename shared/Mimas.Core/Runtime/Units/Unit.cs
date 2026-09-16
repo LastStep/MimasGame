@@ -13,7 +13,7 @@ namespace Mimas.Core.Units
     /// (<see cref="MoveTo"/>, <see cref="TakeDamage"/>, <see cref="RefreshAp"/>, <see cref="SpendAp"/>) so
     /// "who changed this" is always one search away.
     /// </summary>
-    public sealed class Unit
+    public sealed class Unit : IBody
     {
         private static readonly StatBlock BareStats = new StatBlock(new[]
         {
@@ -30,6 +30,7 @@ namespace Mimas.Core.Units
 
         private readonly List<string> _modifierIds = new List<string>();
         private readonly List<string> _itemIds;
+        private readonly HeightsDef _heights;
 
         public int Id { get; }
 
@@ -57,6 +58,15 @@ namespace Mimas.Core.Units
 
         public bool IsAlive => Hp > 0;
 
+        /// <summary>A hero is always a legal target for anything that can reach it.</summary>
+        public bool IsDamageable => true;
+
+        /// <summary>Body height in units above the tile top (rules.heights.body): what this hero blocks with.</summary>
+        public int BodyHeight => _heights.Body;
+
+        /// <summary>Where this hero's attacks leave from and where shots at it land (rules.heights.aim).</summary>
+        public int AimHeight => _heights.Aim;
+
         /// <summary>Ability ids in the order they were granted. Movement rules only look at the movement ones.</summary>
         public IReadOnlyList<string> AbilityIds => _abilityIds;
 
@@ -64,12 +74,13 @@ namespace Mimas.Core.Units
         public IReadOnlyList<string> ModifierIds => _modifierIds;
 
         /// <summary>A unit with no gear and no abilities: for tests and scaffolding.</summary>
-        public Unit(int id, int owner, Hex position)
+        public Unit(int id, int owner, Hex position, HeightsDef heights)
         {
             CheckIds(id, owner);
             Id = id;
             Owner = owner;
             Position = position;
+            _heights = heights ?? throw new ArgumentNullException(nameof(heights));
             Stats = BareStats;
             Hp = Stats.Hp;
             Ap = 0;
@@ -85,6 +96,7 @@ namespace Mimas.Core.Units
             Id = id;
             Owner = owner;
             Position = position;
+            _heights = rules.Heights;
 
             StatBlock stats = rules.BaseStats;
             _itemIds = new List<string>(items.Count);

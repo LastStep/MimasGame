@@ -121,12 +121,16 @@ namespace Mimas.Core.Data
         public int Height { get; }
         public string EffectId { get; }   // null = none
 
-        public MapHex(Hex position, string terrain, int height, string effectId)
+        /// <summary>Id of the <see cref="PropDef"/> standing on this hex, or null. See design: #props.</summary>
+        public string PropId { get; }
+
+        public MapHex(Hex position, string terrain, int height, string effectId, string propId = null)
         {
             Position = position;
             Terrain = terrain ?? throw new ArgumentNullException(nameof(terrain));
             Height = height;
             EffectId = effectId;
+            PropId = propId;
         }
     }
 
@@ -214,7 +218,8 @@ namespace Mimas.Core.Data
                     position,
                     MapJson.RequireString(entry, "terrain", where),
                     MapJson.OptionalInt(entry, "height", 0, where),
-                    MapJson.OptionalString(entry, "effect", where)));
+                    MapJson.OptionalString(entry, "effect", where),
+                    MapJson.OptionalString(entry, "prop", where)));
             }
 
             return new MapData(id, name, symmetry, ladderPosition, p1, p2, hexes);
@@ -263,6 +268,43 @@ namespace Mimas.Core.Data
                     throw new MapLoadException(
                         $"map '{Id}' breaks rotational symmetry: {h.Position} is '{h.Terrain}' but its twin {twin.Position} is '{twin.Terrain}'.");
             }
+
+            foreach (var h in _hexes)
+            {
+                MapHex twin = HexAt(h.Position.Rotate180());
+                string other = twin != null ? twin.PropId : null;
+                if (!string.Equals(other, h.PropId, StringComparison.Ordinal))
+                    throw new MapLoadException(
+                        $"map '{Id}' breaks rotational symmetry: {h.Position} has prop '{h.PropId ?? "none"}' but its twin {h.Position.Rotate180()} has '{other ?? "none"}'.");
+            }
+        }
+
+        /// <summary>The authored hex at a position, or null. Linear: maps are small and the order must stay stable.</summary>
+        public MapHex HexAt(Hex position)
+        {
+            for (int i = 0; i < _hexes.Count; i++)
+                if (_hexes[i].Position == position) return _hexes[i];
+            return null;
+        }
+
+        /// <summary>
+        /// Checks the props this map places against the catalogue: the id must exist and the hex must be
+        /// walkable terrain (a prop stands on ground, it is not a replacement for it). Called at link time,
+        /// where the prop table is known; <see cref="BuildTileMap"/> only needs terrain.
+        /// </summary>
+        public void ValidateProps(Mimas.Core.Content.DefinitionTable<PropDef> props, TerrainSet terrains)
+        {
+            if (props == null) throw new ArgumentNullException(nameof(props));
+            if (terrains == null) throw new ArgumentNullException(nameof(terrains));
+            foreach (var h in _hexes)
+            {
+                if (h.PropId == null) continue;
+                if (!props.Contains(h.PropId))
+                    throw new MapLoadException($"map '{Id}' hex {h.Position} uses unknown prop id '{h.PropId}'.");
+                TerrainDef terrain;
+                if (!terrains.TryGet(h.Terrain, out terrain) || !terrain.Walkable)
+                    throw new MapLoadException($"map '{Id}' hex {h.Position} carries prop '{h.PropId}' on unwalkable terrain '{h.Terrain}'.");
+            }
         }
 
         private void ValidateSpawns(TileMap map)
@@ -272,6 +314,10 @@ namespace Mimas.Core.Data
             if (!map.TryGet(SpawnP2, out t2)) throw new MapLoadException($"map '{Id}' spawn p2 {SpawnP2} is not on the map.");
             if (!t1.Walkable) throw new MapLoadException($"map '{Id}' spawn p1 {SpawnP1} is not walkable.");
             if (!t2.Walkable) throw new MapLoadException($"map '{Id}' spawn p2 {SpawnP2} is not walkable.");
+
+            MapHex h1 = HexAt(SpawnP1), h2 = HexAt(SpawnP2);
+            if (h1 != null && h1.PropId != null) throw new MapLoadException($"map '{Id}' spawn p1 {SpawnP1} carries a prop.");
+            if (h2 != null && h2.PropId != null) throw new MapLoadException($"map '{Id}' spawn p2 {SpawnP2} carries a prop.");
 
             // Walkable tiles in authored order — never iterate the map's dictionary, order must be stable.
             var walkable = new List<Hex>(_hexes.Count);

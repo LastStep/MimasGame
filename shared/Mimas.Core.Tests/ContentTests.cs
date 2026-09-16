@@ -63,6 +63,7 @@ namespace Mimas.Core.Tests
             Assert.Equal(new[] { "blink-boots", "ember-circlet", "flintlock", "leaping-boots", "leather-jerkin", "longbow" },
                 catalog.Items.All.Select(i => i.Id).ToArray());
             Assert.Contains("arena-4", catalog.Maps.All.Select(m => m.Id));
+            Assert.Equal(new[] { "pillar", "wall" }, catalog.Props.All.Select(p => p.Id).ToArray());
             Assert.Equal(3, catalog.TimeControls.Count);
             Assert.Equal(3, catalog.Movements.Count);
             Assert.Equal(64, catalog.Hash.Length);
@@ -315,6 +316,62 @@ namespace Mimas.Core.Tests
         {
             Assert.Equal("abilities/jump.json", new ContentFile(".\\abilities\\jump.json", "{}").Path);
             Assert.Equal("maps/x.json", new ContentFile("/maps/x.json", "{}").Path);
+        }
+    }
+
+    /// <summary>Props in the catalogue: their own folder, their own link checks (spec A, D11/D12).</summary>
+    public class PropCatalogTests
+    {
+        [Fact]
+        public void Catalog_LoadsProps()
+        {
+            var catalog = ContentFixtures.RepoCatalog();
+            Assert.Equal(2, catalog.Props.Count);
+            Assert.True(catalog.Props.Get("pillar").IsDestructible);
+            Assert.False(catalog.Props.Get("wall").IsDestructible);
+            Assert.Contains("props/pillar.json", catalog.Files);
+        }
+
+        [Fact]
+        public void Catalog_HashChangesWhenPropChanges()
+        {
+            var files = ContentFixtures.Repo();
+            string before = ContentHash.Compute(files);
+            var edited = files.Select(f => f.Path == "props/pillar.json"
+                ? new ContentFile(f.Path, f.Text.Replace("\"hp\": 10", "\"hp\": 12"))
+                : f).ToList();
+            Assert.NotEqual(before, ContentHash.Compute(edited));
+        }
+
+        [Fact]
+        public void Map_UnknownProp_LinkError()
+        {
+            var files = CombatFixtures.Files();
+            files = files.Select(f => f.Path == "maps/props-3.json"
+                ? new ContentFile(f.Path, f.Text.Replace(@"""prop"": ""pillar""", @"""prop"": ""obelisk"""))
+                : f).ToList();
+            Assert.Contains("maps/props-3.json: map 'props-3' hex Hex(0,1) uses unknown prop id 'obelisk'", ContentFixtures.ErrorsOf(files));
+        }
+
+        [Fact]
+        public void Map_PropOnUnwalkableTerrain_LinkError()
+        {
+            var files = CombatFixtures.Files();
+            files = files.Select(f => f.Path == "maps/props-3.json"
+                ? new ContentFile(f.Path, f.Text
+                    .Replace(@"{ ""q"": 1, ""r"": 0, ""terrain"": ""grass"", ""prop"": ""wall"" }", @"{ ""q"": 1, ""r"": 0, ""terrain"": ""stone"", ""prop"": ""wall"" }")
+                    .Replace(@"{ ""q"": -1, ""r"": 0, ""terrain"": ""grass"", ""prop"": ""wall"" }", @"{ ""q"": -1, ""r"": 0, ""terrain"": ""stone"", ""prop"": ""wall"" }"))
+                : f).ToList();
+            Assert.Contains("carries prop 'wall' on unwalkable terrain 'stone'", ContentFixtures.ErrorsOf(files));
+        }
+
+        [Fact]
+        public void Catalogue_PropStatWithUndeclaredLane_IsAnError()
+        {
+            var files = ContentFixtures.Minimal();
+            files.Add(new ContentFile("props/odd.json", @"{ ""version"": 1, ""id"": ""odd"", ""bodyHeight"": 3, ""aimHeight"": 1,
+                ""stats"": { ""hp"": 4, ""defense.psychic"": 1 } }"));
+            Assert.Contains("props/odd.json: prop 'odd' stat 'defense.psychic' uses undeclared damage type 'psychic'", ContentFixtures.ErrorsOf(files));
         }
     }
 

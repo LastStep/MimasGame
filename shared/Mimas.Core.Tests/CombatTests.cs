@@ -33,6 +33,19 @@ namespace Mimas.Core.Tests
                 ""spawns"": {{ ""p1"": {{ ""q"": -3, ""r"": 0 }}, ""p2"": {{ ""q"": 3, ""r"": 0 }} }},
                 ""hexes"": [ {string.Join(",", hexes)} ] }}";
 
+            // props-3: a flat radius-3 field with a wall pair and a pillar pair, for body-blocking and
+            // prop-targeting tests. Nothing on it has height, so only the bodies can block.
+            var propHexes = new List<string>();
+            foreach (var h in Hex.Spiral(Hex.Zero, 3))
+            {
+                string prop = (h == new Hex(1, 0) || h == new Hex(-1, 0)) ? @", ""prop"": ""wall"""
+                    : (h == new Hex(0, 1) || h == new Hex(0, -1)) ? @", ""prop"": ""pillar""" : "";
+                propHexes.Add($@"{{ ""q"": {h.Q}, ""r"": {h.R}, ""terrain"": ""grass""{prop} }}");
+            }
+            string propsMap = $@"{{ ""version"": 1, ""id"": ""props-3"", ""name"": ""Props"", ""symmetry"": ""rotational-180"", ""ladderPosition"": 2,
+                ""spawns"": {{ ""p1"": {{ ""q"": -3, ""r"": 0 }}, ""p2"": {{ ""q"": 3, ""r"": 0 }} }},
+                ""hexes"": [ {string.Join(",", propHexes)} ] }}";
+
             return new List<ContentFile>
             {
                 new ContentFile("terrains.json", @"{ ""version"": 1, ""terrains"": [
@@ -68,7 +81,11 @@ namespace Mimas.Core.Tests
                     ""when"": { ""damageTypes"": [ ""ranged"", ""magic"" ] }, ""effect"": { ""damage"": -4 } }"),
                 new ContentFile("modifiers/flaming.json", @"{ ""version"": 1, ""id"": ""flaming"", ""trigger"": ""dealDamage"", ""visibility"": ""hidden"",
                     ""when"": { ""tags"": [ ""arrow"" ] }, ""effect"": { ""damage"": 1 } }"),
+                new ContentFile("props/pillar.json", @"{ ""version"": 1, ""id"": ""pillar"", ""name"": ""Stone Pillar"",
+                    ""bodyHeight"": 6, ""aimHeight"": 3, ""stats"": { ""hp"": 10, ""defense.melee"": 0, ""defense.ranged"": 0 } }"),
+                new ContentFile("props/wall.json", @"{ ""version"": 1, ""id"": ""wall"", ""name"": ""Wall"", ""bodyHeight"": 6, ""aimHeight"": 3 }"),
                 new ContentFile("maps/field-3.json", map),
+                new ContentFile("maps/props-3.json", propsMap),
             };
         }
 

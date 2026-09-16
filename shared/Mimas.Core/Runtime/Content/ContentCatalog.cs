@@ -29,6 +29,7 @@ namespace Mimas.Core.Content
         public const string ItemsFolder = "items/";
         public const string MapsFolder = "maps/";
         public const string ModifiersFolder = "modifiers/";
+        public const string PropsFolder = "props/";
 
         public RulesDef Rules { get; }
         public TerrainSet Terrains { get; }
@@ -37,6 +38,9 @@ namespace Mimas.Core.Content
         public DefinitionTable<MapData> Maps { get; }
         public DefinitionTable<TimeControlDef> TimeControls { get; }
         public DefinitionTable<ModifierDef> Modifiers { get; }
+
+        /// <summary>The prop catalogue (<c>props/*.json</c>): what a map hex's <c>prop</c> field may name.</summary>
+        public DefinitionTable<PropDef> Props { get; }
 
         /// <summary>The movement abilities, keyed by id, for callers that only care about movement.</summary>
         public MovementDefSet Movements { get; }
@@ -55,6 +59,7 @@ namespace Mimas.Core.Content
             DefinitionTable<MapData> maps,
             DefinitionTable<TimeControlDef> timeControls,
             DefinitionTable<ModifierDef> modifiers,
+            DefinitionTable<PropDef> props,
             MovementDefSet movements,
             string hash,
             IReadOnlyList<string> files)
@@ -66,6 +71,7 @@ namespace Mimas.Core.Content
             Maps = maps;
             TimeControls = timeControls;
             Modifiers = modifiers;
+            Props = props;
             Movements = movements;
             Hash = hash;
             Files = files;
@@ -120,11 +126,13 @@ namespace Mimas.Core.Content
             var items = new List<ItemDef>();
             var maps = new List<MapData>();
             var modifiers = new List<ModifierDef>();
+            var props = new List<PropDef>();
             var timeControls = new List<TimeControlDef>();
             var abilityFiles = new Dictionary<string, string>(StringComparer.Ordinal);
             var itemFiles = new Dictionary<string, string>(StringComparer.Ordinal);
             var mapFiles = new Dictionary<string, string>(StringComparer.Ordinal);
             var modifierFiles = new Dictionary<string, string>(StringComparer.Ordinal);
+            var propFiles = new Dictionary<string, string>(StringComparer.Ordinal);
 
             foreach (var f in sorted)
             {
@@ -171,9 +179,15 @@ namespace Mimas.Core.Content
                         if (!RegisterId(modifierFiles, def.Id, path, "modifier", errors)) continue;
                         modifiers.Add(def);
                     }
+                    else if (path.StartsWith(PropsFolder, StringComparison.Ordinal))
+                    {
+                        var def = PropDef.FromJson(f.Text);
+                        if (!RegisterId(propFiles, def.Id, path, "prop", errors)) continue;
+                        props.Add(def);
+                    }
                     else
                     {
-                        errors.Add(new ContentError(path, "unrecognised content file: expected terrains.json, rules.json, timecontrols.json, or a file under abilities/, items/, maps/ or modifiers/."));
+                        errors.Add(new ContentError(path, "unrecognised content file: expected terrains.json, rules.json, timecontrols.json, or a file under abilities/, items/, maps/, modifiers/ or props/."));
                     }
                 }
                 catch (MapLoadException e)
@@ -212,11 +226,21 @@ namespace Mimas.Core.Content
                     }
                 }
 
+                var propTable = new DefinitionTable<PropDef>(props);
                 foreach (var map in maps)
                 {
                     try
                     {
                         map.BuildTileMap(terrains);
+                    }
+                    catch (MapLoadException e)
+                    {
+                        errors.Add(new ContentError(mapFiles[map.Id], e.Message));
+                    }
+
+                    try
+                    {
+                        map.ValidateProps(propTable, terrains);
                     }
                     catch (MapLoadException e)
                     {
@@ -261,6 +285,16 @@ namespace Mimas.Core.Content
                     string type = StatBlock.DamageTypeOf(entry.Key);
                     if (type != null && !rules.IsDamageType(type))
                         errors.Add(new ContentError(RulesFile, $"rules.baseStats '{entry.Key}' uses undeclared damage type '{type}'."));
+                }
+
+                foreach (var prop in props)
+                {
+                    foreach (var entry in prop.Stats.Entries)
+                    {
+                        string type = StatBlock.DamageTypeOf(entry.Key);
+                        if (type != null && !rules.IsDamageType(type))
+                            errors.Add(new ContentError(propFiles[prop.Id], $"prop '{prop.Id}' stat '{entry.Key}' uses undeclared damage type '{type}'."));
+                    }
                 }
 
                 foreach (var modifier in modifiers)
@@ -341,6 +375,7 @@ namespace Mimas.Core.Content
                 new DefinitionTable<MapData>(maps),
                 new DefinitionTable<TimeControlDef>(timeControls),
                 new DefinitionTable<ModifierDef>(modifiers),
+                new DefinitionTable<PropDef>(props),
                 movements,
                 ContentHash.Compute(sorted),
                 paths);

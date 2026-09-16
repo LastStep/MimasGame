@@ -1,0 +1,11 @@
+{
+  "$schema": "../../../../../tools/schemas/prop.schema.json",
+  "version": 1,
+  "id": "pillar",
+  "name": "Stone Pillar",
+  "description": "A cracked pillar the height of a hero. It blocks shots and can be brought down.",
+  "icon": "pillar",
+  "bodyHeight": 6,
+  "aimHeight": 3,
+  "stats": { "hp": 10, "defense.weapon": 0, "defense.spell": 0 }
+}
