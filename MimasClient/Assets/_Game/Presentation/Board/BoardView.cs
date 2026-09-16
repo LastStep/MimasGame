@@ -73,6 +73,7 @@ namespace Mimas.Client.Presentation
         private bool _hasHovered;
         private Hex _hovered;
         private int _unitsPerLevel = 1;
+        private Material _tileMaterialInstance;
 
         /// <summary>Raised once, after every tile view exists. Late subscribers should check <see cref="IsBuilt"/>.</summary>
         public event Action BoardBuilt;
@@ -93,10 +94,11 @@ namespace Mimas.Client.Presentation
         public float Spacing => HexLayout.TileWidth(_tileSize);
 
         /// <summary>
-        /// The material every tile renders with. Per-tile colour goes through each tile's property block;
-        /// the range circles (<see cref="RangeCircles"/>) are uniforms on this shared material.
+        /// The material every tile renders with: a runtime copy of the assigned one, so the range-circle
+        /// uniforms (<see cref="RangeCircles"/>) never dirty the material asset on disk. Per-tile colour keeps
+        /// going through each tile's own property block. Null until the board is built.
         /// </summary>
-        public Material TileMaterial => _tileMaterial;
+        public Material TileMaterial => _tileMaterialInstance != null ? _tileMaterialInstance : _tileMaterial;
 
         /// <summary>Height units one map level is worth (<c>rules.heights.unitsPerLevel</c>). 1 until the board is built.</summary>
         public int UnitsPerLevel => _unitsPerLevel;
@@ -126,6 +128,7 @@ namespace Mimas.Client.Presentation
                 if (_generatedMeshes[i] != null) Destroy(_generatedMeshes[i]);
             }
             _generatedMeshes.Clear();
+            if (_tileMaterialInstance != null) Destroy(_tileMaterialInstance);
         }
 
         /// <summary>
@@ -322,6 +325,14 @@ namespace Mimas.Client.Presentation
             int layer = _tileLayer >= 0 ? _tileLayer : gameObject.layer;
             var meshesByHeight = new Dictionary<float, Mesh>();
 
+            // One runtime copy for the whole board: the range circles write uniforms on it every time the
+            // player arms an attack, and the material asset on disk must not follow them around.
+            if (_tileMaterial != null && _tileMaterialInstance == null)
+            {
+                _tileMaterialInstance = new Material(_tileMaterial) { name = _tileMaterial.name + " (board)" };
+            }
+            Material tileMaterial = TileMaterial;
+
             // Authored file order — deterministic hierarchy, unlike iterating the tile dictionary.
             foreach (MapHex authored in MapData.Hexes)
             {
@@ -347,7 +358,7 @@ namespace Mimas.Client.Presentation
                 filter.sharedMesh = mesh;
 
                 MeshRenderer renderer = go.AddComponent<MeshRenderer>();
-                if (_tileMaterial != null) renderer.sharedMaterial = _tileMaterial;
+                if (tileMaterial != null) renderer.sharedMaterial = tileMaterial;
 
                 MeshCollider collider = go.AddComponent<MeshCollider>();
                 collider.sharedMesh = mesh;
