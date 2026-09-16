@@ -76,7 +76,10 @@ namespace Mimas.Core.Match
         public int Damage { get; }
         public int TargetHpAfter { get; }
 
-        public AttackResolvedEvent(int attackerId, int targetId, string abilityId, DamageBreakdown breakdown, int damage, int targetHpAfter)
+        /// <summary>True when <see cref="TargetId"/> names a prop rather than a hero.</summary>
+        public bool TargetIsProp { get; }
+
+        public AttackResolvedEvent(int attackerId, int targetId, string abilityId, DamageBreakdown breakdown, int damage, int targetHpAfter, bool targetIsProp = false)
         {
             AttackerId = attackerId;
             TargetId = targetId;
@@ -84,6 +87,7 @@ namespace Mimas.Core.Match
             Breakdown = breakdown ?? throw new ArgumentNullException(nameof(breakdown));
             Damage = damage;
             TargetHpAfter = targetHpAfter;
+            TargetIsProp = targetIsProp;
         }
     }
 
@@ -114,6 +118,17 @@ namespace Mimas.Core.Match
             UnitId = unitId;
             ModifierId = modifierId ?? throw new ArgumentNullException(nameof(modifierId));
             ToPlayer = toPlayer;
+        }
+    }
+
+    /// <summary>A prop ran out of hit points and was removed; its tile is enterable again (design: #props).</summary>
+    public sealed class PropDestroyedEvent : MatchEvent
+    {
+        public int PropId { get; }
+
+        public PropDestroyedEvent(int propId)
+        {
+            PropId = propId;
         }
     }
 

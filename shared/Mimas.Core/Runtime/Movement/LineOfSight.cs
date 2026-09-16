@@ -1,36 +1,26 @@
-using System.Collections.Generic;
+using Mimas.Core.Combat;
+using Mimas.Core.Data;
 using Mimas.Core.Geometry;
 using Mimas.Core.Grid;
+using Mimas.Core.Units;
 
 namespace Mimas.Core.Movement
 {
     /// <summary>
-    /// Whether one tile can see another. Uses the integer-exact supercover line so an edge-grazing line is
-    /// blocked by either flanking tile, and the answer is the same from both ends. A tile between blocks sight
-    /// when it is solid (unwalkable terrain) or stands taller than both endpoints. Holes in the map (no tile)
-    /// never block. Shared by teleport-with-sight now and by ranged abilities later.
+    /// Whether a mover can see a destination tile. One rule, shared with attacks: the ray of
+    /// <see cref="Sight"/>, from the mover's aim point to the aim height of the destination, ignoring the
+    /// mover's own body (design: #movement, D16). Used by teleports that require sight.
     /// </summary>
     public static class LineOfSight
     {
-        public static bool IsClear(TileMap map, Hex from, Hex to)
+        public static bool IsClear(TileMap map, IBodyLookup bodies, HeightsDef heights, Hex from, Hex to, int ignoreBodyId)
         {
-            if (map == null) return false;
+            if (map == null || heights == null) return false;
             if (from == to) return true;
-
-            Tile fromTile, toTile;
-            int fromHeight = map.TryGet(from, out fromTile) ? fromTile.Height : 0;
-            int toHeight = map.TryGet(to, out toTile) ? toTile.Height : 0;
-            int eye = fromHeight > toHeight ? fromHeight : toHeight;
-
-            List<Hex> between = HexLine.Grazed(from, to);
-            for (int i = 0; i < between.Count; i++)
-            {
-                Tile tile;
-                if (!map.TryGet(between[i], out tile)) continue;
-                if (!tile.Walkable) return false;
-                if (tile.Height > eye) return false;
-            }
-            return true;
+            return Sight.IsClear(map, bodies, heights,
+                from, Sight.AimHeightAt(map, heights, from, heights.Aim),
+                to, Sight.AimHeightAt(map, heights, to, heights.Aim),
+                ignoreBodyId, -1);
         }
     }
 }

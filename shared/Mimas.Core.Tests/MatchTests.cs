@@ -184,7 +184,7 @@ namespace Mimas.Core.Tests
         {
             var catalog = CombatFixtures.Catalog();
             var state = CombatFixtures.Started(catalog, CombatFixtures.Setup(), High, Low);
-            var targets = new List<Unit>();
+            var targets = new List<IBody>();
 
             Assert.Equal(5, state.MoveOptions(0, "move").Count);
             state.AttackTargets(0, "bow", targets);

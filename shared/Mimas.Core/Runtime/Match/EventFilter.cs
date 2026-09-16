@@ -28,7 +28,7 @@ namespace Mimas.Core.Match
                     return modifier.ToPlayer == viewer ? e : null;
                 case AttackResolvedEvent attack:
                     return new AttackResolvedEvent(attack.AttackerId, attack.TargetId, attack.AbilityId,
-                        Trim(attack.Breakdown, viewer, state), attack.Damage, attack.TargetHpAfter);
+                        Trim(attack.Breakdown, viewer, state), attack.Damage, attack.TargetHpAfter, attack.TargetIsProp);
                 default:
                     return e;
             }
@@ -56,6 +56,7 @@ namespace Mimas.Core.Match
                 DamageLine line = breakdown.Lines[i];
                 if (line.Hidden)
                 {
+                    // Only a unit can own a hidden line; a prop's defence is public like the prop itself.
                     Unit owner;
                     bool visible = state.Units.TryGet(line.OwnerUnitId, out owner)
                         && (owner.Owner == viewer || state.Knows(viewer, owner.Id, line.Id));

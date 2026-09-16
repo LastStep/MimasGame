@@ -45,7 +45,10 @@ namespace Mimas.Core.Combat
 
         public DamageLineOwner Owner { get; }
 
-        /// <summary>The unit that carries this line's modifier or stat, or -1 for tiles and globals.</summary>
+        /// <summary>
+        /// The body that carries this line's modifier or stat, or -1 for tiles and globals. A prop can own a
+        /// defence line, so this is a body id, not necessarily a unit id; the name is kept for the wire.
+        /// </summary>
         public int OwnerUnitId { get; }
 
         public int Amount { get; }

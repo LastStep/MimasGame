@@ -26,7 +26,7 @@ namespace Mimas.Core.Combat
             _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
         }
 
-        public DamageBreakdown Compute(TileMap map, Unit attacker, Unit target, AttackDef attack, Knowledge knowledge)
+        public DamageBreakdown Compute(TileMap map, Unit attacker, IBody target, AttackDef attack, Knowledge knowledge)
         {
             if (map == null) throw new ArgumentNullException(nameof(map));
             if (attacker == null) throw new ArgumentNullException(nameof(attacker));
@@ -72,7 +72,7 @@ namespace Mimas.Core.Combat
             return new Situation(attack, attackerTile, targetTile).Satisfies(modifier);
         }
 
-        private int AddUnitModifiers(List<DamageLine> lines, Unit unit, DamageLineOwner owner, string trigger, Situation situation, Knowledge knowledge)
+        private int AddUnitModifiers(List<DamageLine> lines, IBody unit, DamageLineOwner owner, string trigger, Situation situation, Knowledge knowledge)
         {
             int unknown = 0;
             CollectSorted(unit.ModifierIds, _scratch);

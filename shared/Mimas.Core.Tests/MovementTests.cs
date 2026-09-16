@@ -56,8 +56,12 @@ namespace Mimas.Core.Tests
             var units = new UnitSet();
             units.Add(new Unit(0, 0, origin, TestHeights.Default));
             for (int i = 0; i < others.Length; i++) units.Add(new Unit(i + 1, 1, others[i], TestHeights.Default));
-            return new MovementContext(map, Terrains, units, origin, def);
+            var bodies = new BodySet(units);
+            return MovementContext.For(map, Terrains, bodies, units.Get(0), def, TestHeights.Default);
         }
+
+        /// <summary>Every body of a hand-built unit set, for contexts a test assembles itself.</summary>
+        internal static BodySet Of(UnitSet units) => new BodySet(units);
 
         internal static readonly MovementResolverRegistry Registry = MovementResolverRegistry.CreateDefault();
     }
@@ -526,8 +530,19 @@ namespace Mimas.Core.Tests
             var map = MoveFixtures.Board(3)
                 .With(Hex.Zero, "grass", height: 3)
                 .With(new Hex(1, 0), "grass", height: 2);
-            Assert.True(LineOfSight.IsClear(map, Hex.Zero, new Hex(2, 0)));
-            Assert.True(LineOfSight.IsClear(map, new Hex(2, 0), Hex.Zero));
+            var bodies = MoveFixtures.Of(new UnitSet());
+            Assert.True(LineOfSight.IsClear(map, bodies, TestHeights.Default, Hex.Zero, new Hex(2, 0), -1));
+            Assert.True(LineOfSight.IsClear(map, bodies, TestHeights.Default, new Hex(2, 0), Hex.Zero, -1));
+        }
+
+        [Fact]
+        public void LineOfSight_WithoutHeights_RefusesTheMovement()
+        {
+            var map = MoveFixtures.Board(3);
+            var units = new UnitSet();
+            units.Add(new Unit(0, 0, Hex.Zero, TestHeights.Default));
+            var bare = new MovementContext(map, MoveFixtures.Terrains, units, Hex.Zero, MoveFixtures.Teleport(3, los: true));
+            Assert.Throws<System.InvalidOperationException>(() => MoveFixtures.Registry.Validate(bare, new Hex(2, 0)));
         }
     }
 
@@ -577,6 +592,7 @@ namespace Mimas.Core.Tests
             var units = new UnitSet();
             units.Add(new Unit(0, 0, data.SpawnP1, TestHeights.Default));
             units.Add(new Unit(1, 1, data.SpawnP2, TestHeights.Default));
+            var bodies = MoveFixtures.Of(units);
 
             // Test from several origins, not just the spawn, so the plateau and pillars are exercised.
             foreach (var origin in new[] { data.SpawnP1, new Hex(-2, 0), new Hex(0, 0), new Hex(-1, 2) })
@@ -584,7 +600,7 @@ namespace Mimas.Core.Tests
                 units.Get(0).MoveTo(origin);
                 foreach (var def in defs.All)
                 {
-                    var ctx = MovementContext.For(map, terrains, units, units.Get(0), def);
+                    var ctx = MovementContext.For(map, terrains, bodies, units.Get(0), def, TestHeights.Default);
                     var options = MoveFixtures.Registry.Enumerate(ctx);
                     Assert.True(options.Count > 0, $"{def.Id} from {origin} has no options");
                     foreach (var tile in map.Tiles)
@@ -619,8 +635,9 @@ namespace Mimas.Core.Tests
             var units = new UnitSet();
             units.Add(new Unit(0, 0, data.SpawnP1, TestHeights.Default));
 
-            var jump = MoveFixtures.Registry.Enumerate(MovementContext.For(map, terrains, units, units.Get(0), defs.Get("jump")));
-            var walk = MoveFixtures.Registry.Enumerate(MovementContext.For(map, terrains, units, units.Get(0), defs.Get("move")));
+            var bodies = MoveFixtures.Of(units);
+            var jump = MoveFixtures.Registry.Enumerate(MovementContext.For(map, terrains, bodies, units.Get(0), defs.Get("jump"), TestHeights.Default));
+            var walk = MoveFixtures.Registry.Enumerate(MovementContext.For(map, terrains, bodies, units.Get(0), defs.Get("move"), TestHeights.Default));
             Assert.True(jump.Contains(new Hex(-2, 0)));    // two hexes out and one level up
             Assert.False(walk.Contains(new Hex(-2, 0)));   // walk is one hex per point
         }
@@ -635,12 +652,13 @@ namespace Mimas.Core.Tests
             var jump = defs.Get("jump");
 
             // From the ground the level-2 plateau is two levels up: more than jumpHeight.
-            var fromGround = MovementContext.For(map, terrains, units, units.Get(0), jump);
+            var bodies = MoveFixtures.Of(units);
+            var fromGround = MovementContext.For(map, terrains, bodies, units.Get(0), jump, TestHeights.Default);
             Assert.Equal(MoveRejectReason.TooHigh, MoveFixtures.Registry.Validate(fromGround, new Hex(-1, 0)).Reason);
 
             // From the level-1 step it is one level up: fine.
             units.Get(0).MoveTo(new Hex(-2, 0));
-            var fromStep = MovementContext.For(map, terrains, units, units.Get(0), jump);
+            var fromStep = MovementContext.For(map, terrains, bodies, units.Get(0), jump, TestHeights.Default);
             Assert.True(MoveFixtures.Registry.Validate(fromStep, new Hex(0, 0)).Ok);
         }
 
@@ -651,9 +669,10 @@ namespace Mimas.Core.Tests
             var terrains = TerrainSet.FromJson(RepoData.TerrainsJson);
             var units = new UnitSet();
             units.Add(new Unit(0, 0, new Hex(-2, 0), TestHeights.Default));
+            var bodies = MoveFixtures.Of(units);
             foreach (var def in defs.All)
             {
-                var ctx = MovementContext.For(map, terrains, units, units.Get(0), def);
+                var ctx = MovementContext.For(map, terrains, bodies, units.Get(0), def, TestHeights.Default);
                 var a = MoveFixtures.Registry.Enumerate(ctx).Plans.Select(p => p.ToString()).ToArray();
                 var b = MoveFixtures.Registry.Enumerate(ctx).Plans.Select(p => p.ToString()).ToArray();
                 Assert.Equal(a, b);

@@ -460,13 +460,14 @@ namespace Mimas.Core.Tests
             var units = new UnitSet();
             var hero = ContentFixtures.HeroFrom(catalog, ContentFixtures.GunKit, map.SpawnP1);
             units.Add(hero);
+            var bodies = new BodySet(units);
 
             var registry = MovementResolverRegistry.CreateDefault();
             var movements = hero.AbilityIds.Select(catalog.GetMovement).Where(m => m != null).ToList();
             Assert.Equal(new[] { "move", "teleport" }, movements.Select(m => m.Id));
             foreach (var movement in movements)
             {
-                var options = registry.Enumerate(MovementContext.For(tiles, catalog.Terrains, units, hero, movement));
+                var options = registry.Enumerate(MovementContext.For(tiles, catalog.Terrains, bodies, hero, movement, catalog.Rules.Heights));
                 Assert.True(options.Count > 0, movement.Id);
             }
         }

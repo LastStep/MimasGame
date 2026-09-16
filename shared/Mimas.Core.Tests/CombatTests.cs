@@ -341,28 +341,149 @@ namespace Mimas.Core.Tests
 
     public class AttackTargetingTests
     {
+        private static TargetCheck Check(MatchState state, Unit attacker, AttackDef attack, Hex target)
+            => AttackTargeting.Check(state.Map, state.Bodies, state.Catalog.Rules.Heights, state.Trajectories, attacker, attack, target);
+
         [Fact]
-        public void Check_RefusesOwnUnit_EmptyTile_OutOfRange_AndBlockedSight()
+        public void Check_EmptyTile_NoBody()
         {
             var catalog = CombatFixtures.Catalog();
             var state = CombatFixtures.Started(catalog, CombatFixtures.Setup(), new Hex(-3, 0), new Hex(3, 0));
+            Assert.Equal(TargetRejectReason.NoBody, Check(state, state.Units.Get(0), catalog.GetAttack("bow"), new Hex(0, 0)).Reason);
+        }
+
+        [Fact]
+        public void Check_OwnUnit_Rejected()
+        {
+            var catalog = CombatFixtures.Catalog();
+            var state = CombatFixtures.Started(catalog, CombatFixtures.Setup(), new Hex(-3, 0), new Hex(3, 0));
+            Assert.Equal(TargetRejectReason.OwnUnit, Check(state, state.Units.Get(0), catalog.GetAttack("bow"), new Hex(-3, 0)).Reason);
+        }
+
+        [Fact]
+        public void Check_OutOfRange_UsesEuclidean_Diagonal44InGunRange()
+        {
+            var catalog = ContentFixtures.RepoCatalog();
+            var state = Arena(catalog, ContentFixtures.GunKit);
+            var shooter = state.Units.Get(0);
+            var gun = catalog.GetAttack("quick-shot");           // range 7, so a band of 1..49 squared
+
+            // (4,4) is eight hexes away but only sqrt(48) spacings: a circle reaches it, a hex band would not.
+            var diagonal = new Hex(1, 3);
+            shooter.MoveTo(new Hex(-3, -1));
+            state.Units.Get(1).MoveTo(diagonal);
+            Assert.Equal(8, Hex.Distance(shooter.Position, diagonal));
+            Assert.Equal(48, Hex.EuclideanSquared(shooter.Position, diagonal));
+            Assert.NotEqual(TargetRejectReason.OutOfRange, Check(state, shooter, gun, diagonal).Reason);
+
+            // Eight hexes straight along an axis is 64: outside the same circle.
+            shooter.MoveTo(state.MapData.SpawnP1);
+            state.Units.Get(1).MoveTo(state.MapData.SpawnP2);
+            Assert.Equal(TargetRejectReason.OutOfRange, Check(state, shooter, gun, state.MapData.SpawnP2).Reason);
+        }
+
+        [Fact]
+        public void Check_DirectWithSight_BlockedReportsNoLineOfSight()
+        {
+            var catalog = ContentFixtures.RepoCatalog();
+            var state = Arena(catalog, ContentFixtures.GunKit);
+            var shooter = state.Units.Get(0);
+            shooter.MoveTo(Across.From);
+            state.Units.Get(1).MoveTo(Across.To);
+
+            var check = Check(state, shooter, catalog.GetAttack("quick-shot"), Across.To);
+            Assert.Equal(TargetRejectReason.NoLineOfSight, check.Reason);
+            Assert.True(check.HasBlockedAt);
+            Assert.Equal(new Hex(0, 0), check.BlockedAt);
+            Assert.Equal(2, state.Map[check.BlockedAt].Height);
+        }
+
+        [Fact]
+        public void Check_ArcWithoutSight_HitsUnseenTarget()
+        {
+            var catalog = ContentFixtures.RepoCatalog();
+            var state = Arena(catalog, ContentFixtures.BowKit);
             var archer = state.Units.Get(0);
-            var bow = catalog.GetAttack("bow");
-            Unit victim;
+            archer.MoveTo(Across.From);
+            state.Units.Get(1).MoveTo(Across.To);
 
-            Assert.Equal(TargetRejectReason.NoUnit, AttackTargeting.Check(state.Map, state.Units, archer, bow, new Hex(0, 0), out victim));
-            Assert.Equal(TargetRejectReason.NotEnemy, AttackTargeting.Check(state.Map, state.Units, archer, bow, new Hex(-3, 0), out victim));
-            Assert.Equal(TargetRejectReason.OutOfRange, AttackTargeting.Check(state.Map, state.Units, archer, bow, new Hex(3, 0), out victim));
+            // A straight shot cannot see across the plateau; the lobbed arrow does not need to.
+            Assert.Equal(TargetRejectReason.NoLineOfSight, Check(state, archer, catalog.GetAttack("quick-shot"), Across.To).Reason);
+            Assert.True(Check(state, archer, catalog.GetAttack("arrow-shot"), Across.To).Ok);
+        }
 
-            // Brute at distance 2 behind the height-1 bump at (-1,0): both endpoints at 0, bump is taller than both.
-            state.Units.Get(1).MoveTo(new Hex(0, 0));
-            archer.MoveTo(new Hex(-2, 0));
-            Assert.Equal(TargetRejectReason.NoLineOfSight, AttackTargeting.Check(state.Map, state.Units, archer, bow, new Hex(0, 0), out victim));
+        [Fact]
+        public void Check_WallProp_NotDamageable()
+        {
+            var catalog = CombatFixtures.Catalog();
+            var state = PropsMatch(catalog);
+            state.Units.Get(0).MoveTo(new Hex(-2, 0));
+            var check = Check(state, state.Units.Get(0), catalog.GetAttack("bow"), new Hex(-1, 0));
+            Assert.Equal(TargetRejectReason.NotDamageable, check.Reason);
+            Assert.IsType<Prop>(check.Victim);
+        }
 
-            // Adjacent from the other side: clear.
-            archer.MoveTo(new Hex(0, 1));
-            Assert.Equal(TargetRejectReason.None, AttackTargeting.Check(state.Map, state.Units, archer, bow, new Hex(0, 0), out victim));
-            Assert.Same(state.Units.Get(1), victim);
+        [Fact]
+        public void Check_PillarProp_IsLegalTarget()
+        {
+            var catalog = CombatFixtures.Catalog();
+            var state = PropsMatch(catalog);
+            state.Units.Get(0).MoveTo(new Hex(0, -2));
+            var check = Check(state, state.Units.Get(0), catalog.GetAttack("bow"), new Hex(0, -1));
+            Assert.True(check.Ok);
+            Assert.Equal("pillar", Assert.IsType<Prop>(check.Victim).Def.Id);
+        }
+
+        [Fact]
+        public void WithTrajectory_CloneOfGunAsArc_ClearsOverPlateau()
+        {
+            var catalog = ContentFixtures.RepoCatalog();
+            var state = Arena(catalog, ContentFixtures.GunKit);
+            var shooter = state.Units.Get(0);
+            shooter.MoveTo(Across.From);
+            state.Units.Get(1).MoveTo(Across.To);
+
+            var gun = catalog.GetAttack("quick-shot");
+            Assert.Equal(TargetRejectReason.NoLineOfSight, Check(state, shooter, gun, Across.To).Reason);
+
+            // The one seam an enchant would swap: same id, same numbers, a different flight.
+            var lobbed = gun.WithTrajectory(Trajectories.Arc, 5, false);
+            Assert.True(Check(state, shooter, lobbed, Across.To).Ok);
+            Assert.Equal(gun.Id, lobbed.Id);
+        }
+
+        [Fact]
+        public void Sky_StillNeedsSightWhenFlagged()
+        {
+            var catalog = ContentFixtures.RepoCatalog();
+            var state = Arena(catalog, ContentFixtures.GunKit);
+            var shooter = state.Units.Get(0);
+            shooter.MoveTo(Across.From);
+            state.Units.Get(1).MoveTo(Across.To);
+            var gun = catalog.GetAttack("heavy-shot");
+
+            // sky ignores the plateau, but the two fields are independent: a sighted sky shot still needs sight.
+            Assert.Equal(TargetRejectReason.NoLineOfSight,
+                Check(state, shooter, gun.WithTrajectory(Trajectories.Sky, 0, true), Across.To).Reason);
+            Assert.True(Check(state, shooter, gun.WithTrajectory(Trajectories.Sky, 0, false), Across.To).Ok);
+        }
+
+        /// <summary>Two ground tiles either side of arena-4's level-2 plateau, two hexes apart through (0,0).</summary>
+        private static readonly (Hex From, Hex To) Across = (new Hex(0, -1), new Hex(0, 1));
+
+        private static MatchState Arena(ContentCatalog catalog, Loadout kit)
+        {
+            var state = new MatchState(catalog, new MatchSetup("arena-4", kit, kit), 1);
+            state.Start();
+            return state;
+        }
+
+        /// <summary>The props-3 fixture: walls at (±1,0), pillars at (0,±1), both heroes parked out of the way.</summary>
+        private static MatchState PropsMatch(ContentCatalog catalog)
+        {
+            var state = new MatchState(catalog, new MatchSetup("props-3", CombatFixtures.Archer, CombatFixtures.Brute), 1);
+            state.Start();
+            return state;
         }
     }
 }

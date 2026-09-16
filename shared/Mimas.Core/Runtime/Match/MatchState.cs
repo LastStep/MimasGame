@@ -73,13 +73,23 @@ namespace Mimas.Core.Match
         private readonly MovementResolverRegistry _resolvers;
         private readonly DamageCalculator _damage;
         private readonly RevealedSet _revealed = new RevealedSet();
-        private readonly List<Unit> _targetScratch = new List<Unit>();
+        private readonly List<IBody> _targetScratch = new List<IBody>();
 
         public ContentCatalog Catalog { get; }
         public MatchSetup Setup { get; }
         public MapData MapData { get; }
         public TileMap Map { get; }
         public UnitSet Units { get; }
+
+        /// <summary>Every body on the board: the units plus the props the map placed (design: #props).</summary>
+        public BodySet Bodies { get; }
+
+        /// <summary>The props this map placed, in authored order. Public information, for both players.</summary>
+        public IReadOnlyList<Prop> Props => Bodies.Props;
+
+        /// <summary>Which trajectories exist. One registry per match so a mod could add one.</summary>
+        public TrajectoryRegistry Trajectories { get; }
+
         public Rng Rng { get; }
 
         /// <summary>Player whose turn it is.</summary>
@@ -97,17 +107,20 @@ namespace Mimas.Core.Match
         public int Winner { get; private set; } = -1;
 
         /// <summary>Builds the board, spawns one unit per player on its spawn, and starts the first turn (events are returned by <see cref="Start"/>).</summary>
-        public MatchState(ContentCatalog catalog, MatchSetup setup, uint seed, MovementResolverRegistry resolvers = null)
+        public MatchState(ContentCatalog catalog, MatchSetup setup, uint seed,
+            MovementResolverRegistry resolvers = null, TrajectoryRegistry trajectories = null)
         {
             Catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
             Setup = setup ?? throw new ArgumentNullException(nameof(setup));
             _resolvers = resolvers ?? MovementResolverRegistry.CreateDefault();
+            Trajectories = trajectories ?? TrajectoryRegistry.Default();
             _damage = new DamageCalculator(catalog);
             Rng = new Rng(seed);
 
             MapData = catalog.Maps.Get(setup.MapId);
             Map = MapData.BuildTileMap(catalog.Terrains);
             Units = new UnitSet();
+            Bodies = new BodySet(Units);
 
             for (int player = 0; player < MatchSetup.PlayerCount; player++)
             {
@@ -124,6 +137,16 @@ namespace Mimas.Core.Match
                     unit.AddModifier(modifiers[i]);
                 }
                 Units.Add(unit);
+            }
+
+            // Props come after the units, in the map's authored hex order, so their ids are stable.
+            int nextId = 0;
+            for (int i = 0; i < Units.All.Count; i++)
+                if (Units.All[i].Id >= nextId) nextId = Units.All[i].Id + 1;
+            foreach (MapHex hex in MapData.Hexes)
+            {
+                if (hex.PropId == null) continue;
+                Bodies.AddProp(new Prop(nextId++, catalog.Props.Get(hex.PropId), hex.Position));
             }
 
             ActivePlayer = setup.FirstPlayer;
@@ -181,11 +204,11 @@ namespace Mimas.Core.Match
             if (!actor.Ok) return actor;
             var movement = ability as MovementDef;
             if (movement == null) return CommandResult.Reject(CommandRejectReason.WrongAbilityType);
-            result = _resolvers.Validate(MovementContext.For(Map, Catalog.Terrains, Units, unit, movement), move.Destination);
+            result = _resolvers.Validate(MoveContext(unit, movement), move.Destination);
             return result.Ok ? CommandResult.Accepted : CommandResult.RejectMove(result.Reason);
         }
 
-        private CommandResult ValidateAttack(AttackCommand attack, out Unit attacker, out AttackDef def, out Unit victim)
+        private CommandResult ValidateAttack(AttackCommand attack, out Unit attacker, out AttackDef def, out IBody victim)
         {
             attacker = null; def = null; victim = null;
             AbilityDef ability;
@@ -193,9 +216,14 @@ namespace Mimas.Core.Match
             if (!actor.Ok) return actor;
             def = ability as AttackDef;
             if (def == null) return CommandResult.Reject(CommandRejectReason.WrongAbilityType);
-            TargetRejectReason target = AttackTargeting.Check(Map, Units, attacker, def, attack.Target, out victim);
-            return target == TargetRejectReason.None ? CommandResult.Accepted : CommandResult.RejectTarget(target);
+            TargetCheck target = AttackTargeting.Check(Map, Bodies, Catalog.Rules.Heights, Trajectories, attacker, def, attack.Target);
+            victim = target.Victim;
+            return target.Ok ? CommandResult.Accepted : CommandResult.RejectTarget(target.Reason);
         }
+
+        /// <summary>The movement context every resolver call goes through: bodies, heights and the mover's id.</summary>
+        private MovementContext MoveContext(Unit unit, MovementDef movement)
+            => MovementContext.For(Map, Catalog.Terrains, Bodies, unit, movement, Catalog.Rules.Heights);
 
         // ---- application ---------------------------------------------------------------------------
 
@@ -243,7 +271,7 @@ namespace Mimas.Core.Match
 
         private void ApplyAttack(AttackCommand attack, List<MatchEvent> events)
         {
-            Unit attacker, victim; AttackDef def;
+            Unit attacker; IBody victim; AttackDef def;
             ValidateAttack(attack, out attacker, out def, out victim);
 
             attacker.SpendAp(def.Cost);
@@ -257,21 +285,28 @@ namespace Mimas.Core.Match
             {
                 DamageLine line = breakdown.Lines[i];
                 if (!line.Hidden || line.Amount == 0) continue;
-                Unit owner = Units.Get(line.OwnerUnitId);
+                IBody body;
+                // Props carry no hidden modifiers; the guard keeps the reveal honest if one ever does.
+                if (!Bodies.TryGetBody(line.OwnerUnitId, out body) || !(body is Unit owner)) continue;
                 int other = 1 - owner.Owner;
                 if (_revealed.Add(other, owner.Id, line.Id))
                     events.Add(new ModifierRevealedEvent(owner.Id, line.Id, other));
             }
 
             int lost = victim.TakeDamage(breakdown.Total);
-            events.Add(new AttackResolvedEvent(attacker.Id, victim.Id, def.Id, breakdown, lost, victim.Hp));
+            var prop = victim as Prop;
+            events.Add(new AttackResolvedEvent(attacker.Id, victim.Id, def.Id, breakdown, lost, victim.Hp, prop != null));
             events.Add(new ApSpentEvent(attacker.Id, def.Id, def.Cost, attacker.Ap));
 
-            if (!victim.IsAlive)
+            if (victim.IsAlive) return;
+            if (prop != null)
             {
-                events.Add(new UnitDiedEvent(victim.Id));
-                CheckElimination(events);
+                // A destroyed prop is simply gone: its tile is enterable again and nobody was eliminated (D11).
+                events.Add(new PropDestroyedEvent(prop.Id));
+                return;
             }
+            events.Add(new UnitDiedEvent(victim.Id));
+            CheckElimination(events);
         }
 
         private void ApplyEndTurn(EndTurnCommand end, List<MatchEvent> events)
@@ -355,7 +390,7 @@ namespace Mimas.Core.Match
                     var movement = ability as MovementDef;
                     if (movement != null)
                     {
-                        MovementOptions options = _resolvers.Enumerate(MovementContext.For(Map, Catalog.Terrains, Units, unit, movement));
+                        MovementOptions options = _resolvers.Enumerate(MoveContext(unit, movement));
                         for (int i = 0; i < options.Plans.Count; i++)
                             into.Add(new MoveCommand(player, unit.Id, movement.Id, options.Plans[i].Destination));
                         continue;
@@ -364,7 +399,7 @@ namespace Mimas.Core.Match
                     var attack = ability as AttackDef;
                     if (attack != null)
                     {
-                        AttackTargeting.Enumerate(Map, Units, unit, attack, _targetScratch);
+                        AttackTargeting.Enumerate(Map, Bodies, Catalog.Rules.Heights, Trajectories, unit, attack, _targetScratch);
                         for (int i = 0; i < _targetScratch.Count; i++)
                             into.Add(new AttackCommand(player, unit.Id, attack.Id, _targetScratch[i].Position));
                     }
@@ -382,11 +417,11 @@ namespace Mimas.Core.Match
             if (!Catalog.Abilities.TryGet(abilityId, out ability) || !unit.HasAbility(abilityId) || !unit.CanAfford(ability.Cost)) return MovementOptions.Empty;
             var movement = ability as MovementDef;
             if (movement == null) return MovementOptions.Empty;
-            return _resolvers.Enumerate(MovementContext.For(Map, Catalog.Terrains, Units, unit, movement));
+            return _resolvers.Enumerate(MoveContext(unit, movement));
         }
 
         /// <summary>Legal targets for a unit's attack ability (empty when the unit cannot use it now).</summary>
-        public void AttackTargets(int unitId, string abilityId, List<Unit> into)
+        public void AttackTargets(int unitId, string abilityId, List<IBody> into)
         {
             if (into == null) throw new ArgumentNullException(nameof(into));
             into.Clear();
@@ -395,7 +430,37 @@ namespace Mimas.Core.Match
             if (!Catalog.Abilities.TryGet(abilityId, out ability) || !unit.HasAbility(abilityId) || !unit.CanAfford(ability.Cost)) return;
             var attack = ability as AttackDef;
             if (attack == null) return;
-            AttackTargeting.Enumerate(Map, Units, unit, attack, into);
+            AttackTargeting.Enumerate(Map, Bodies, Catalog.Rules.Heights, Trajectories, unit, attack, into);
+        }
+
+        /// <summary>
+        /// Why a target would be refused, without throwing: what a HUD asks while the cursor moves. Unknown
+        /// units and abilities read as <see cref="TargetRejectReason.NoBody"/> rather than an exception.
+        /// </summary>
+        public TargetCheck CheckTarget(int unitId, string abilityId, Hex target)
+        {
+            Unit unit; AbilityDef ability;
+            if (!Units.TryGet(unitId, out unit) || !Catalog.Abilities.TryGet(abilityId, out ability))
+                return TargetCheck.Reject(TargetRejectReason.NoBody);
+            var attack = ability as AttackDef;
+            if (attack == null) return TargetCheck.Reject(TargetRejectReason.NoBody);
+            return AttackTargeting.Check(Map, Bodies, Catalog.Rules.Heights, Trajectories, unit, attack, target);
+        }
+
+        /// <summary>
+        /// Every map tile inside an attack's circular range band from where the unit stands, in the map's
+        /// authored hex order. Geometry only: it says nothing about sight, trajectory or what is standing there.
+        /// </summary>
+        public void RangeBand(int unitId, string abilityId, List<Hex> into)
+        {
+            if (into == null) throw new ArgumentNullException(nameof(into));
+            into.Clear();
+            Unit unit; AbilityDef ability;
+            if (!Units.TryGet(unitId, out unit) || !Catalog.Abilities.TryGet(abilityId, out ability)) return;
+            var attack = ability as AttackDef;
+            if (attack == null) return;
+            foreach (MapHex hex in MapData.Hexes)
+                if (attack.InRangeSquared(Hex.EuclideanSquared(unit.Position, hex.Position))) into.Add(hex.Position);
         }
 
         /// <summary>
@@ -404,7 +469,7 @@ namespace Mimas.Core.Match
         /// </summary>
         public DamageBreakdown PreviewAttack(int viewer, int unitId, string abilityId, Hex target)
         {
-            Unit attacker, victim; AttackDef def;
+            Unit attacker; IBody victim; AttackDef def;
             var command = new AttackCommand(ActivePlayer, unitId, abilityId, target);
             if (IsOver || TurnNumber == 0) return null;
             if (!ValidateAttack(command, out attacker, out def, out victim).Ok) return null;
@@ -414,7 +479,7 @@ namespace Mimas.Core.Match
         /// <summary>The same arithmetic with full knowledge: for tests and the server only.</summary>
         public DamageBreakdown ResolveAttackFully(int unitId, string abilityId, Hex target)
         {
-            Unit attacker, victim; AttackDef def;
+            Unit attacker; IBody victim; AttackDef def;
             var command = new AttackCommand(ActivePlayer, unitId, abilityId, target);
             if (IsOver || TurnNumber == 0) return null;
             if (!ValidateAttack(command, out attacker, out def, out victim).Ok) return null;
