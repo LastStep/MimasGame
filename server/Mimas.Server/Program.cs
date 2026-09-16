@@ -43,6 +43,7 @@ app.MapGet("/health", () => Results.Ok(new
         abilities = catalog.Abilities.Count,
         items = catalog.Items.Count,
         maps = catalog.Maps.Count,
+        props = catalog.Props.Count,
         terrains = catalog.Terrains.Count,
     },
     utc = DateTime.UtcNow,

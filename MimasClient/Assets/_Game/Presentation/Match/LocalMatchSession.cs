@@ -81,7 +81,7 @@ namespace Mimas.Client.Presentation
         private readonly List<HudAction> _actions = new List<HudAction>();
         private readonly List<AbilityDef> _abilities = new List<AbilityDef>();
         private readonly List<Hex> _highlight = new List<Hex>();
-        private readonly List<Unit> _targetScratch = new List<Unit>();
+        private readonly List<IBody> _targetScratch = new List<IBody>();
         private int _armed = None;
         private MovementOptions _moveOptions = MovementOptions.Empty;
         private HudExamine _examine;
