@@ -195,7 +195,7 @@ namespace Mimas.Client.Presentation
             if (_board == null || _input == null) return;
             _board.BoardBuilt += HandleBoardBuilt;
             _input.TileClicked += HandleTileClicked;
-            _input.TileHovered += HandleTileHovered;
+            _input.HoverChanged += HandleHoverChanged;
             _input.RightClicked += HandleRightClicked;
             if (_unit != null) _unit.Mover.Arrived += HandleArrived;
             if (_opponent != null) _opponent.Mover.Arrived += HandleArrived;
@@ -206,7 +206,7 @@ namespace Mimas.Client.Presentation
             if (_board == null || _input == null) return;
             _board.BoardBuilt -= HandleBoardBuilt;
             _input.TileClicked -= HandleTileClicked;
-            _input.TileHovered -= HandleTileHovered;
+            _input.HoverChanged -= HandleHoverChanged;
             _input.RightClicked -= HandleRightClicked;
             if (_unit != null) _unit.Mover.Arrived -= HandleArrived;
             if (_opponent != null) _opponent.Mover.Arrived -= HandleArrived;
@@ -322,6 +322,7 @@ namespace Mimas.Client.Presentation
             _ready = true;
             RefreshView();
             BuildBodies();
+            FaceNearestEnemies();
             CollectAbilities();
             RefreshMarkers();
 
@@ -482,6 +483,7 @@ namespace Mimas.Client.Presentation
                     UnitView view;
                     if (_unitViews.TryGetValue(died.UnitId, out view)) view.gameObject.SetActive(false);
                     RefreshView();
+                    FaceNearestEnemies();
                     RaiseStateChanged();
                     break;
                 }
@@ -904,13 +906,13 @@ namespace Mimas.Client.Presentation
             RaiseStateChanged();
         }
 
-        private void HandleTileHovered(TileView tile)
+        private void HandleHoverChanged(BoardHover hover)
         {
             if (!_ready) return;
-            _board.SetHovered(tile);
+            _board.SetHovered(hover.Tile);
 
             AbilityDef def = ArmedAbility;
-            if (def == null || IsPlaying || tile == null)
+            if (def == null || IsPlaying || !hover.Any)
             {
                 _board.ShowPathPreview(null);
                 if (ClearPreview()) RaiseStateChanged();
@@ -920,15 +922,19 @@ namespace Mimas.Client.Presentation
             if (def is MovementDef)
             {
                 MovePlan plan;
-                _board.ShowPathPreview(_moveOptions.TryGet(tile.Coord, out plan) ? plan.Path : null);
+                _board.ShowPathPreview(_moveOptions.TryGet(hover.Hex, out plan) ? plan.Path : null);
                 return;
             }
 
             if (def is AttackDef)
             {
-                DamageBreakdown breakdown = _state.PreviewAttack(LocalPlayer, _localUnitId, def.Id, tile.Coord);
+                // Aiming is local presentation: the hero turns towards whatever the cursor snapped to, and no
+                // command, event or byte on the wire ever says so (design: #presentation).
+                FaceAim(SnappedAimPoint(hover));
+
+                DamageBreakdown breakdown = _state.PreviewAttack(LocalPlayer, _localUnitId, def.Id, hover.Hex);
                 Unit target;
-                if (breakdown == null || !_state.Units.TryGetUnitAt(tile.Coord, out target))
+                if (breakdown == null || !_state.Units.TryGetUnitAt(hover.Hex, out target))
                 {
                     if (ClearPreview()) RaiseStateChanged();
                     return;
@@ -936,6 +942,64 @@ namespace Mimas.Client.Presentation
                 ShowPreview(def, target, breakdown);
                 RaiseStateChanged();
             }
+        }
+
+        /// <summary>
+        /// Where a shot at this hover would land: the enemy's aim point, else the prop's hit mark, else the
+        /// tile centre at aim height — the snap priority from the design page (#presentation). The same point
+        /// the hero turns towards, the preview line ends at and the projectile flies to.
+        /// </summary>
+        private Vector3 SnappedAimPoint(BoardHover hover)
+        {
+            if (hover.Unit != null && hover.Unit.AimPoint != null) return hover.Unit.AimPoint.position;
+            if (hover.Prop != null && hover.Prop.AimPoint != null) return hover.Prop.AimPoint.position;
+            return _board.HexToAimPoint(hover.Hex, _catalog.Rules.Heights.Aim);
+        }
+
+        /// <summary>Turns the local hero towards a point while it is aiming.</summary>
+        private void FaceAim(Vector3 point)
+        {
+            UnitView view;
+            if (_localUnitId != None && _unitViews.TryGetValue(_localUnitId, out view)) view.Facing.FaceWorldPoint(point);
+        }
+
+        /// <summary>
+        /// Nothing armed: every hero looks at the nearest living enemy, so both read as being in the fight.
+        /// A hero with no enemy left keeps the yaw it had.
+        /// </summary>
+        private void FaceNearestEnemies()
+        {
+            if (_view == null) return;
+            for (int i = 0; i < _view.Units.Count; i++)
+            {
+                Mimas.Core.Match.UnitView unit = _view.Units[i];
+                UnitView view;
+                if (!_unitViews.TryGetValue(unit.Id, out view) || !unit.IsAlive) continue;
+
+                UnitView enemy = NearestLivingEnemyView(unit);
+                if (enemy != null) view.Facing.FaceTransform(enemy.transform);
+                else view.Facing.ClearTarget();
+            }
+        }
+
+        private UnitView NearestLivingEnemyView(Mimas.Core.Match.UnitView of)
+        {
+            UnitView best = null;
+            int bestDistance = int.MaxValue;
+            for (int i = 0; i < _view.Units.Count; i++)
+            {
+                Mimas.Core.Match.UnitView other = _view.Units[i];
+                if (other.Owner == of.Owner || !other.IsAlive) continue;
+
+                int distance = Hex.Distance(of.Position, other.Position);
+                if (distance >= bestDistance) continue;
+
+                UnitView view;
+                if (!_unitViews.TryGetValue(other.Id, out view)) continue;
+                bestDistance = distance;
+                best = view;
+            }
+            return best;
         }
 
         private void ShowPreview(AbilityDef def, Unit target, DamageBreakdown breakdown)
@@ -1003,6 +1067,7 @@ namespace Mimas.Client.Presentation
                 _board.ClearHighlights();
                 _board.ShowPathPreview(null);
             }
+            FaceNearestEnemies();
             RefreshEmphasis();
         }
 
