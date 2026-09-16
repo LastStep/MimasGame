@@ -50,6 +50,12 @@ namespace Mimas.Core.Match
         public int ApPerTurn { get; }
         public bool IsAlive => Hp > 0;
 
+        /// <summary>Body height in units above the tile top: what this hero blocks with. Public.</summary>
+        public int BodyHeight { get; }
+
+        /// <summary>Where shots leave from and land on this hero, in units above the tile top. Public.</summary>
+        public int AimHeight { get; }
+
         /// <summary>True when the viewer owns this unit (everything is visible).</summary>
         public bool IsMine { get; }
 
@@ -60,8 +66,10 @@ namespace Mimas.Core.Match
         public IReadOnlyList<KnownEntry> Modifiers => _modifiers;
 
         public UnitView(int id, int owner, IReadOnlyList<string> itemIds, Hex position, int hp, int maxHp, int ap, int apPerTurn, bool isMine,
-            List<KnownEntry> abilities, List<KnownEntry> modifiers)
+            List<KnownEntry> abilities, List<KnownEntry> modifiers, int bodyHeight = 0, int aimHeight = 0)
         {
+            BodyHeight = bodyHeight;
+            AimHeight = aimHeight;
             Id = id;
             Owner = owner;
             ItemIds = itemIds ?? new List<string>();
@@ -87,6 +95,41 @@ namespace Mimas.Core.Match
     }
 
     /// <summary>
+    /// A prop as a player sees it. Props are neutral and entirely public (design: #props): there is nothing
+    /// about one to hide, so both viewers get the same rows.
+    /// </summary>
+    public sealed class PropView
+    {
+        public int Id { get; }
+
+        /// <summary>The <c>props/*.json</c> id: what to render.</summary>
+        public string DefId { get; }
+
+        public Hex Position { get; }
+        public int Hp { get; }
+        public int MaxHp { get; }
+        public bool IsAlive { get; }
+        public int BodyHeight { get; }
+        public int AimHeight { get; }
+
+        /// <summary>False for a wall: it blocks shots but can never be targeted.</summary>
+        public bool IsDamageable { get; }
+
+        public PropView(int id, string defId, Hex position, int hp, int maxHp, bool isAlive, int bodyHeight, int aimHeight, bool isDamageable)
+        {
+            Id = id;
+            DefId = defId;
+            Position = position;
+            Hp = hp;
+            MaxHp = maxHp;
+            IsAlive = isAlive;
+            BodyHeight = bodyHeight;
+            AimHeight = aimHeight;
+            IsDamageable = isDamageable;
+        }
+    }
+
+    /// <summary>
     /// Everything one player may know about the match (ADR-010): the projection the server sends and the
     /// only thing a client renders from. Built fresh by <see cref="MatchState.ViewFor"/>; it holds no
     /// reference back to the state.
@@ -94,6 +137,7 @@ namespace Mimas.Core.Match
     public sealed class PlayerView
     {
         private readonly List<UnitView> _units;
+        private readonly List<PropView> _props;
 
         public int Viewer { get; }
         public int ActivePlayer { get; }
@@ -107,7 +151,11 @@ namespace Mimas.Core.Match
 
         public IReadOnlyList<UnitView> Units => _units;
 
-        private PlayerView(int viewer, int activePlayer, int turnNumber, bool acted, bool isOver, int winner, string mapId, List<UnitView> units)
+        /// <summary>Every prop the map placed, in its authored order. Destroyed ones are gone from this list.</summary>
+        public IReadOnlyList<PropView> Props => _props;
+
+        private PlayerView(int viewer, int activePlayer, int turnNumber, bool acted, bool isOver, int winner, string mapId,
+            List<UnitView> units, List<PropView> props)
         {
             Viewer = viewer;
             ActivePlayer = activePlayer;
@@ -117,11 +165,18 @@ namespace Mimas.Core.Match
             Winner = winner;
             MapId = mapId;
             _units = units;
+            _props = props;
         }
 
         public UnitView FindUnit(int id)
         {
             for (int i = 0; i < _units.Count; i++) if (_units[i].Id == id) return _units[i];
+            return null;
+        }
+
+        public PropView FindProp(int id)
+        {
+            for (int i = 0; i < _props.Count; i++) if (_props[i].Id == id) return _props[i];
             return null;
         }
 
@@ -154,10 +209,20 @@ namespace Mimas.Core.Match
                     modifiers.Add(new KnownEntry(known ? id : null));
                 }
 
-                units.Add(new UnitView(unit.Id, unit.Owner, unit.ItemIds, unit.Position, unit.Hp, unit.MaxHp, unit.Ap, unit.ApPerTurn, mine, abilities, modifiers));
+                units.Add(new UnitView(unit.Id, unit.Owner, unit.ItemIds, unit.Position, unit.Hp, unit.MaxHp, unit.Ap, unit.ApPerTurn, mine,
+                    abilities, modifiers, unit.BodyHeight, unit.AimHeight));
             }
 
-            return new PlayerView(viewer, state.ActivePlayer, state.TurnNumber, state.ActedThisTurn, state.IsOver, state.Winner, state.MapData.Id, units);
+            var props = new List<PropView>(state.Props.Count);
+            for (int i = 0; i < state.Props.Count; i++)
+            {
+                Prop prop = state.Props[i];
+                if (prop.IsDestroyed) continue;
+                props.Add(new PropView(prop.Id, prop.Def.Id, prop.Position, prop.Hp, prop.MaxHp, prop.IsAlive,
+                    prop.BodyHeight, prop.AimHeight, prop.IsDamageable));
+            }
+
+            return new PlayerView(viewer, state.ActivePlayer, state.TurnNumber, state.ActedThisTurn, state.IsOver, state.Winner, state.MapData.Id, units, props);
         }
     }
 }

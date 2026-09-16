@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Mimas.Core.Bots;
 using Mimas.Core.Combat;
+using Mimas.Core.Content;
 using Mimas.Core.Geometry;
 using Mimas.Core.Match;
 using Mimas.Core.Movement;
@@ -269,6 +270,238 @@ namespace Mimas.Core.Tests
             Assert.Null(trimmed.Breakdown.FindModifier("ward"));
             Assert.Equal(1, trimmed.Breakdown.UnknownCount);
             Assert.Equal(6, trimmed.Breakdown.Total);
+        }
+    }
+
+
+    /// <summary>
+    /// Props inside a live match (spec A, D11/D12): where they come from, what they block, what happens when
+    /// one falls, and what each player is told about them.
+    /// </summary>
+    public class MatchPropTests
+    {
+        private static readonly Hex PillarAt = new Hex(0, -1);       // props-3 fixture, prop id 4
+        private static readonly Hex WallAt = new Hex(1, 0);          // props-3 fixture, prop id 3
+
+        /// <summary>The props-3 fixture with the archer placed next to the south pillar.</summary>
+        private static MatchState Props(Hex archerAt)
+        {
+            var state = new MatchState(CombatFixtures.Catalog(), new MatchSetup("props-3", CombatFixtures.Archer, CombatFixtures.Brute), 3);
+            state.Units.Get(0).MoveTo(archerAt);
+            state.Start();
+            return state;
+        }
+
+        [Fact]
+        public void Match_PropsCreatedFromMap_IdsAfterUnits()
+        {
+            var state = Props(new Hex(0, -2));
+            Assert.Equal(4, state.Props.Count);
+            Assert.Equal(new[] { 2, 3, 4, 5 }, state.Props.Select(p => p.Id).ToArray());
+            Assert.Equal(new[] { "pillar", "wall", "pillar", "wall" }, state.Props.Select(p => p.Def.Id).ToArray());
+
+            // Units first, then props in the map's authored hex order.
+            Assert.Equal(new[] { 0, 1, 2, 3, 4, 5 }, state.Bodies.All.Select(b => b.Id).ToArray());
+            Assert.Equal(-1, state.Props[0].Owner);
+        }
+
+        [Fact]
+        public void Match_PropOccupiesTile_MoveRejected()
+        {
+            var state = Props(new Hex(0, -2));
+            var result = state.Validate(new MoveCommand(0, 0, "move", PillarAt));
+            Assert.Equal(MoveRejectReason.Occupied, result.MoveReason);
+            Assert.True(state.Bodies.IsOccupied(PillarAt));
+        }
+
+        [Fact]
+        public void Match_AttackOnPillar_ResolvedEventFlagsProp()
+        {
+            var state = Props(new Hex(0, -2));
+            var events = state.Apply(new AttackCommand(0, 0, "bow", PillarAt));
+            var resolved = events.OfType<AttackResolvedEvent>().Single();
+
+            Assert.True(resolved.TargetIsProp);
+            Assert.Equal(4, resolved.TargetId);
+            Assert.Equal(7, resolved.Damage);                        // 5 base + 2 power, no armour
+            Assert.Equal(3, resolved.TargetHpAfter);
+            Assert.DoesNotContain(events, e => e is PropDestroyedEvent);
+        }
+
+        [Fact]
+        public void Match_DestroyedPillar_TileEnterable_EventEmitted()
+        {
+            var state = Props(new Hex(0, -2));
+            state.Apply(new AttackCommand(0, 0, "bow", PillarAt));    // 7 of 10
+            state.Apply(new EndTurnCommand(0));
+            state.Apply(new EndTurnCommand(1));
+            var events = state.Apply(new AttackCommand(0, 0, "bow", PillarAt));
+
+            Assert.Equal(4, Assert.IsType<PropDestroyedEvent>(events.Single(e => e is PropDestroyedEvent)).PropId);
+            Assert.True(state.Props.Single(p => p.Id == 4).IsDestroyed);
+
+            // Gone from the board: nothing reports it and the tile can be walked into.
+            Assert.False(state.Bodies.IsOccupied(PillarAt));
+            Assert.False(state.Bodies.TryGetBodyAt(PillarAt, out _));
+            Assert.True(state.Validate(new MoveCommand(0, 0, "move", PillarAt)).Ok);
+        }
+
+        [Fact]
+        public void Match_DestroyingPillar_DoesNotEndMatch()
+        {
+            var state = Props(new Hex(0, -2));
+            state.Apply(new AttackCommand(0, 0, "bow", PillarAt));
+            state.Apply(new EndTurnCommand(0));
+            state.Apply(new EndTurnCommand(1));
+            state.Apply(new AttackCommand(0, 0, "bow", PillarAt));
+
+            Assert.False(state.IsOver);
+            Assert.Equal(-1, state.Winner);
+            Assert.True(state.HasLivingUnit(0));
+            Assert.True(state.HasLivingUnit(1));
+        }
+
+        [Fact]
+        public void EnumerateLegal_IncludesPillarTargets()
+        {
+            var state = Props(new Hex(0, -2));
+            var legal = new List<Command>();
+            state.EnumerateLegal(0, legal);
+
+            var targets = legal.OfType<AttackCommand>().Select(a => a.Target).ToList();
+            Assert.Contains(PillarAt, targets);
+            Assert.DoesNotContain(WallAt, targets);                  // a wall blocks but cannot be hit
+            foreach (var command in legal) Assert.True(state.Validate(command).Ok, command.ToString());
+        }
+
+        [Fact]
+        public void PlayerView_ListsPropsForBothViewers()
+        {
+            var state = Props(new Hex(0, -2));
+            foreach (int viewer in new[] { 0, 1 })
+            {
+                var view = state.ViewFor(viewer);
+                Assert.Equal(4, view.Props.Count);
+                var pillar = view.FindProp(4);
+                Assert.Equal("pillar", pillar.DefId);
+                Assert.Equal(PillarAt, pillar.Position);
+                Assert.Equal(10, pillar.Hp);
+                Assert.True(pillar.IsDamageable);
+                Assert.False(view.FindProp(3).IsDamageable);          // the wall
+                Assert.Equal(6, view.FindProp(3).BodyHeight);
+            }
+
+            state.Apply(new AttackCommand(0, 0, "bow", PillarAt));
+            state.Apply(new EndTurnCommand(0));
+            state.Apply(new EndTurnCommand(1));
+            state.Apply(new AttackCommand(0, 0, "bow", PillarAt));
+            Assert.Equal(3, state.ViewFor(1).Props.Count);            // the destroyed pillar is simply gone
+            Assert.Null(state.ViewFor(1).FindProp(4));
+        }
+
+        [Fact]
+        public void PlayerView_UnitViewCarriesHeights()
+        {
+            var state = Props(new Hex(0, -2));
+            var view = state.ViewFor(0);
+            Assert.Equal(6, view.FindUnit(0).BodyHeight);
+            Assert.Equal(4, view.FindUnit(0).AimHeight);
+            Assert.Equal(6, view.FindUnit(1).BodyHeight);
+        }
+
+        [Fact]
+        public void RangeBand_ReturnsTilesInsideCircle_OrderStable()
+        {
+            var catalog = ContentFixtures.RepoCatalog();
+            var state = new MatchState(catalog, new MatchSetup("arena-4", ContentFixtures.BowKit, ContentFixtures.BowKit), 1);
+            state.Units.Get(0).MoveTo(Hex.Zero);
+            state.Start();
+
+            var band = new List<Hex>();
+            state.RangeBand(0, "arcane-spark", band);                 // range 2, so 1..4 squared
+            Assert.Equal(18, band.Count);
+            Assert.All(band, h => Assert.InRange(Hex.EuclideanSquared(Hex.Zero, h), 1, 4));
+
+            var again = new List<Hex>();
+            state.RangeBand(0, "arcane-spark", again);
+            Assert.Equal(band, again);
+
+            // Authored map order, not a dictionary walk.
+            var authored = state.MapData.Hexes.Select(h => h.Position).Where(band.Contains).ToList();
+            Assert.Equal(authored, band);
+        }
+
+        [Fact]
+        public void Match_TeleportSight_UsesRay_IgnoresMover()
+        {
+            var catalog = ContentFixtures.RepoCatalog();
+            var state = new MatchState(catalog, new MatchSetup("arena-4", ContentFixtures.GunKit, ContentFixtures.GunKit), 1);
+            var mover = state.Units.Get(0);
+            var other = state.Units.Get(1);
+
+            // Across the level-2 plateau: the ray is stopped even though the tiles are only two apart.
+            mover.MoveTo(new Hex(0, -1));
+            other.MoveTo(new Hex(3, 0));
+            state.Start();
+            Assert.Equal(MoveRejectReason.NoLineOfSight, state.Validate(new MoveCommand(0, 0, "teleport", new Hex(0, 1))).MoveReason);
+
+            // Along a clear corridor: legal, and the mover's own body at the origin never blocks it.
+            mover.MoveTo(new Hex(-4, 3));
+            Assert.True(state.Validate(new MoveCommand(0, 0, "teleport", new Hex(-1, 3))).Ok);
+
+            // The other hero standing in that corridor does block it.
+            other.MoveTo(new Hex(-3, 3));
+            Assert.Equal(MoveRejectReason.NoLineOfSight, state.Validate(new MoveCommand(0, 0, "teleport", new Hex(-1, 3))).MoveReason);
+        }
+
+        [Fact]
+        public void Bot_GamesOnArena4WithProps_InvariantsHold_SameSeedSameLog()
+        {
+            var first = PlayOnArena(11, 400);
+            var second = PlayOnArena(11, 400);
+            Assert.Equal(first, second);
+            Assert.NotEmpty(first);
+        }
+
+        /// <summary>Plays random bots on arena-4 and returns the command log, checking the invariants each step.</summary>
+        private static List<string> PlayOnArena(uint seed, int maxCommands)
+        {
+            var catalog = ContentFixtures.RepoCatalog();
+            var state = new MatchState(catalog, new MatchSetup("arena-4", ContentFixtures.BowKit, ContentFixtures.GunKit), seed);
+            state.Start();
+            var bots = new IBot[] { new RandomBot(seed * 2 + 1), new RandomBot(seed * 2 + 2) };
+            var log = new List<string>();
+            var legal = new List<Command>();
+
+            while (!state.IsOver && log.Count < maxCommands)
+            {
+                Command command = bots[state.ActivePlayer].Choose(state, state.ActivePlayer);
+                Assert.NotNull(command);
+                Assert.True(state.Validate(command).Ok, command.ToString());
+                state.Apply(command);
+                log.Add(command.ToString());
+
+                foreach (var unit in state.Units.All)
+                {
+                    Assert.InRange(unit.Ap, 0, unit.ApPerTurn);
+                    Assert.InRange(unit.Hp, 0, unit.MaxHp);
+                    Assert.True(state.Map.Contains(unit.Position));
+                }
+                foreach (var prop in state.Props)
+                {
+                    Assert.InRange(prop.Hp, 0, prop.MaxHp);
+                    // A destroyed prop's tile is free again and no body reports it.
+                    if (!prop.IsDestroyed) continue;
+                    IBody there;
+                    Assert.False(state.Bodies.TryGetBodyAt(prop.Position, out there) && ReferenceEquals(there, prop));
+                }
+                var standing = state.Bodies.All.Where(b => b.IsAlive).Select(b => b.Position).ToList();
+                Assert.Equal(standing.Count, standing.Distinct().Count());
+
+                state.EnumerateLegal(state.ActivePlayer, legal);
+                foreach (var c in legal) Assert.True(state.Validate(c).Ok, c.ToString());
+            }
+            return log;
         }
     }
 
