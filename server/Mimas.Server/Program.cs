@@ -41,7 +41,7 @@ app.MapGet("/health", () => Results.Ok(new
         hash = catalog.Hash,
         files = catalog.Files.Count,
         abilities = catalog.Abilities.Count,
-        classes = catalog.Classes.Count,
+        items = catalog.Items.Count,
         maps = catalog.Maps.Count,
         terrains = catalog.Terrains.Count,
     },
