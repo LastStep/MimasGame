@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "id": "quick-shot",
+  "name": "Quick Shot",
+  "type": "attack",
+  "category": "weapon",
+  "icon": "quick-shot",
+  "description": "A snap shot from the hip. Long reach, light hit.",
+  "cost": 1,
+  "attack": { "damage": 2, "damageType": "weapon", "range": 7 }
+}

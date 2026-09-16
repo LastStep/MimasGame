@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "id": "blink-boots",
+  "name": "Blink Boots",
+  "slot": "boots",
+  "kind": "blink",
+  "description": "Soft slippers stitched with silver. Blink to any tile you can see within three hexes.",
+  "stats": {},
+  "abilities": ["teleport"],
+  "tags": ["boots"],
+  "icon": "blink-boots"
+}

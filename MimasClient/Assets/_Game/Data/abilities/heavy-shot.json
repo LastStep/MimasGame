@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "id": "heavy-shot",
+  "name": "Heavy Shot",
+  "type": "attack",
+  "category": "weapon",
+  "icon": "heavy-shot",
+  "description": "A braced, full-charge shot across the whole field.",
+  "cost": 2,
+  "attack": { "damage": 5, "damageType": "weapon", "range": 7 }
+}

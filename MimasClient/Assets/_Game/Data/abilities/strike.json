@@ -9,7 +9,7 @@
   "cost": 2,
   "attack": {
     "damage": 5,
-    "damageType": "melee",
+    "damageType": "weapon",
     "range": 1
   }
 }

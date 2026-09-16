@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "id": "longbow",
+  "name": "Longbow",
+  "slot": "weapon",
+  "kind": "bow",
+  "description": "A tall yew bow. Reaches five hexes and hits harder than a gun.",
+  "stats": { "power.weapon": 2 },
+  "abilities": ["arrow-shot", "aimed-shot"],
+  "tags": ["bow", "ranged"],
+  "icon": "longbow"
+}

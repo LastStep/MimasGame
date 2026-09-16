@@ -13,14 +13,23 @@ MonoBehaviour:
   m_Name: GameDataManifest
   m_EditorClassIdentifier: Mimas.Client.Content::Mimas.Client.Content.GameDataManifest
   _paths:
+  - abilities/aimed-shot.json
+  - abilities/arcane-spark.json
+  - abilities/arrow-shot.json
   - abilities/fire-bolt.json
+  - abilities/heavy-shot.json
   - abilities/jab.json
   - abilities/jump.json
   - abilities/move.json
+  - abilities/quick-shot.json
   - abilities/strike.json
   - abilities/teleport.json
-  - classes/mage.json
-  - classes/warrior.json
+  - items/blink-boots.json
+  - items/ember-circlet.json
+  - items/flintlock.json
+  - items/leaping-boots.json
+  - items/leather-jerkin.json
+  - items/longbow.json
   - maps/arena-4.json
   - maps/board-3.json
   - modifiers/high-ground.json
@@ -30,14 +39,23 @@ MonoBehaviour:
   - terrains.json
   - timecontrols.json
   _files:
+  - {fileID: 4900000, guid: 139cdbb33e00adc48adca811b3e5c730, type: 3}
+  - {fileID: 4900000, guid: 0837faeac6ae46b459ae5c7afc01705d, type: 3}
+  - {fileID: 4900000, guid: f6f6b04ba5b706146ba300ce3b88d82d, type: 3}
   - {fileID: 4900000, guid: 10a70288140e96c4987d9b6a532f5604, type: 3}
+  - {fileID: 4900000, guid: 218d9fcee13bb7d408a7ee9cb404c4eb, type: 3}
   - {fileID: 4900000, guid: 1e3f815a4338e4840ba442832f42687b, type: 3}
   - {fileID: 4900000, guid: a12469e7cf920c24d8fc068c1943ad6e, type: 3}
   - {fileID: 4900000, guid: fe64dbe470c66bb4593d0fef73593d5a, type: 3}
+  - {fileID: 4900000, guid: ad26926ddcbc2f444afb9129a160beb6, type: 3}
   - {fileID: 4900000, guid: 741f23d2e4dcff84cba40dd8a7958afc, type: 3}
   - {fileID: 4900000, guid: 44e89ca4837e0f1429bd3ca58ba95561, type: 3}
-  - {fileID: 4900000, guid: e596717e0448fd34a8dcd8d06a449929, type: 3}
-  - {fileID: 4900000, guid: ac7b09d361dc9a949afa2154d2ded2fa, type: 3}
+  - {fileID: 4900000, guid: 8d40d64356be14d4e8906da1889073c9, type: 3}
+  - {fileID: 4900000, guid: c2cb31de3152f1e4e8ee3fe1fea3b709, type: 3}
+  - {fileID: 4900000, guid: 457d4efb6b2ff01419bfa4bc760afba3, type: 3}
+  - {fileID: 4900000, guid: 16cdf32cd27f8d6408d14ae1be38dd89, type: 3}
+  - {fileID: 4900000, guid: 3765632929529e442869c4f514284d44, type: 3}
+  - {fileID: 4900000, guid: ab4e425be60a2744fb8c6e017fdc6675, type: 3}
   - {fileID: 4900000, guid: d43b726c8f8016947b6e59ea45620fb8, type: 3}
   - {fileID: 4900000, guid: 58043282de934db4d94f35a99a95874d, type: 3}
   - {fileID: 4900000, guid: fcc495a46bc6ccf43aff5b3aa6a49856, type: 3}

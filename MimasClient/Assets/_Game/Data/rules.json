@@ -1,5 +1,14 @@
 {
   "version": 1,
-  "damageTypes": ["melee", "ranged", "magic"],
-  "globalModifiers": ["high-ground"]
+  "damageTypes": ["weapon", "spell"],
+  "globalModifiers": ["high-ground"],
+  "baseStats": {
+    "hp": 20,
+    "ap": 3,
+    "power.weapon": 1,
+    "power.spell": 1,
+    "defense.weapon": 0,
+    "defense.spell": 0
+  },
+  "innateAbilities": ["move"]
 }

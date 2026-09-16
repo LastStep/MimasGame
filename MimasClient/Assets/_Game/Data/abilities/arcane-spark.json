@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "id": "arcane-spark",
+  "name": "Arcane Spark",
+  "type": "attack",
+  "category": "spell",
+  "icon": "arcane-spark",
+  "description": "A cheap flick of raw magic at a nearby foe.",
+  "cost": 1,
+  "attack": { "damage": 2, "damageType": "spell", "range": 2 }
+}

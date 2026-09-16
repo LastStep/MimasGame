@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "id": "arrow-shot",
+  "name": "Arrow Shot",
+  "type": "attack",
+  "category": "weapon",
+  "icon": "arrow-shot",
+  "description": "A quick arrow at any enemy you can see within five hexes.",
+  "cost": 1,
+  "attack": { "damage": 3, "damageType": "weapon", "range": 5 }
+}

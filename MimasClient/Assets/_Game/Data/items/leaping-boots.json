@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "id": "leaping-boots",
+  "name": "Leaping Boots",
+  "slot": "boots",
+  "kind": "leaping",
+  "description": "Sprung soles. Lets you leap two hexes in a straight line.",
+  "stats": {},
+  "abilities": ["jump"],
+  "tags": ["boots"],
+  "icon": "leaping-boots"
+}

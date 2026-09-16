@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "id": "flintlock",
+  "name": "Flintlock",
+  "slot": "weapon",
+  "kind": "gun",
+  "description": "A long-barrelled gun. Reaches the whole field with lighter hits.",
+  "stats": { "power.weapon": 2 },
+  "abilities": ["quick-shot", "heavy-shot"],
+  "tags": ["gun", "ranged"],
+  "icon": "flintlock"
+}

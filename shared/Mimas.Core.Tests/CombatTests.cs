@@ -14,7 +14,9 @@ namespace Mimas.Core.Tests
 {
     /// <summary>
     /// A small, fully controlled content set: a radius-3 grass field with two height-1 bumps and two forest
-    /// tiles, an archer and a brute, one public terrain modifier, one global height modifier, one hidden ward.
+    /// tiles, an archer kit and a brute kit, one public terrain modifier, one global height modifier, one
+    /// hidden ward. The fixture keeps the melee/ranged/magic lanes on purpose: the engine is lane-agnostic
+    /// and only shipped data moved to weapon/spell.
     /// </summary>
     internal static class CombatFixtures
     {
@@ -37,7 +39,8 @@ namespace Mimas.Core.Tests
                     { ""id"": ""grass"", ""walkable"": true },
                     { ""id"": ""forest"", ""walkable"": true, ""moveCost"": 2, ""modifiers"": [ ""forest-cover"" ] },
                     { ""id"": ""stone"", ""walkable"": false } ] }"),
-                new ContentFile("rules.json", @"{ ""version"": 1, ""damageTypes"": [ ""melee"", ""ranged"", ""magic"" ], ""globalModifiers"": [ ""high-ground"" ] }"),
+                new ContentFile("rules.json", @"{ ""version"": 1, ""damageTypes"": [ ""melee"", ""ranged"", ""magic"" ], ""globalModifiers"": [ ""high-ground"" ],
+                    ""baseStats"": { ""hp"": 2, ""ap"": 3 }, ""innateAbilities"": [ ""move"" ] }"),
                 new ContentFile("abilities/move.json", @"{ ""version"": 1, ""id"": ""move"", ""type"": ""movement"", ""movement"": { ""mode"": ""walk"", ""range"": 1 } }"),
                 new ContentFile("abilities/bow.json", @"{ ""version"": 1, ""id"": ""bow"", ""type"": ""attack"", ""category"": ""weapon"", ""cost"": 2,
                     ""attack"": { ""damage"": 5, ""damageType"": ""ranged"", ""range"": 3 }, ""tags"": [ ""arrow"" ] }"),
@@ -45,10 +48,18 @@ namespace Mimas.Core.Tests
                     ""attack"": { ""damage"": 4, ""damageType"": ""melee"", ""range"": 1 } }"),
                 new ContentFile("abilities/jab.json", @"{ ""version"": 1, ""id"": ""jab"", ""type"": ""attack"", ""category"": ""weapon"", ""cost"": 1,
                     ""attack"": { ""damage"": 2, ""damageType"": ""melee"", ""range"": 1 } }"),
-                new ContentFile("classes/archer.json", @"{ ""version"": 1, ""id"": ""archer"", ""abilities"": [ ""move"", ""bow"" ],
-                    ""stats"": { ""hp"": 12, ""ap"": 3, ""power.ranged"": 2, ""defense.ranged"": 1, ""defense.melee"": 0 } }"),
-                new ContentFile("classes/brute.json", @"{ ""version"": 1, ""id"": ""brute"", ""abilities"": [ ""move"", ""jab"", ""strike"" ],
-                    ""stats"": { ""hp"": 20, ""ap"": 3, ""power.melee"": 3, ""defense.melee"": 2, ""defense.ranged"": 3 } }"),
+                new ContentFile("items/archer-bow.json", @"{ ""version"": 1, ""id"": ""archer-bow"", ""slot"": ""weapon"", ""kind"": ""bow"",
+                    ""stats"": { ""power.ranged"": 2, ""defense.ranged"": 1, ""defense.melee"": 0 }, ""abilities"": [ ""bow"" ] }"),
+                new ContentFile("items/brute-club.json", @"{ ""version"": 1, ""id"": ""brute-club"", ""slot"": ""weapon"", ""kind"": ""club"",
+                    ""stats"": { ""power.melee"": 3, ""defense.melee"": 2, ""defense.ranged"": 3 }, ""abilities"": [ ""jab"", ""strike"" ] }"),
+                new ContentFile("items/bare-crown.json", @"{ ""version"": 1, ""id"": ""bare-crown"", ""slot"": ""crown"", ""kind"": ""bare"",
+                    ""stats"": {}, ""abilities"": [] }"),
+                new ContentFile("items/bare-boots.json", @"{ ""version"": 1, ""id"": ""bare-boots"", ""slot"": ""boots"", ""kind"": ""bare"",
+                    ""stats"": {}, ""abilities"": [] }"),
+                new ContentFile("items/archer-vest.json", @"{ ""version"": 1, ""id"": ""archer-vest"", ""slot"": ""armour"", ""kind"": ""vest"",
+                    ""stats"": { ""hp"": 10 }, ""abilities"": [] }"),
+                new ContentFile("items/brute-hide.json", @"{ ""version"": 1, ""id"": ""brute-hide"", ""slot"": ""armour"", ""kind"": ""hide"",
+                    ""stats"": { ""hp"": 18 }, ""abilities"": [] }"),
                 new ContentFile("modifiers/high-ground.json", @"{ ""version"": 1, ""id"": ""high-ground"", ""trigger"": ""dealDamage"",
                     ""when"": { ""heightAdvantage"": true }, ""effect"": { ""damage"": 2 } }"),
                 new ContentFile("modifiers/forest-cover.json", @"{ ""version"": 1, ""id"": ""forest-cover"", ""trigger"": ""takeDamage"",
@@ -63,7 +74,12 @@ namespace Mimas.Core.Tests
 
         internal static ContentCatalog Catalog() => ContentCatalog.Load(Files());
 
-        internal static MatchSetup Setup() => new MatchSetup("field-3", "archer", "brute");
+        /// <summary>Bare boots grant no movement, which shipped data would not do; the fixture only needs the sums (D6).</summary>
+        internal static readonly Loadout Archer = new Loadout("archer-bow", "bare-crown", "bare-boots", "archer-vest");
+
+        internal static readonly Loadout Brute = new Loadout("brute-club", "bare-crown", "bare-boots", "brute-hide");
+
+        internal static MatchSetup Setup() => new MatchSetup("field-3", Archer, Brute);
 
         /// <summary>Archer (player 0) and brute (player 1) placed directly; the match is started so turn 1 belongs to player 0.</summary>
         internal static MatchState Started(ContentCatalog catalog, MatchSetup setup, Hex archerAt, Hex bruteAt)
@@ -81,26 +97,30 @@ namespace Mimas.Core.Tests
         [Fact]
         public void StatBlock_RequiresHpAndAp_AndRejectsUnknownKeys()
         {
-            Assert.Throws<MapLoadException>(() => ClassDef.FromJson(@"{ ""version"": 1, ""id"": ""x"", ""abilities"": [ ""move"" ], ""stats"": { ""ap"": 3 } }"));
-            Assert.Throws<MapLoadException>(() => ClassDef.FromJson(@"{ ""version"": 1, ""id"": ""x"", ""abilities"": [ ""move"" ], ""stats"": { ""hp"": 5, ""ap"": 3, ""luck"": 1 } }"));
-            Assert.Throws<MapLoadException>(() => ClassDef.FromJson(@"{ ""version"": 1, ""id"": ""x"", ""abilities"": [ ""move"" ], ""stats"": { ""hp"": 0, ""ap"": 3 } }"));
-            Assert.Throws<MapLoadException>(() => ClassDef.FromJson(@"{ ""version"": 1, ""id"": ""x"", ""abilities"": [ ""move"" ] }"));
+            Assert.Throws<MapLoadException>(() => Rules(@"{ ""ap"": 3 }"));
+            Assert.Throws<MapLoadException>(() => Rules(@"{ ""hp"": 5, ""ap"": 3, ""luck"": 1 }"));
+            Assert.Throws<MapLoadException>(() => Rules(@"{ ""hp"": 0, ""ap"": 3 }"));
+            Assert.Throws<MapLoadException>(() => Rules(@"{ ""hp"": 5 }"));
 
-            var cls = ClassDef.FromJson(@"{ ""version"": 1, ""id"": ""x"", ""abilities"": [ ""move"" ], ""stats"": { ""hp"": 7, ""ap"": 2, ""power.magic"": 4 } }");
-            Assert.Equal(7, cls.Stats.Hp);
-            Assert.Equal(2, cls.Stats.Ap);
-            Assert.Equal(4, cls.Stats.Get("power.magic"));
-            Assert.Equal(0, cls.Stats.Get("defense.magic"));
+            var rules = Rules(@"{ ""hp"": 7, ""ap"": 2, ""power.magic"": 4 }");
+            Assert.Equal(7, rules.BaseStats.Hp);
+            Assert.Equal(2, rules.BaseStats.Ap);
+            Assert.Equal(4, rules.BaseStats.Get("power.magic"));
+            Assert.Equal(0, rules.BaseStats.Get("defense.magic"));
         }
+
+        /// <summary>A rules file whose only interesting part is its <c>baseStats</c> object.</summary>
+        private static RulesDef Rules(string baseStats) => RulesDef.FromJson(
+            @"{ ""version"": 1, ""damageTypes"": [ ""melee"", ""magic"" ], ""baseStats"": " + baseStats + @", ""innateAbilities"": [ ""move"" ] }");
 
         [Fact]
         public void Catalogue_RejectsStatKeysAndAttacksWithUndeclaredDamageTypes()
         {
             var files = CombatFixtures.Files();
-            files.Add(new ContentFile("classes/odd.json", @"{ ""version"": 1, ""id"": ""odd"", ""abilities"": [ ""move"" ], ""stats"": { ""hp"": 5, ""ap"": 3, ""power.psychic"": 1 } }"));
+            files.Add(new ContentFile("items/odd.json", @"{ ""version"": 1, ""id"": ""odd"", ""slot"": ""armour"", ""kind"": ""odd"", ""stats"": { ""power.psychic"": 1 }, ""abilities"": [] }"));
             files.Add(new ContentFile("abilities/mind.json", @"{ ""version"": 1, ""id"": ""mind"", ""type"": ""attack"", ""category"": ""spell"", ""attack"": { ""damage"": 1, ""damageType"": ""psychic"", ""range"": 2 } }"));
             string errors = ContentFixtures.ErrorsOf(files);
-            Assert.Contains("classes/odd.json: class 'odd' stat 'power.psychic' uses undeclared damage type 'psychic'", errors);
+            Assert.Contains("items/odd.json: item 'odd' stat 'power.psychic' uses undeclared damage type 'psychic'", errors);
             Assert.Contains("abilities/mind.json: attack 'mind' uses undeclared damage type 'psychic'", errors);
         }
 
@@ -172,9 +192,9 @@ namespace Mimas.Core.Tests
         public void ShippedData_LoadsWithStatsAttacksAndModifiers()
         {
             var catalog = ContentFixtures.RepoCatalog();
-            Assert.Equal(20, catalog.Classes.Get("warrior").Stats.Hp);
-            Assert.Equal(3, catalog.Classes.Get("mage").Stats.Ap);
-            Assert.Equal("magic", catalog.GetAttack("fire-bolt").DamageType);
+            Assert.Equal(20, catalog.Rules.BaseStats.Hp);
+            Assert.Equal(8, catalog.Items.Get("leather-jerkin").Stats.Hp);
+            Assert.Equal("spell", catalog.GetAttack("fire-bolt").DamageType);
             Assert.Equal(2, catalog.GetAttack("fire-bolt").Cost);
             Assert.Equal(new[] { "high-ground" }, catalog.Rules.GlobalModifierIds);
             Assert.True(catalog.Modifiers.Get("ward-of-feathers").IsHidden);
@@ -229,7 +249,7 @@ namespace Mimas.Core.Tests
             Assert.Equal(-1, line.Amount);
 
             // Melee is not covered by the forest. Brute (player 1) attacks the archer standing in the forest.
-            var melee = CombatFixtures.Started(catalog, new MatchSetup("field-3", "archer", "brute", firstPlayer: 1), Forest, new Hex(1, 0));
+            var melee = CombatFixtures.Started(catalog, new MatchSetup("field-3", CombatFixtures.Archer, CombatFixtures.Brute, firstPlayer: 1), Forest, new Hex(1, 0));
             Assert.Null(melee.ResolveAttackFully(1, "strike", Forest).FindModifier("forest-cover"));
         }
 

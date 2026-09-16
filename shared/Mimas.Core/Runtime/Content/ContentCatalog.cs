@@ -10,10 +10,10 @@ namespace Mimas.Core.Content
     /// immutable afterwards. The single place code looks up an id.
     ///
     /// Loading is two-phase. Phase 1 parses each file on its own and records errors against that file.
-    /// Phase 2 links: class ability ids must exist, class stat keys must name declared damage types,
-    /// attack damage types must be declared, movement terrain overrides must name real terrains, terrain
-    /// and map-hex modifiers and global modifiers must exist, every map must build (symmetry, spawns,
-    /// connectivity). All errors are collected and thrown together as one
+    /// Phase 2 links: item and innate ability ids must exist, a weapon must grant an attack, item and base
+    /// stat keys must name declared damage types, attack damage types must be declared, movement terrain
+    /// overrides must name real terrains, terrain and map-hex modifiers and global modifiers must exist,
+    /// every map must build (symmetry, spawns, connectivity). All errors are collected and thrown together as one
     /// <see cref="ContentLoadException"/>. Unknown files are errors too: the catalogue fails closed rather
     /// than silently ignoring a misplaced definition.
     ///
@@ -26,14 +26,14 @@ namespace Mimas.Core.Content
         public const string TimeControlsFile = "timecontrols.json";
         public const string RulesFile = "rules.json";
         public const string AbilitiesFolder = "abilities/";
-        public const string ClassesFolder = "classes/";
+        public const string ItemsFolder = "items/";
         public const string MapsFolder = "maps/";
         public const string ModifiersFolder = "modifiers/";
 
         public RulesDef Rules { get; }
         public TerrainSet Terrains { get; }
         public DefinitionTable<AbilityDef> Abilities { get; }
-        public DefinitionTable<ClassDef> Classes { get; }
+        public DefinitionTable<ItemDef> Items { get; }
         public DefinitionTable<MapData> Maps { get; }
         public DefinitionTable<TimeControlDef> TimeControls { get; }
         public DefinitionTable<ModifierDef> Modifiers { get; }
@@ -51,7 +51,7 @@ namespace Mimas.Core.Content
             RulesDef rules,
             TerrainSet terrains,
             DefinitionTable<AbilityDef> abilities,
-            DefinitionTable<ClassDef> classes,
+            DefinitionTable<ItemDef> items,
             DefinitionTable<MapData> maps,
             DefinitionTable<TimeControlDef> timeControls,
             DefinitionTable<ModifierDef> modifiers,
@@ -62,7 +62,7 @@ namespace Mimas.Core.Content
             Rules = rules;
             Terrains = terrains;
             Abilities = abilities;
-            Classes = classes;
+            Items = items;
             Maps = maps;
             TimeControls = timeControls;
             Modifiers = modifiers;
@@ -83,6 +83,17 @@ namespace Mimas.Core.Content
         {
             AbilityDef def;
             return Abilities.TryGet(id, out def) ? def as AttackDef : null;
+        }
+
+        /// <summary>The item, or throws ArgumentException naming the slot when the id is unknown or in the wrong slot.</summary>
+        public ItemDef GetItemForSlot(string slot, string itemId)
+        {
+            ItemDef def;
+            if (!Items.TryGet(itemId, out def))
+                throw new ArgumentException($"Unknown item '{itemId}' for slot '{slot}'.", nameof(itemId));
+            if (def.Slot != slot)
+                throw new ArgumentException($"Item '{itemId}' fills slot '{def.Slot}', not '{slot}'.", nameof(itemId));
+            return def;
         }
 
         /// <summary>Loads and links a content set. Throws <see cref="ContentLoadException"/> listing every problem.</summary>
@@ -106,12 +117,12 @@ namespace Mimas.Core.Content
             RulesDef rules = null;
             TerrainSet terrains = null;
             var abilities = new List<AbilityDef>();
-            var classes = new List<ClassDef>();
+            var items = new List<ItemDef>();
             var maps = new List<MapData>();
             var modifiers = new List<ModifierDef>();
             var timeControls = new List<TimeControlDef>();
             var abilityFiles = new Dictionary<string, string>(StringComparer.Ordinal);
-            var classFiles = new Dictionary<string, string>(StringComparer.Ordinal);
+            var itemFiles = new Dictionary<string, string>(StringComparer.Ordinal);
             var mapFiles = new Dictionary<string, string>(StringComparer.Ordinal);
             var modifierFiles = new Dictionary<string, string>(StringComparer.Ordinal);
 
@@ -142,11 +153,11 @@ namespace Mimas.Core.Content
                         if (!RegisterId(abilityFiles, def.Id, path, "ability", errors)) continue;
                         abilities.Add(def);
                     }
-                    else if (path.StartsWith(ClassesFolder, StringComparison.Ordinal))
+                    else if (path.StartsWith(ItemsFolder, StringComparison.Ordinal))
                     {
-                        var def = ClassDef.FromJson(f.Text);
-                        if (!RegisterId(classFiles, def.Id, path, "class", errors)) continue;
-                        classes.Add(def);
+                        var def = ItemDef.FromJson(f.Text);
+                        if (!RegisterId(itemFiles, def.Id, path, "item", errors)) continue;
+                        items.Add(def);
                     }
                     else if (path.StartsWith(MapsFolder, StringComparison.Ordinal))
                     {
@@ -162,7 +173,7 @@ namespace Mimas.Core.Content
                     }
                     else
                     {
-                        errors.Add(new ContentError(path, "unrecognised content file: expected terrains.json, rules.json, timecontrols.json, or a file under abilities/, classes/, maps/ or modifiers/."));
+                        errors.Add(new ContentError(path, "unrecognised content file: expected terrains.json, rules.json, timecontrols.json, or a file under abilities/, items/, maps/ or modifiers/."));
                     }
                 }
                 catch (MapLoadException e)
@@ -235,14 +246,21 @@ namespace Mimas.Core.Content
                         errors.Add(new ContentError(abilityFiles[ability.Id], $"attack '{ability.Id}' uses undeclared damage type '{attack.DamageType}' (rules.json damageTypes: {string.Join(", ", rules.DamageTypes)})."));
                 }
 
-                foreach (var cls in classes)
+                foreach (var item in items)
                 {
-                    foreach (var entry in cls.Stats.Entries)
+                    foreach (var entry in item.Stats.Entries)
                     {
                         string type = StatBlock.DamageTypeOf(entry.Key);
                         if (type != null && !rules.IsDamageType(type))
-                            errors.Add(new ContentError(classFiles[cls.Id], $"class '{cls.Id}' stat '{entry.Key}' uses undeclared damage type '{type}'."));
+                            errors.Add(new ContentError(itemFiles[item.Id], $"item '{item.Id}' stat '{entry.Key}' uses undeclared damage type '{type}'."));
                     }
+                }
+
+                foreach (var entry in rules.BaseStats.Entries)
+                {
+                    string type = StatBlock.DamageTypeOf(entry.Key);
+                    if (type != null && !rules.IsDamageType(type))
+                        errors.Add(new ContentError(RulesFile, $"rules.baseStats '{entry.Key}' uses undeclared damage type '{type}'."));
                 }
 
                 foreach (var modifier in modifiers)
@@ -259,19 +277,40 @@ namespace Mimas.Core.Content
             foreach (var a in abilities) abilityIds.Add(a.Id);
             var movementIds = new HashSet<string>(StringComparer.Ordinal);
             foreach (var a in abilities) if (a is MovementDef) movementIds.Add(a.Id);
+            var attackIds = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var a in abilities) if (a is AttackDef) attackIds.Add(a.Id);
 
-            foreach (var cls in classes)
+            if (rules != null)
             {
-                bool hasMovement = false;
-                foreach (string abilityId in cls.AbilityIds)
+                bool innateMovement = false;
+                foreach (string abilityId in rules.InnateAbilityIds)
                 {
                     if (!abilityIds.Contains(abilityId))
-                        errors.Add(new ContentError(classFiles[cls.Id], $"class '{cls.Id}' references unknown ability '{abilityId}'."));
+                        errors.Add(new ContentError(RulesFile, $"rules reference unknown innate ability '{abilityId}'."));
                     else if (movementIds.Contains(abilityId))
-                        hasMovement = true;
+                        innateMovement = true;
                 }
-                if (!hasMovement)
-                    errors.Add(new ContentError(classFiles[cls.Id], $"class '{cls.Id}' has no movement ability; every class needs at least one (usually 'move')."));
+                if (!innateMovement)
+                    errors.Add(new ContentError(RulesFile, "rules.innateAbilities must include at least one movement ability (usually 'move')."));
+            }
+
+            foreach (var item in items)
+            {
+                bool hasAttack = false;
+                foreach (string abilityId in item.AbilityIds)
+                {
+                    if (!abilityIds.Contains(abilityId))
+                    {
+                        errors.Add(new ContentError(itemFiles[item.Id], $"item '{item.Id}' references unknown ability '{abilityId}'."));
+                        continue;
+                    }
+                    if (rules != null && rules.IsInnateAbility(abilityId))
+                        errors.Add(new ContentError(itemFiles[item.Id], $"item '{item.Id}' grants '{abilityId}', which is already innate (rules.innateAbilities)."));
+                    if (attackIds.Contains(abilityId))
+                        hasAttack = true;
+                }
+                if (item.Slot == ItemSlots.Weapon && !hasAttack)
+                    errors.Add(new ContentError(itemFiles[item.Id], $"item '{item.Id}' is a weapon but grants no attack ability."));
             }
 
             if (errors.Count > 0) throw new ContentLoadException(errors);
@@ -288,7 +327,7 @@ namespace Mimas.Core.Content
                 rules,
                 terrains,
                 sortedAbilities,
-                new DefinitionTable<ClassDef>(classes),
+                new DefinitionTable<ItemDef>(items),
                 new DefinitionTable<MapData>(maps),
                 new DefinitionTable<TimeControlDef>(timeControls),
                 new DefinitionTable<ModifierDef>(modifiers),

@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "id": "ember-circlet",
+  "name": "Ember Circlet",
+  "slot": "crown",
+  "kind": "circlet",
+  "description": "A thin band of warm bronze. Holds two spells.",
+  "stats": { "power.spell": 3 },
+  "abilities": ["fire-bolt", "arcane-spark"],
+  "tags": ["crown"],
+  "icon": "ember-circlet"
+}

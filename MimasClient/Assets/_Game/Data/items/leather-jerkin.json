@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "id": "leather-jerkin",
+  "name": "Leather Jerkin",
+  "slot": "armour",
+  "kind": "leather",
+  "description": "Boiled leather over padding. Turns a little of everything.",
+  "stats": { "hp": 8, "defense.weapon": 2, "defense.spell": 2 },
+  "abilities": [],
+  "tags": ["armour"],
+  "icon": "leather-jerkin"
+}

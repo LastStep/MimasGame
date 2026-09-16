@@ -6,29 +6,42 @@ using Newtonsoft.Json.Linq;
 namespace Mimas.Core.Data
 {
     /// <summary>
-    /// Match-wide knobs from <c>rules.json</c>: the damage lanes every stat key and attack must use, and
-    /// the modifiers that apply to every attack (height advantage lives here as data, not as a special
-    /// case in the calculator). One file, loaded once, required.
+    /// Match-wide knobs from <c>rules.json</c>: the damage lanes every stat key and attack must use, the
+    /// stats and abilities every hero has before gear, and the modifiers that apply to every attack
+    /// (height advantage lives here as data, not as a special case in the calculator). One file, loaded
+    /// once, required.
     /// </summary>
     public sealed class RulesDef
     {
         private readonly List<string> _damageTypes;
         private readonly List<string> _globalModifierIds;
+        private readonly List<string> _innateAbilityIds;
 
-        /// <summary>Damage lanes in authored order (e.g. melee, ranged, magic).</summary>
+        /// <summary>Damage lanes in authored order (weapon, spell).</summary>
         public IReadOnlyList<string> DamageTypes => _damageTypes;
 
         /// <summary>Modifier ids evaluated for every attack, in authored order.</summary>
         public IReadOnlyList<string> GlobalModifierIds => _globalModifierIds;
 
-        public RulesDef(List<string> damageTypes, List<string> globalModifierIds)
+        /// <summary>Stats every hero starts with before gear (rules.json baseStats).</summary>
+        public StatBlock BaseStats { get; }
+
+        /// <summary>Ability ids every hero has regardless of gear (rules.json innateAbilities), authored order.</summary>
+        public IReadOnlyList<string> InnateAbilityIds => _innateAbilityIds;
+
+        public RulesDef(List<string> damageTypes, List<string> globalModifierIds, StatBlock baseStats, List<string> innateAbilityIds)
         {
             if (damageTypes == null || damageTypes.Count == 0) throw new ArgumentException("At least one damage type is required.", nameof(damageTypes));
+            if (innateAbilityIds == null || innateAbilityIds.Count == 0) throw new ArgumentException("At least one innate ability is required.", nameof(innateAbilityIds));
             _damageTypes = new List<string>(damageTypes);
             _globalModifierIds = globalModifierIds != null ? new List<string>(globalModifierIds) : new List<string>();
+            BaseStats = baseStats ?? throw new ArgumentNullException(nameof(baseStats));
+            _innateAbilityIds = new List<string>(innateAbilityIds);
         }
 
         public bool IsDamageType(string type) => type != null && _damageTypes.Contains(type);
+
+        public bool IsInnateAbility(string abilityId) => abilityId != null && _innateAbilityIds.Contains(abilityId);
 
         public static RulesDef FromJson(string json)
         {
@@ -50,7 +63,15 @@ namespace Mimas.Core.Data
             var damageTypes = MapJson.RequireStringList(root, "damageTypes", "rules");
             if (damageTypes.Count == 0) throw new MapLoadException("rules field 'damageTypes' must list at least one damage type.");
             var globals = MapJson.OptionalStringList(root, "globalModifiers", "rules");
-            return new RulesDef(damageTypes, globals);
+
+            if (!(MapJson.Require(root, "baseStats", "rules") is JObject baseStatsObj))
+                throw new MapLoadException("rules field 'baseStats' must be an object.");
+            StatBlock baseStats = StatBlock.FromJsonAt(baseStatsObj, "rules.baseStats", true);
+
+            var innate = MapJson.RequireStringList(root, "innateAbilities", "rules");
+            if (innate.Count == 0) throw new MapLoadException("rules field 'innateAbilities' must list at least one ability id.");
+
+            return new RulesDef(damageTypes, globals, baseStats, innate);
         }
     }
 }

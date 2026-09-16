@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "id": "aimed-shot",
+  "name": "Aimed Shot",
+  "type": "attack",
+  "category": "weapon",
+  "icon": "aimed-shot",
+  "description": "A drawn, steady shot. Twice the cost, twice the arrow.",
+  "cost": 2,
+  "attack": { "damage": 6, "damageType": "weapon", "range": 5 }
+}
