@@ -1,6 +1,6 @@
 # Mimas — guide for Claude Code
 
-Mimas is a browser-based, 1v1 online, turn-based tactics game (hex tiles, 3D characters, hidden information, ladder of maps, TFT-style boons). Read `docs/design.md` for the vision and `docs/decisions.md` before proposing architecture changes.
+Mimas is a browser-based, 1v1 online, turn-based tactics game (hex tiles, 3D characters, hidden information, ladder of maps, TFT-style boons). **`docs/design/index.html` is the design source of truth** (open it in a browser; grep it by `id="…"` anchors). Read the section you are about to touch before any work, and `docs/decisions.md` before proposing architecture changes.
 
 ## Repo layout
 
@@ -25,6 +25,7 @@ Mimas is a browser-based, 1v1 online, turn-based tactics game (hex tiles, 3D cha
 8. Renamed serialized fields get `[FormerlySerializedAs("_old")]`. Compare `UnityEngine.Object` with `== null` (never `is null` / `?.`).
 9. Web build constraints: WebGL2 only (no compute shaders → **no VFX Graph**, use Shuriken particles), no managed threads, no synchronous GPU readback, Brotli compression, Managed Stripping High (keep `link.xml` updated when adding reflection-based types).
 10. Never commit `Library/`, `Temp/`, `obj/`, `bin/`, `Logs/`, `Build*/`, `UserSettings/`.
+11. **Design first, no drift.** Nothing is built that is not in `docs/design/index.html` with status `decided` or `proposed`. Before implementing, cite the anchor (e.g. `design/index.html#boons`) and follow its rules and vocabulary (Boon = Blessing / Enchant / Sigil; lanes = weapon / spell; gear = weapon / crown / boots / armour; no classes). If the design is silent, add a `proposed` section or an open question there and ask; never invent a rule in code. When code and design disagree, set that section's `data-impl="drift"` with a `.drift-note`, or fix the code. When you implement a section, flip its `data-impl`. Log design decisions in the page's decision log and architectural ones as ADRs.
 
 ## Commands
 
@@ -62,9 +63,9 @@ unity build MimasClient --profile "Web Release" --output-path Build/Web   # exit
 
 ## Workflow for a feature
 
-1. Read the relevant `docs/*.md`. If the design is unclear, ask — do not invent rules.
+1. Read the relevant section of `docs/design/index.html` (and `docs/data.md` for schemas). If the design is unclear or missing, add a `proposed` section / open question there and ask — do not invent rules.
 2. Write/adjust JSON data + `docs/data.md` if data changes.
 3. Implement in Core with tests → `dotnet test` green.
 4. Server: wire message handlers; integration test with two fake clients.
 5. Client: presentation only, via Unity CLI; check `get_console_logs`.
-6. Update `docs/decisions.md` if you made an architectural choice.
+6. Update `docs/design/index.html` statuses (`data-impl`, drift notes, changelog) and `docs/decisions.md` if you made an architectural choice.

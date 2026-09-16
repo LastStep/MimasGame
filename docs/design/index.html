@@ -1,0 +1,1043 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mimas Design</title>
+<meta name="description" content="Source of truth for what Mimas is: every game concept, how it links to the others, what is decided, proposed or open, and whether the code matches.">
+<style>
+:root{
+  --bg:#f7f5f0; --panel:#ffffff; --ink:#1d1b17; --muted:#6b675e; --line:#e2ddd3; --accent:#8a4b1c; --accent-ink:#ffffff;
+  --code-bg:#f0ece4; --hl:#fff3c4;
+  --decided:#2b7a3d; --proposed:#a86b00; --open:#b3261e; --superseded:#6b675e;
+  --implemented:#2b7a3d; --partial:#a86b00; --not-started:#8c877d; --drift:#b3261e;
+  --sidebar-w:300px; --font:"Segoe UI",system-ui,-apple-system,sans-serif; --mono:Consolas,"SF Mono",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#171614; --panel:#1f1e1b; --ink:#ece8df; --muted:#a49f93; --line:#33302a; --accent:#e0a068; --accent-ink:#171614;
+  --code-bg:#26241f; --hl:#4a3f14;
+  --decided:#5fc274; --proposed:#e8b04a; --open:#ff7a70; --superseded:#a49f93;
+  --implemented:#5fc274; --partial:#e8b04a; --not-started:#8c877d; --drift:#ff7a70;
+}}
+:root[data-theme="dark"]{
+  --bg:#171614; --panel:#1f1e1b; --ink:#ece8df; --muted:#a49f93; --line:#33302a; --accent:#e0a068; --accent-ink:#171614;
+  --code-bg:#26241f; --hl:#4a3f14;
+  --decided:#5fc274; --proposed:#e8b04a; --open:#ff7a70; --superseded:#a49f93;
+  --implemented:#5fc274; --partial:#e8b04a; --not-started:#8c877d; --drift:#ff7a70;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth; scroll-padding-top:72px}
+body{margin:0; background:var(--bg); color:var(--ink); font:15px/1.55 var(--font)}
+a{color:var(--accent); text-decoration:none} a:hover{text-decoration:underline}
+code,pre{font-family:var(--mono); font-size:13px}
+code{background:var(--code-bg); padding:1px 5px; border-radius:4px}
+pre{background:var(--code-bg); padding:12px 14px; border-radius:8px; overflow:auto; line-height:1.45}
+pre code{background:none; padding:0}
+table{border-collapse:collapse; width:100%; margin:8px 0 16px; font-size:14px}
+th,td{border:1px solid var(--line); padding:6px 9px; text-align:left; vertical-align:top}
+th{background:var(--code-bg)}
+h1{font-size:26px; margin:0 0 4px}
+h2{font-size:22px; margin:0; letter-spacing:-.01em}
+h3{font-size:15px; margin:20px 0 6px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted)}
+h4{font-size:15px; margin:14px 0 4px}
+p{margin:8px 0}
+ul,ol{margin:6px 0 10px; padding-left:22px} li{margin:3px 0}
+hr{border:0; border-top:1px solid var(--line); margin:24px 0}
+
+/* layout */
+.topbar{position:sticky; top:0; z-index:20; display:flex; align-items:center; gap:10px; padding:10px 16px; background:var(--panel); border-bottom:1px solid var(--line)}
+.topbar .brand{font-weight:700; letter-spacing:.02em}
+.topbar .brand small{color:var(--muted); font-weight:400; margin-left:8px}
+.topbar .spacer{flex:1}
+.topbar button{background:none; border:1px solid var(--line); color:var(--ink); border-radius:6px; padding:5px 10px; cursor:pointer; font:inherit; font-size:13px}
+#menu-btn{display:none}
+.wrap{display:flex; min-height:calc(100vh - 50px)}
+nav.side{width:var(--sidebar-w); flex:none; position:sticky; top:50px; height:calc(100vh - 50px); overflow:auto; border-right:1px solid var(--line); background:var(--panel); padding:12px 10px 40px}
+main{flex:1; min-width:0; padding:24px 32px 120px; max-width:980px}
+@media (max-width:900px){
+  #menu-btn{display:inline-block}
+  nav.side{position:fixed; left:0; top:50px; transform:translateX(-100%); transition:transform .2s; z-index:15; width:min(320px,90vw)}
+  nav.side.open{transform:none; box-shadow:0 0 0 100vw rgba(0,0,0,.35)}
+  main{padding:16px 16px 100px}
+}
+/* sidebar */
+nav.side input{width:100%; padding:7px 9px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--ink); font:inherit; font-size:13px; margin-bottom:8px}
+.chips{display:flex; flex-wrap:wrap; gap:4px; margin:0 0 10px}
+.chip{font-size:11px; padding:2px 7px; border-radius:99px; border:1px solid var(--line); cursor:pointer; user-select:none; color:var(--muted)}
+.chip.on{color:var(--ink); border-color:currentColor}
+.chip[data-v="decided"].on,.chip[data-v="implemented"].on{color:var(--decided)}
+.chip[data-v="proposed"].on,.chip[data-v="partial"].on{color:var(--proposed)}
+.chip[data-v="open"].on,.chip[data-v="drift"].on{color:var(--open)}
+.chip[data-v="superseded"].on,.chip[data-v="not-started"].on{color:var(--superseded)}
+nav.side .grp{font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin:12px 6px 4px}
+nav.side a.item{display:flex; align-items:center; gap:7px; padding:4px 6px; border-radius:5px; color:var(--ink); font-size:13.5px}
+nav.side a.item:hover{background:var(--code-bg); text-decoration:none}
+nav.side a.item.active{background:var(--code-bg); font-weight:600}
+nav.side a.item.hidden{display:none}
+.dot{width:8px; height:8px; border-radius:50%; flex:none; background:var(--muted)}
+.dot.decided{background:var(--decided)} .dot.proposed{background:var(--proposed)} .dot.open{background:var(--open)} .dot.superseded{background:var(--superseded)}
+.impl-mark{margin-left:auto; font-size:10px; color:var(--muted); letter-spacing:.04em}
+.impl-mark.drift{color:var(--drift); font-weight:700}
+.impl-mark.implemented{color:var(--implemented)} .impl-mark.partial{color:var(--partial)}
+
+/* sections */
+section.concept{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:20px 24px; margin:0 0 22px}
+section.concept.hidden{display:none}
+section.concept:target{box-shadow:0 0 0 3px var(--accent)}
+section.concept>header{display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-bottom:6px}
+section.concept>header .anchor{color:var(--muted); font-size:12px; font-family:var(--mono)}
+.badge{font-size:11px; font-weight:600; padding:2px 8px; border-radius:99px; color:#fff; letter-spacing:.03em; text-transform:uppercase}
+.badge.decided{background:var(--decided)} .badge.proposed{background:var(--proposed)} .badge.open{background:var(--open)} .badge.superseded{background:var(--superseded)}
+.badge.implemented{background:var(--implemented)} .badge.partial{background:var(--partial)} .badge.not-started{background:var(--not-started)} .badge.drift{background:var(--drift)}
+:root[data-theme="dark"] .badge, :root:not([data-theme="light"]) .badge{color:#171614}
+@media (prefers-color-scheme: light){ :root:not([data-theme="dark"]) .badge{color:#fff} }
+:root[data-theme="light"] .badge{color:#fff}
+.lead{font-size:16px; margin:4px 0 8px}
+.drift-note{border-left:4px solid var(--drift); background:var(--code-bg); padding:8px 12px; border-radius:0 8px 8px 0; margin:10px 0}
+.note{border-left:4px solid var(--accent); background:var(--code-bg); padding:8px 12px; border-radius:0 8px 8px 0; margin:10px 0}
+.open-q{border:1px dashed var(--open); border-radius:8px; padding:6px 14px 8px; margin-top:14px}
+.open-q h3{color:var(--open); margin-top:8px}
+.open-q li{margin:5px 0}
+.open-q li .qid{font-family:var(--mono); font-size:12px; color:var(--muted); margin-right:6px}
+.src{color:var(--muted); font-size:12.5px; margin-top:14px}
+.backlinks{font-size:12.5px; color:var(--muted); margin-top:10px; padding-top:8px; border-top:1px dashed var(--line)}
+.backlinks a{margin-right:8px}
+.grp-title{margin:36px 0 12px; font-size:13px; text-transform:uppercase; letter-spacing:.1em; color:var(--muted)}
+.kv{display:grid; grid-template-columns:max-content 1fr; gap:4px 14px; margin:8px 0}
+.kv b{font-weight:600}
+.small{font-size:13px; color:var(--muted)}
+.pill{display:inline-block; font-size:11.5px; border:1px solid var(--line); border-radius:99px; padding:1px 8px; margin:2px 2px 2px 0; color:var(--muted)}
+mark{background:var(--hl); color:inherit; padding:0 2px}
+figure{margin:12px 0} figure svg{width:100%; height:auto; display:block} figcaption{font-size:12.5px; color:var(--muted); margin-top:4px}
+.two{display:grid; grid-template-columns:1fr 1fr; gap:16px} @media (max-width:700px){.two{grid-template-columns:1fr}}
+#drift-table:empty::after{content:"No drift recorded."; color:var(--muted)}
+.legend{display:flex; flex-wrap:wrap; gap:14px; font-size:13px; margin:8px 0}
+.legend span{display:inline-flex; align-items:center; gap:6px}
+@media print{ nav.side,.topbar{display:none} main{max-width:none; padding:0} section.concept{break-inside:avoid; border:0; padding:0 0 20px} }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <button id="menu-btn" aria-label="Menu">☰</button>
+  <span class="brand">Mimas Design <small>source of truth · v0.2 · 16 Sep 2026</small></span>
+  <span class="spacer"></span>
+  <button id="theme-btn" title="Toggle theme">◐</button>
+</div>
+<div class="wrap">
+<nav class="side" id="side">
+  <input id="search" type="search" placeholder="Filter concepts…" aria-label="Filter concepts">
+  <div class="chips" id="chips-design" title="Design status">
+    <span class="chip on" data-k="design" data-v="decided">decided</span>
+    <span class="chip on" data-k="design" data-v="proposed">proposed</span>
+    <span class="chip on" data-k="design" data-v="open">open</span>
+    <span class="chip on" data-k="design" data-v="superseded">superseded</span>
+  </div>
+  <div class="chips" id="chips-impl" title="Code status">
+    <span class="chip on" data-k="impl" data-v="implemented">in code</span>
+    <span class="chip on" data-k="impl" data-v="partial">partial</span>
+    <span class="chip on" data-k="impl" data-v="not-started">not started</span>
+    <span class="chip on" data-k="impl" data-v="drift">drift</span>
+  </div>
+  <div id="nav"></div>
+</nav>
+
+<main>
+
+<!-- ============================================================ -->
+<div class="grp-title" data-group="Start here">Start here</div>
+
+<section class="concept" id="how-to-use" data-design="decided" data-impl="implemented" data-title="How to use this document">
+<header><h2>How to use this document</h2></header>
+<p class="lead">This page is the single source of truth for <em>what Mimas is</em>. Nothing gets built that is not written here first. Code that disagrees with this page is a bug in the code or a missing decision here, never a silent new rule.</p>
+<h3>The contract</h3>
+<ol>
+  <li><b>Design first.</b> Before any Core, Server or Client work, the concept it touches must exist here with status <span class="badge decided">decided</span> or <span class="badge proposed">proposed</span>. If it does not, add it (as <em>proposed</em>) and get it confirmed, or log a question in the section's <em>Open questions</em> block.</li>
+  <li><b>Every concept has two statuses.</b> <em>Design</em>: decided (Rohan confirmed), proposed (a default written by Claude, not yet confirmed), open (no default is safe), superseded (replaced; kept for history). <em>Code</em>: in code, partial, not started, drift (the code implements something different from this page).</li>
+  <li><b>Drift is loud.</b> When a section carries <span class="badge drift">drift</span>, the section says exactly what the code does instead and which change is planned. The <a href="#drift">drift register</a> is generated from these flags.</li>
+  <li><b>Link, do not repeat.</b> A rule lives in one section. Other sections link to it with <code>#anchor</code>. Backlinks ("Referenced by") are computed when the page loads, so cross references never go stale.</li>
+  <li><b>Numbers are data.</b> Balance values quoted here are the <em>current</em> JSON values and may change without a design decision. Formulas, slots, visibility rules and vocabulary may not.</li>
+  <li><b>Architecture goes to the ADR log.</b> Design decisions are recorded here in the <a href="#decisions">decision log</a>; architectural ones also get an ADR in <code>docs/decisions.md</code>. Data schemas are detailed in <code>docs/data.md</code>; this page only sketches them.</li>
+  <li><b>Anchors are stable.</b> Commit messages, ADRs and CLAUDE.md cite sections as <code>design/index.html#equipment</code>. Never rename an anchor; add a new section and mark the old one superseded.</li>
+</ol>
+<h3>Editing checklist (for Claude Code and Rohan)</h3>
+<ul>
+  <li>New concept: copy any <code>&lt;section class="concept"&gt;</code>, give it a unique <code>id</code>, <code>data-design</code>, <code>data-impl</code>, <code>data-title</code>, place it under the right group.</li>
+  <li>Changed rule: edit the rule, add a line to the <a href="#changelog">changelog</a>, update the statuses. If code now disagrees, set <code>data-impl="drift"</code> and add a <code>.drift-note</code>.</li>
+  <li>Answered question: delete the <code>&lt;li&gt;</code> from the section's open questions, write the answer into the rules, log it in the decision log.</li>
+  <li>Status vocabulary is closed. Do not invent a fifth design status.</li>
+</ul>
+<div class="legend">
+  <span><i class="dot decided"></i>decided</span><span><i class="dot proposed"></i>proposed</span><span><i class="dot open"></i>open</span><span><i class="dot superseded"></i>superseded</span>
+  <span class="small">Sidebar dot = design status, right-hand tag = code status.</span>
+</div>
+</section>
+
+<section class="concept" id="vision" data-design="decided" data-impl="partial" data-title="Vision and pillars">
+<header><h2>Vision and pillars</h2></header>
+<p class="lead">A browser-based 1v1 turn-based tactics duel on hex maps. A Baldur's Gate 3 fight distilled into a competitive, chess-like ladder game with hidden information and TFT-style power drafting. No story, pure play.</p>
+<h3>Pillars</h3>
+<table>
+<tr><th>#</th><th>Pillar</th><th>What it means in rules</th><th>Where</th></tr>
+<tr><td>1</td><td>PvP turn-based fighting</td><td>1v1, online matchmaking, alternating turns</td><td><a href="#turns">Turns</a>, <a href="#online">Online</a></td></tr>
+<tr><td>2</td><td>Strategy through positioning, build and modifiers</td><td>Depth comes from where you stand, what you equipped, which god you chose, what you drafted</td><td><a href="#board">Board</a>, <a href="#character">Character</a>, <a href="#boons">Boons</a></td></tr>
+<tr><td>3</td><td>Ladder of maps</td><td>A session walks through maps of rising complexity; each map brings its own effects</td><td><a href="#session">Session</a>, <a href="#maps">Maps</a></td></tr>
+<tr><td>4</td><td>Hex tile board</td><td>Controlled movement; tile effects: terrain modifiers, pickups (later)</td><td><a href="#board">Board</a>, <a href="#tile-effects">Tile effects</a></td></tr>
+<tr><td>5</td><td>Time controls as game modes</td><td>Bullet / blitz / rapid, like chess</td><td><a href="#time-controls">Time controls</a></td></tr>
+<tr><td>6</td><td>Carry-forward build</td><td>Gear, lineage and every drafted boon persist across rounds of a session</td><td><a href="#session">Session</a>, <a href="#boons">Boons</a></td></tr>
+<tr><td>7</td><td>Boon drafting</td><td>Between rounds choose one power from offered options (TFT augments)</td><td><a href="#draft">Draft</a></td></tr>
+<tr><td>8</td><td>Hidden information</td><td>Enemy abilities, lineage and boons are hidden until first used; once revealed, known for the rest of the session</td><td><a href="#hidden-info">Hidden information</a></td></tr>
+<tr><td>9</td><td>Browser-based, lean and responsive</td><td>Fast load, no UI lag, WebGL2</td><td><a href="#presentation">Presentation</a></td></tr>
+<tr><td>10</td><td>Clean in-game UI</td><td>Minimal HUD; depth through examine controls</td><td><a href="#hud">HUD</a></td></tr>
+<tr><td>11</td><td>Audio</td><td>Music that stays out of the way; SFX and VFX for feedback</td><td><a href="#audio-vfx">Audio and VFX</a></td></tr>
+<tr><td>12</td><td>Movement variety</td><td>Walk, jump, teleport, fly, granted by boots and sigils</td><td><a href="#movement">Movement</a>, <a href="#boots">Boots</a></td></tr>
+<tr><td>13</td><td>Camera</td><td>3D tilted view with a top-down toggle</td><td><a href="#camera">Camera</a></td></tr>
+<tr><td>14</td><td>Map symmetry</td><td>Maps are symmetrical; spawns opposite each other at maximum distance</td><td><a href="#maps">Maps</a></td></tr>
+<tr><td>15</td><td>No story</td><td>Lineages are flavour and mechanics, never narrative</td><td><a href="#lineage">Lineage</a></td></tr>
+</table>
+<h3>Reference games</h3>
+<p>Baldur's Gate 3 (tactical feel, camera), chess (time controls, ladder, clean information model), Teamfight Tactics (augment drafting), Hades (god-granted boon pools), Into the Breach (deterministic, readable combat).</p>
+<h3>Non-goals</h3>
+<ul><li>No campaign, no dialogue, no lore text beyond one line per item or boon.</li><li>No random damage. See <a href="#damage">Damage</a>.</li><li>No more than one hero per player at launch. The model is multi-unit ready but summons are a later boon idea.</li></ul>
+<p class="src">Source: notebook 14 Sep 2026; docs/design.md v0.1.</p>
+</section>
+
+<section class="concept" id="concept-map" data-design="decided" data-impl="implemented" data-title="Concept map">
+<header><h2>Concept map</h2></header>
+<p class="lead">How the systems fit together. Solid arrows: "is made of" or "produces". Dashed: "reads" or "constrains". Click a box to jump.</p>
+<figure>
+<svg viewBox="0 0 900 560" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, system-ui, sans-serif" font-size="13" fill="currentColor">
+<defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs>
+<style>.b{fill:var(--panel);stroke:currentColor;stroke-width:1.2;rx:8} .l{stroke:currentColor;stroke-width:1.2;fill:none;marker-end:url(#ar)} .d{stroke-dasharray:4 3} text{fill:currentColor} .t{font-weight:600}</style>
+<!-- session column -->
+<a href="#session"><rect class="b" x="20" y="20" width="150" height="40"/><text x="95" y="45" text-anchor="middle" class="t">Session (best of X)</text></a>
+<a href="#round"><rect class="b" x="20" y="90" width="150" height="40"/><text x="95" y="115" text-anchor="middle" class="t">Round (one map)</text></a>
+<a href="#turns"><rect class="b" x="20" y="160" width="150" height="40"/><text x="95" y="185" text-anchor="middle" class="t">Turn (3 AP, clock)</text></a>
+<a href="#draft"><rect class="b" x="20" y="250" width="150" height="40"/><text x="95" y="275" text-anchor="middle" class="t">Draft (between rounds)</text></a>
+<a href="#character-select"><rect class="b" x="20" y="330" width="150" height="40"/><text x="95" y="355" text-anchor="middle" class="t">Character select</text></a>
+<path class="l" d="M95 60V90"/><path class="l" d="M95 130V160"/><path class="l" d="M95 230V250"/><path class="l d" d="M95 370V400"/>
+<!-- board -->
+<a href="#board"><rect class="b" x="20" y="410" width="150" height="40"/><text x="95" y="435" text-anchor="middle" class="t">Board / Map</text></a>
+<a href="#maps"><rect class="b" x="20" y="480" width="150" height="40"/><text x="95" y="505" text-anchor="middle" class="t">Map ladder</text></a>
+<path class="l" d="M95 450V480"/>
+<path class="l d" d="M170 110 H200 V430 H170"/>
+<!-- character column -->
+<a href="#character"><rect class="b" x="260" y="160" width="160" height="40"/><text x="340" y="185" text-anchor="middle" class="t">Character</text></a>
+<a href="#equipment"><rect class="b" x="260" y="240" width="160" height="40"/><text x="340" y="265" text-anchor="middle" class="t">Gear (4 slots)</text></a>
+<a href="#lineage"><rect class="b" x="260" y="320" width="160" height="40"/><text x="340" y="345" text-anchor="middle" class="t">Divine lineage</text></a>
+<a href="#boons"><rect class="b" x="260" y="400" width="160" height="40"/><text x="340" y="425" text-anchor="middle" class="t">Boons</text></a>
+<a href="#stats"><rect class="b" x="260" y="60" width="160" height="40"/><text x="340" y="85" text-anchor="middle" class="t">Stats</text></a>
+<path class="l" d="M340 240V200"/><path class="l" d="M340 320V280"/><path class="l" d="M340 400V360"/><path class="l" d="M340 160V100"/>
+<path class="l d" d="M170 350 H260"/><path class="l d" d="M170 270 H260 V400"/>
+<!-- boon kinds -->
+<a href="#blessing"><rect class="b" x="460" y="380" width="110" height="34"/><text x="515" y="402" text-anchor="middle">Blessing</text></a>
+<a href="#enchant"><rect class="b" x="460" y="424" width="110" height="34"/><text x="515" y="446" text-anchor="middle">Enchant</text></a>
+<a href="#sigil"><rect class="b" x="460" y="468" width="110" height="34"/><text x="515" y="490" text-anchor="middle">Sigil</text></a>
+<path class="l" d="M420 420 H460 V397"/><path class="l" d="M420 420 H460 V441"/><path class="l" d="M420 420 H460 V485"/>
+<!-- abilities / damage column -->
+<a href="#abilities"><rect class="b" x="640" y="160" width="160" height="40"/><text x="720" y="185" text-anchor="middle" class="t">Abilities</text></a>
+<a href="#movement"><rect class="b" x="640" y="90" width="160" height="34"/><text x="720" y="112" text-anchor="middle">Movement</text></a>
+<a href="#attacks"><rect class="b" x="640" y="230" width="160" height="34"/><text x="720" y="252" text-anchor="middle">Attacks (weapon / spell)</text></a>
+<a href="#damage"><rect class="b" x="640" y="300" width="160" height="40"/><text x="720" y="325" text-anchor="middle" class="t">Damage</text></a>
+<a href="#modifiers"><rect class="b" x="640" y="380" width="160" height="40"/><text x="720" y="405" text-anchor="middle" class="t">Modifiers</text></a>
+<a href="#elements"><rect class="b" x="640" y="450" width="160" height="34"/><text x="720" y="472" text-anchor="middle">Elements</text></a>
+<path class="l" d="M720 160V124"/><path class="l" d="M720 200V230"/><path class="l" d="M720 264V300"/><path class="l d" d="M720 380V340"/><path class="l d" d="M720 450V420"/>
+<path class="l" d="M420 260 H640 V180"/>
+<path class="l" d="M570 485 H720 V200" opacity=".55"/>
+<path class="l d" d="M570 441 H640 V400"/>
+<path class="l d" d="M570 397 H620 V400 H640"/>
+<path class="l d" d="M420 80 H640 V320" opacity=".55"/>
+<path class="l d" d="M170 430 H600 V320 H640" opacity=".55"/>
+<!-- hidden info band -->
+<a href="#hidden-info"><rect class="b" x="260" y="20" width="540" height="24" rx="12"/><text x="530" y="37" text-anchor="middle">Hidden information: lineage, boons, abilities revealed on first use · gear and stats public</text></a>
+<a href="#presentation"><rect class="b" x="460" y="520" width="340" height="24" rx="12"/><text x="630" y="537" text-anchor="middle">Presentation: camera · HUD · examine · audio · VFX</text></a>
+</svg>
+<figcaption>Character = gear + lineage + boons. Gear and sigils grant abilities; abilities deal damage through the modifier pipeline; the board constrains movement and sight; the session loop drives drafts.</figcaption>
+</figure>
+</section>
+
+<section class="concept" id="glossary" data-design="decided" data-impl="implemented" data-title="Glossary">
+<header><h2>Glossary</h2></header>
+<p class="lead">One word per idea. If code or UI uses another word for the same idea, the code is wrong.</p>
+<table>
+<tr><th>Term</th><th>Meaning</th><th>Not to be confused with</th></tr>
+<tr><td><a href="#session">Session</a></td><td>One matchmade encounter between two players: best of X <em>rounds</em> across the map ladder.</td><td>"Match" in code (<code>MatchState</code>) is one round today; see drift note in <a href="#session">Session</a>.</td></tr>
+<tr><td><a href="#round">Round</a></td><td>One map, played until one hero dies.</td><td>Turn.</td></tr>
+<tr><td><a href="#turns">Turn</a></td><td>One player's action window: 3 AP, capped by the clock.</td><td>Round.</td></tr>
+<tr><td><a href="#character">Character</a> / hero</td><td>The single unit a player controls. Defined by gear, lineage and boons. There are no classes.</td><td>Class (superseded).</td></tr>
+<tr><td><a href="#equipment">Gear</a></td><td>The four equipped items: weapon, crown, boots, armour. Picked at character select, locked for the session.</td><td>Boons (which modify gear).</td></tr>
+<tr><td><a href="#lineage">Lineage</a></td><td>The divine pantheon a player prays to (Greek, Norse, Hindu). Grants a starting Blessing and defines the boon pool.</td><td>Class.</td></tr>
+<tr><td><a href="#boons">Boon</a></td><td>Umbrella term for anything a lineage grants: a Blessing, an Enchant or a Sigil. Drafted between rounds.</td><td>The notebook's narrow use of "boon" for item passives (now Enchant).</td></tr>
+<tr><td><a href="#blessing">Blessing</a></td><td>A boon that is a passive on the character (immune to fire, +max health).</td><td>Enchant.</td></tr>
+<tr><td><a href="#enchant">Enchant</a></td><td>A boon that changes a property of one equipped item (+range on bow, fire on crown).</td><td>Sigil.</td></tr>
+<tr><td><a href="#sigil">Sigil</a></td><td>A boon that adds a new active ability to one equipped item (triple shot on gun, blink on boots).</td><td>Enchant.</td></tr>
+<tr><td><a href="#abilities">Ability</a></td><td>Any active thing a unit can do for AP: a movement or an attack. Granted by gear or sigils.</td><td>Modifier (passive).</td></tr>
+<tr><td><a href="#modifiers">Modifier</a></td><td>A passive rule that changes a damage result under conditions. Owned by a unit, a terrain, a hex or the rules.</td><td>Ability.</td></tr>
+<tr><td><a href="#damage">Lane</a></td><td>Weapon or spell. Every attack is in exactly one lane; the lane picks the power stat and the armour defence.</td><td>Element.</td></tr>
+<tr><td><a href="#elements">Element</a></td><td>A modifier class (fire, frost, …) tagged on an attack; matched by resistances, immunities and riders.</td><td>Lane.</td></tr>
+<tr><td><a href="#stats">Strength / Magic / Armour</a></td><td>Display names for <code>power.weapon</code> / <code>power.spell</code> / <code>defense.weapon</code>+<code>defense.spell</code>.</td><td></td></tr>
+<tr><td><a href="#hidden-info">Reveal</a></td><td>The moment a hidden ability, boon or lineage becomes known to the opponent for the rest of the session.</td><td></td></tr>
+<tr><td><a href="#draft">Draft</a></td><td>The between-round screen where each player picks one boon from three offers.</td><td></td></tr>
+<tr><td><a href="#time-controls">Rope</a></td><td>The visual turn timer that burns down in the last seconds of a turn (Hearthstone).</td><td>Session clock.</td></tr>
+</table>
+</section>
+
+<!-- ============================================================ -->
+<div class="grp-title" data-group="Loop">Loop</div>
+
+<section class="concept" id="session" data-design="decided" data-impl="drift" data-title="Session">
+<header><h2>Session</h2></header>
+<p class="lead">A session is one matchmade encounter between two players. It is a best-of-X series of <a href="#round">rounds</a>, each on the next map of the <a href="#maps">ladder</a>, with a <a href="#draft">draft</a> between rounds. The build (gear, lineage, boons) carries forward for the whole session.</p>
+<h3>Rules</h3>
+<ol>
+  <li>A session starts after <a href="#online">matchmaking</a> pairs two players on the same <a href="#time-controls">time control</a>.</li>
+  <li>Both players go through <a href="#character-select">character select</a> before round 1. Selection is simultaneous and private.</li>
+  <li>Rounds are played on ladder maps in order: round 1 on ladder position 1, round 2 on position 2, and so on.</li>
+  <li>The session ends when one player has won the majority of rounds (<mark>best of 3 at launch</mark>, so first to 2). See <a href="#win-conditions">Win conditions</a>.</li>
+  <li>After every round except the last, both players <a href="#draft">draft</a> one boon.</li>
+  <li>Everything learned through <a href="#hidden-info">reveals</a> stays revealed for the rest of the session.</li>
+  <li>A player who leaves and does not reconnect within the grace period forfeits the session (see <a href="#online">Online</a>).</li>
+</ol>
+<div class="drift-note"><b>Drift.</b> Code has <code>MatchState</code> for one round and no series wrapper. <code>Mimas.Core.Match</code> is one round; a <code>Session</code> (series score, ladder index, per-player build, revealed sets that outlive a round) is not started. Planned for M3.</div>
+<h3>Depends on</h3>
+<ul><li><a href="#round">Round</a>, <a href="#draft">Draft</a>, <a href="#maps">Maps</a>, <a href="#character-select">Character select</a></li></ul>
+<div class="open-q"><h3>Open questions</h3><ul>
+<li id="q-session-length">Best of 3 vs best of 5 as the default, and whether the count depends on the time control (bullet = single round?).</li>
+<li id="q-session-map-order">Whether the ladder is strictly ordered or the server picks from a pool per ladder position.</li>
+</ul></div>
+<p class="src">Source: pillars 3 and 6; ADR-018 (revealed sets in state).</p>
+</section>
+
+<section class="concept" id="round" data-design="decided" data-impl="implemented" data-title="Round">
+<header><h2>Round</h2></header>
+<p class="lead">One map, played in alternating <a href="#turns">turns</a> until one hero dies. The round winner takes a series point.</p>
+<h3>Rules</h3>
+<ol>
+  <li>Each player has exactly one hero, spawned on their map spawn (<a href="#maps">p1 / p2</a>) at full health.</li>
+  <li><mark>Who moves first:</mark> round 1 by a seeded coin flip; then the loser of the previous round moves first (proposed).</li>
+  <li>The round ends the moment a hero reaches 0 health (<a href="#win-conditions">by damage or environment</a>).</li>
+  <li>Between rounds, health, AP and one-round states reset; gear, lineage, boons and revealed knowledge persist.</li>
+  <li>The round clock (see <a href="#time-controls">time controls</a>) restarts per round. A flag fall loses the round, not the session (proposed).</li>
+</ol>
+<div class="open-q"><h3>Open questions</h3><ul>
+<li id="q-round-first">Confirm first-mover rule: coin flip then loser-first, or alternate.</li>
+<li id="q-round-clock">Does the chess clock reset per round, or is one clock shared across the whole session?</li>
+<li id="q-round-flag">Flag fall = lose round or lose session?</li>
+</ul></div>
+<p class="src">Source: design v0.1 win conditions; ADR-015.</p>
+</section>
+
+<section class="concept" id="character-select" data-design="decided" data-impl="not-started" data-title="Character select">
+<header><h2>Character select</h2></header>
+<p class="lead">Before round 1, each player builds their hero in two steps, in this order: <b>1. pick gear</b> (one item for each of weapon, armour, crown, boots), <b>2. pick a divine lineage</b> to pray to. Simultaneous, private, on a timer.</p>
+<h3>Rules</h3>
+<ol>
+  <li>Step 1, gear: one item per <a href="#equipment">slot</a> from the full item catalogue. All four slots are mandatory. There are no classes; "warrior" and "mage" survive only as suggested presets in the UI.</li>
+  <li>Step 2, lineage: one of Greek, Norse, Hindu (<a href="#lineage">Lineage</a>). Shown after gear so the player can pick a god that suits the kit (the lineage's boon pool is filtered by owned gear).</li>
+  <li>The choice is locked for the session. Gear only changes through <a href="#enchant">Enchants</a> and <a href="#sigil">Sigils</a>.</li>
+  <li>Selection timer: <mark>60 s</mark> (proposed). Timing out picks the last preset the player used, or the default preset.</li>
+  <li>The opponent sees your gear at round start (<a href="#hidden-info">public</a>) but never your lineage or starting Blessing until revealed.</li>
+</ol>
+<h3>Screen sketch</h3>
+<p class="small">Left: four slot columns with the catalogue for that slot. Centre: the hero model wearing the picks, with the derived <a href="#stats">stat block</a> and ability list. Right: presets (save/load). "Continue" reveals a second panel of three lineage cards, each naming its starting Blessing and three example boons from its pool.</p>
+<div class="open-q"><h3>Open questions</h3><ul>
+<li id="q-select-catalogue">Is the whole item catalogue always available, or is there any unlock or ban/pick phase?</li>
+<li id="q-select-presets">Are presets stored per account (needs accounts, M5) or per browser?</li>
+</ul></div>
+<p class="src">Source: notebook 16 Sep 2026 ("choose your gear… then pick a divine lineage").</p>
+</section>
+
+<section class="concept" id="draft" data-design="decided" data-impl="not-started" data-title="Draft (between rounds)">
+<header><h2>Draft (between rounds)</h2></header>
+<p class="lead">After every round except the last, each player is offered <mark>three</mark> <a href="#boons">boons</a> from their <a href="#lineage">lineage</a>'s pool and keeps <mark>one</mark>. The pick is private and simultaneous.</p>
+<h3>Rules</h3>
+<ol>
+  <li>Offers are drawn with the session <a href="#determinism">seeded RNG</a>, so a replay reproduces them.</li>
+  <li>Only boons the player can use are offered: an <a href="#enchant">Enchant</a> or <a href="#sigil">Sigil</a> whose <code>requires</code> does not match the player's gear is excluded; a boon already owned is excluded unless it declares <code>stackable</code>.</li>
+  <li>Offers are one of each kind when possible (<mark>one Blessing, one Enchant, one Sigil</mark>, proposed); otherwise filled from what remains.</li>
+  <li>Draft timer: <mark>20 s</mark> (proposed). Timeout picks the first offer.</li>
+  <li>The pick is <a href="#hidden-info">hidden</a>. The opponent sees only that a pick was made.</li>
+  <li>Picks apply immediately and last for the session.</li>
+</ol>
+<div class="open-q"><h3>Open questions</h3><ul>
+<li id="q-draft-comeback">Comeback mechanic: does the round loser get a better offer (a tier up, or four options), or is the draft symmetric?</li>
+<li id="q-draft-tiers">Do boons have tiers/rarity (TFT silver/gold/prismatic) and does the tier depend on the round number?</li>
+<li id="q-draft-reroll">Is there a reroll?</li>
+</ul></div>
+<p class="src">Source: pillar 7; notebook 16 Sep 2026; round-2 answer "starting passive + lineage pool".</p>
+</section>
+
+<section class="concept" id="turns" data-design="decided" data-impl="implemented" data-title="Turns and action points">
+<header><h2>Turns and action points</h2></header>
+<p class="lead">Players alternate. On your turn your hero has <mark>3 AP</mark>; every <a href="#abilities">ability</a> has a flat AP cost and can be used as often as AP allows. Unspent AP is lost. End Turn passes early; the clock cap passes for you.</p>
+<h3>Rules</h3>
+<ol>
+  <li>Alternating turns, one actor at a time (ADR-015). No simultaneous planning, no initiative stat.</li>
+  <li>AP refreshes to the unit's <code>ap</code> stat at the start of its owner's turn (ADR-016). AP lives on the unit, not the player, so summons can arrive later.</li>
+  <li>An ability costs its <code>cost</code> (default 1, may be 0). No per-turn use limits other than AP; cheap repeatable attacks are a data balance lever.</li>
+  <li>Legal actions are enumerated by one function (<code>EnumerateLegal</code>) that the HUD, the server and bots all use, so they cannot disagree (ADR-018).</li>
+  <li>Reaching the per-turn clock cap with no action = skip. The server submits <code>EndTurnCommand(Timeout)</code> so replays need no clock.</li>
+  <li>An idle skip gives the next turn a short fuse (idle penalty) that resets the moment the player acts.</li>
+  <li><a href="#boons">Boons</a> may change <code>ap</code> or an ability's cost (e.g. a Blessing "+1 AP", an Enchant "Shot costs 1"). See <a href="#stats">Stats</a>.</li>
+</ol>
+<h3>Depends on</h3><ul><li><a href="#time-controls">Time controls</a>, <a href="#abilities">Abilities</a></li></ul>
+<p class="src">Source: ADR-015, ADR-016, ADR-018.</p>
+</section>
+
+<section class="concept" id="time-controls" data-design="decided" data-impl="partial" data-title="Time controls and clock">
+<header><h2>Time controls and clock</h2></header>
+<p class="lead">Game modes are chess-style time controls. Each player has a bank, an increment, and a per-turn cap. Presentation follows Hearthstone: no visible numbers, a rope in the last seconds.</p>
+<table>
+<tr><th>id</th><th>Name</th><th>Bank</th><th>Increment</th><th>Turn cap</th></tr>
+<tr><td>1+0</td><td>Bullet</td><td>60 s</td><td>0</td><td>20 s</td></tr>
+<tr><td>3+2</td><td>Blitz</td><td>180 s</td><td>2 s</td><td>45 s</td></tr>
+<tr><td>10+0</td><td>Rapid</td><td>600 s</td><td>0</td><td>90 s</td></tr>
+</table>
+<p class="small">Current values in <code>timecontrols.json</code>; balance data, not design.</p>
+<h3>Rules</h3>
+<ol>
+  <li>The server is the timekeeper; the client predicts and displays.</li>
+  <li>The rope appears for the final seconds of a turn and burns down; the bank is never shown as digits in the HUD (examine may show it).</li>
+  <li>Idle penalty: see <a href="#turns">Turns</a>.</li>
+  <li>Draft and character select timers are separate from the game clock.</li>
+</ol>
+<div class="drift-note"><b>Partial.</b> Time controls load and the local session fakes a clock with timeout-as-command. Server-side clocks and flag fall are M2.</div>
+<div class="open-q"><h3>Open questions</h3><ul>
+<li id="q-time-flag">See <a href="#q-round-flag">round: flag fall consequence</a> and <a href="#q-round-clock">clock per round vs per session</a>.</li>
+</ul></div>
+<p class="src">Source: pillar 5; ADR-015.</p>
+</section>
+
+<section class="concept" id="win-conditions" data-design="decided" data-impl="partial" data-title="Win conditions">
+<header><h2>Win conditions</h2></header>
+<ol>
+  <li><b>Round:</b> the opponent's hero reaches 0 health, by <a href="#damage">damage</a> or by the environment (<a href="#tile-effects">tile effects</a>, later).</li>
+  <li><b>Session:</b> majority of rounds (best of X, see <a href="#session">Session</a>).</li>
+  <li><b>Resign</b> concedes the session. <b>Flag fall</b>: see <a href="#q-round-flag">open question</a>.</li>
+  <li><b>Simultaneous death</b> (both heroes at 0 in the same resolution, possible once environment damage exists): <mark>the active player loses</mark> (proposed, punishes the reckless actor).</li>
+</ol>
+<div class="drift-note"><b>Partial.</b> Elimination win exists (<code>MatchEndedEvent</code>); resign, series score and simultaneous death are not in code.</div>
+<div class="open-q"><h3>Open questions</h3><ul><li id="q-win-draw">Confirm the simultaneous-death rule or allow a drawn round.</li></ul></div>
+</section>
+
+<!-- ============================================================ -->
+<div class="grp-title" data-group="Board">Board</div>
+
+<section class="concept" id="board" data-design="decided" data-impl="implemented" data-title="Board: hex tiles, terrain, height">
+<header><h2>Board: hex tiles, terrain, height</h2></header>
+<p class="lead">The board is any set of hex tiles (axial coordinates, cube math). Each tile has a terrain, an integer height and optionally a modifier. Shape is data: rings, boards, arenas are all just hex lists.</p>
+<h3>Rules</h3>
+<ol>
+  <li><b>Terrain</b> (<code>terrains.json</code>): <code>walkable</code>, <code>moveCost</code>, optional <code>modifiers[]</code> granted to whoever stands on it. Current: grass (walkable, 1), stone (blocking).</li>
+  <li><b>Height</b> is a rules value: walking may rise at most <code>maxClimb</code> per step; a jump is blocked by anything more than <code>jumpHeight</code> above the origin; <a href="#line-of-sight">line of sight</a> is blocked by tiles taller than both endpoints. Descending is never limited.</li>
+  <li><b>High ground</b>: attacking from a higher tile adds a public flat bonus (global modifier <code>high-ground</code>, currently +2). See <a href="#modifiers">Modifiers</a>.</li>
+  <li><b>Occupancy</b>: one living unit per tile; dead units occupy nothing.</li>
+  <li>All geometry is integer-exact (<code>HexLine</code>, ADR-013) so server and client agree bit for bit.</li>
+</ol>
+<h3>Depends on</h3><ul><li><a href="#maps">Maps</a>, <a href="#movement">Movement</a>, <a href="#line-of-sight">Line of sight</a></li></ul>
+<p class="src">Source: pillar 4; ADR-003, ADR-013; docs/data.md.</p>
+</section>
+
+<section class="concept" id="line-of-sight" data-design="decided" data-impl="implemented" data-title="Line of sight">
+<header><h2>Line of sight</h2></header>
+<p class="lead">Every attack, including melee, requires a clear line of sight to its target. Teleports may require it as a balance lever. Sight follows the exact hex line and is blocked by unwalkable tiles and by tiles taller than both endpoints.</p>
+<ol>
+  <li>A grazing line (through a hex edge or corner) is blocked if <em>either</em> flanking tile blocks (supercover). <code>Line(a,b)</code> equals <code>Line(b,a)</code>.</li>
+  <li>Units do not block sight (proposed; only one enemy unit exists, so it is moot at launch).</li>
+</ol>
+<div class="open-q"><h3>Open questions</h3><ul><li id="q-los-units">Should units block sight once summons or obstacles exist?</li></ul></div>
+<p class="src">Source: ADR-013; design v0.1 targeting decision.</p>
+</section>
+
+<section class="concept" id="maps" data-design="decided" data-impl="implemented" data-title="Maps and the ladder">
+<header><h2>Maps and the ladder</h2></header>
+<p class="lead">Maps are JSON hex lists with a declared symmetry, two spawns and a ladder position. Every shipped map is validated at boot: symmetric with matching terrain, spawns walkable and at maximal distance, all walkable tiles connected.</p>
+<ol>
+  <li>Symmetry: <code>rotational-180</code> implemented; <code>mirror-q</code> reserved.</li>
+  <li>Spawns are opposite each other at maximum walkable distance (pillar 14).</li>
+  <li><b>Ladder</b>: <code>ladderPosition</code> orders maps; lower positions are smaller and simpler, higher ones add height, pillars and (later) <a href="#tile-effects">tile effects</a>. Current: board-3 (position 1?), arena-4 (position 3).</li>
+  <li>Heights must be symmetric too (enforced by test only; loader check pending).</li>
+</ol>
+<div class="open-q"><h3>Open questions</h3><ul>
+<li id="q-maps-count">How many maps per ladder position for variety, and whether players see the next map before drafting.</li>
+</ul></div>
+<p class="src">Source: pillars 3, 14; ADR-014; docs/data.md.</p>
+</section>
+
+<section class="concept" id="tile-effects" data-design="open" data-impl="not-started" data-title="Tile effects and pickups">
+<header><h2>Tile effects and pickups</h2></header>
+<p class="lead">Pillar 4 promises tile effects: bonus pickups, hazards, terrain modifiers. Terrain modifiers exist (a terrain or a hex can grant a <a href="#modifiers">modifier</a> to whoever stands on it). Pickups and hazards are not designed.</p>
+<p>The movement model already separates <code>Path</code> (what to animate) from <code>EnteredTiles</code> (what tile effects fire for: every tile of a walk, only the destination of a jump or blink), so an <code>OnEnter</code> hook can be added without touching resolvers (ADR-012).</p>
+<div class="open-q"><h3>Open questions</h3><ul>
+<li id="q-tiles-pickups">What can a pickup be: AP, health, a one-round boon, a charge? Does it respawn?</li>
+<li id="q-tiles-hazards">Hazards: damage on enter, damage per turn standing, knockback into holes (environment kills)?</li>
+<li id="q-tiles-visibility">Are tile effects always public? (Proposed: yes; hidden information lives on characters, not on the board.)</li>
+</ul></div>
+</section>
+
+<!-- ============================================================ -->
+<div class="grp-title" data-group="Character">Character</div>
+
+<section class="concept" id="character" data-design="decided" data-impl="drift" data-title="Character">
+<header><h2>Character</h2></header>
+<p class="lead">A player's hero is defined by three things and nothing else: <b>gear</b> (four items), a <b>divine lineage</b>, and the <b>boons</b> drafted during the session. There are no classes.</p>
+<figure>
+<svg viewBox="0 0 720 200" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, system-ui, sans-serif" font-size="13">
+<style>.b{fill:var(--panel);stroke:currentColor;stroke-width:1.2;rx:8} text{fill:currentColor} .t{font-weight:600} .l{stroke:currentColor;stroke-width:1.2;fill:none}</style>
+<rect class="b" x="280" y="20" width="160" height="40"/><text x="360" y="45" text-anchor="middle" class="t">Character</text>
+<rect class="b" x="20" y="120" width="200" height="60"/><text x="120" y="145" text-anchor="middle" class="t">Gear (locked)</text><text x="120" y="165" text-anchor="middle">weapon · crown · boots · armour</text>
+<rect class="b" x="260" y="120" width="200" height="60"/><text x="360" y="145" text-anchor="middle" class="t">Lineage (locked)</text><text x="360" y="165" text-anchor="middle">Greek · Norse · Hindu</text>
+<rect class="b" x="500" y="120" width="200" height="60"/><text x="600" y="145" text-anchor="middle" class="t">Boons (grow per round)</text><text x="600" y="165" text-anchor="middle">Blessing · Enchant · Sigil</text>
+<path class="l" d="M360 60 V90 H120 V120"/><path class="l" d="M360 60 V120"/><path class="l" d="M360 60 V90 H600 V120"/>
+<text x="120" y="105" text-anchor="middle" font-size="11">stats + abilities</text><text x="600" y="105" text-anchor="middle" font-size="11">passives + item changes + new abilities</text>
+</svg></figure>
+<h3>Rules</h3>
+<ol>
+  <li>Derived <a href="#stats">stats</a> = base values (<code>rules.json</code>) + sum of item stats + Blessing and Enchant stat effects.</li>
+  <li>Derived <a href="#abilities">ability list</a> = innate movement (walk) + abilities of each equipped item + abilities added by Sigils. Order in the HUD: movement, weapon, spell.</li>
+  <li>Derived <a href="#modifiers">modifier list</a> = Blessings' modifiers + Enchants' modifiers + whatever the tile grants + global rules.</li>
+  <li>One hero per player. The unit model stays multi-unit ready (per-unit ids and AP).</li>
+  <li>Nothing about the character is random. Same picks = same character.</li>
+</ol>
+<div class="drift-note"><b>Drift.</b> Code defines characters by <code>classes/*.json</code> (warrior, mage) that own abilities and stats directly. Plan: replace <code>classes/</code> with <code>items/</code> + <code>lineages/</code> and a <code>Loadout</code> in <code>MatchSetup</code>; warrior/mage become UI presets. Class stats table in <code>docs/data.md</code> will be superseded.</div>
+<h3>Depends on</h3><ul><li><a href="#equipment">Equipment</a>, <a href="#lineage">Lineage</a>, <a href="#boons">Boons</a>, <a href="#stats">Stats</a></li></ul>
+<p class="src">Source: notebook 16 Sep 2026; round-1 answer "choose your gear… then pick a divine lineage".</p>
+</section>
+
+<section class="concept" id="classes" data-design="superseded" data-impl="drift" data-title="Classes (superseded)">
+<header><h2>Classes (superseded)</h2></header>
+<p class="lead">Superseded on 16 Sep 2026 by <a href="#character">Character</a> = gear + lineage + boons. Kept so the drift is visible. "Warrior" and "Mage" live on as presets in <a href="#character-select">character select</a>.</p>
+<div class="drift-note"><b>Drift.</b> <code>classes/warrior.json</code>, <code>classes/mage.json</code>, <code>ClassDef</code>, the catalogue's class linking rule "a class needs a movement ability" and <code>MatchSettings.PlayerClassId</code> still exist. Remove with the loadout work (M3).</div>
+</section>
+
+<section class="concept" id="stats" data-design="decided" data-impl="drift" data-title="Stats">
+<header><h2>Stats</h2></header>
+<p class="lead">Six numbers describe a hero. Display names on the left, engine keys on the right. All integers; all public knowledge except where a hidden boon changed them.</p>
+<table>
+<tr><th>Display</th><th>Key</th><th>Meaning</th><th>Main source</th></tr>
+<tr><td>Health</td><td><code>hp</code></td><td>Max hit points; 0 = dead</td><td>base + armour + Blessings</td></tr>
+<tr><td>Action points</td><td><code>ap</code></td><td>AP granted each turn</td><td>base (3) + Blessings</td></tr>
+<tr><td>Strength</td><td><code>power.weapon</code></td><td>Added to every weapon-lane attack</td><td>weapon + armour + Blessings</td></tr>
+<tr><td>Magic</td><td><code>power.spell</code></td><td>Added to every spell-lane attack</td><td>crown + Blessings</td></tr>
+<tr><td>Armour (weapon)</td><td><code>defense.weapon</code></td><td>Subtracted from every weapon-lane hit taken</td><td>armour item</td></tr>
+<tr><td>Armour (spell)</td><td><code>defense.spell</code></td><td>Subtracted from every spell-lane hit taken</td><td>armour item</td></tr>
+</table>
+<h3>Rules</h3>
+<ol>
+  <li>Keys follow <code>power.&lt;lane&gt;</code> / <code>defense.&lt;lane&gt;</code> for the two lanes in <code>rules.damageTypes</code> (weapon, spell). This keeps the existing generic stat table; only the lane list and display names change.</li>
+  <li>Every hero has the same base stats, in <code>rules.json</code> <code>baseStats</code> (current placeholders: hp 20, ap 3, Strength 1, Magic 1, armour 0/0). Items are pure additions, so the stat block is a sum. New stats are JSON only.</li>
+  <li>No item carries a negative stat at launch (the loader rejects them). <code>hp</code> is at least 1, <code>ap</code> at least 0. Negative effects, if ever, come from boons and need a floor rule first.</li>
+  <li>Enemy stats are public because gear is public. A hidden Blessing that changed a stat is <a href="#hidden-info">revealed</a> the first time the changed stat alters a result (for hp: at round start, since max health is visible on the bar; so hp Blessings are effectively public).</li>
+</ol>
+<div class="drift-note"><b>Drift.</b> Code lanes are <code>melee / ranged / magic</code> (<code>rules.json</code>) and stats sit on classes. Migration: <code>damageTypes</code> becomes <code>["weapon","spell"]</code>, attack <code>damageType</code> values are remapped (jab, strike, bow shots = weapon; fire-bolt = spell), stats move to items. Display names are a client concern.</div>
+<div class="open-q"><h3>Open questions</h3><ul>
+<li id="q-stats-negative">Can Enchants or Blessings ever lower an enemy's stats (debuffs), or only the owner's?</li>
+</ul></div>
+<p class="src">Source: notebook page 1 (Health, Strength, Magic; armour negates damage); round-2 answer "separate weapon and spell reduction"; ADR-017.</p>
+</section>
+
+<section class="concept" id="equipment" data-design="decided" data-impl="not-started" data-title="Equipment (gear)">
+<header><h2>Equipment (gear)</h2></header>
+<p class="lead">Four slots, one item each, all mandatory, locked for the session: <a href="#weapon">Weapon</a>, <a href="#crown">Crown</a>, <a href="#boots">Boots</a>, <a href="#armour">Armour</a>. Items are the only source of stats and abilities besides the lineage.</p>
+<h3>Rules</h3>
+<ol>
+  <li>An item has: <code>id</code>, <code>slot</code>, <code>kind</code> (bow, gun, blade, … used by boons' <code>requires</code>), <code>stats</code> (any <a href="#stats">stat keys</a>), <code>abilities[]</code> (ability ids it grants), <code>tags[]</code> (matched by modifiers), one-line description, presentation keys (model, icon).</li>
+  <li>Item identity is <a href="#hidden-info">public</a>: the opponent sees the item name and its innate stats. Its ability list is not shown until each ability is used.</li>
+  <li>Items never change identity during a session. <a href="#enchant">Enchants</a> attach to an item and alter its numbers or add tags; <a href="#sigil">Sigils</a> add abilities to it.</li>
+  <li>Slots are fixed at four. New item kinds are data; new slots are a design decision.</li>
+  <li>Items are pure additions: no negative stats, no set bonuses, no anti-synergies. Synergy comes from boons.</li>
+  <li>Every base weapon and every base crown carries exactly two abilities. Boots carry one movement mode. Armour carries none. (Authoring convention on shipped content, enforced by a repo-data test; the loader itself only requires a weapon to have an attack.)</li>
+  <li>Launch catalogue (16 Sep 2026): weapons bow and gun; one crown; boots jump and teleport; one armour. Blade (melee) is deferred, not rejected.</li>
+</ol>
+<h3>Data (proposed schema, <code>items/*.json</code>)</h3>
+<pre><code>{ "version": 1, "id": "longbow", "name": "Longbow", "slot": "weapon", "kind": "bow",
+  "description": "Two-handed bow. Shoots far, hits softly.",
+  "stats": { "power.weapon": 2 },
+  "abilities": ["arrow-shot", "aimed-shot"],
+  "tags": ["bow", "ranged"], "model": "longbow", "icon": "longbow" }</code></pre>
+<h3>Depends on</h3><ul><li><a href="#stats">Stats</a>, <a href="#abilities">Abilities</a>, <a href="#boons">Boons</a></li></ul>
+<div class="open-q"><h3>Open questions</h3><ul>
+<li id="q-gear-more">When the catalogue grows past launch, how many items per slot and do any need unlocks?</li>
+</ul></div>
+<p class="src">Source: notebook page 1 (Equippables); round-2 answers "locked; only boons change it", "gear visible".</p>
+</section>
+
+<section class="concept" id="weapon" data-design="decided" data-impl="drift" data-title="Weapon slot">
+<header><h2>Weapon slot</h2></header>
+<p class="lead">The weapon grants the hero's two weapon-lane <a href="#attacks">attacks</a> and some Strength. Every weapon has a minimum and a maximum range. Kinds at launch: <b>bow</b> and <b>gun</b>. Both hit adjacent enemies; the gun reaches further, the bow hits slightly harder.</p>
+<table>
+<tr><th>Kind</th><th>Range</th><th>Identity</th><th>Innate abilities (current data)</th><th>Later enchants / sigils</th></tr>
+<tr><td>Bow</td><td>1..5</td><td>Slightly more damage per shot; needs line of sight; high ground matters</td><td>Arrow Shot (1 AP, 3), Aimed Shot (2 AP, 6)</td><td>+1 range; Volley (sigil)</td></tr>
+<tr><td>Gun</td><td>1..7</td><td>Whole-field reach, lighter hits</td><td>Quick Shot (1 AP, 2), Heavy Shot (2 AP, 5)</td><td>Triple Shot (sigil); cheaper shot</td></tr>
+<tr><td>Blade (deferred)</td><td>1..1</td><td>Adjacent only, cheap repeats, most Strength</td><td>Jab, Strike (files kept, unreferenced)</td><td>Cleave (sigil)</td></tr>
+</table>
+<div class="drift-note"><b>Drift.</b> Jab and Strike exist as class abilities with <code>damageType: melee</code>; no bow or gun abilities or items exist yet. Spec: <code>docs/specs/2026-09-16-loadout-slice.md</code>.</div>
+<div class="open-q"><h3>Open questions</h3><ul><li id="q-weapon-ammo">Do guns have ammo / reload as a state, or is AP cost the only limiter? Proposed: AP only.</li><li id="q-weapon-blade">When does blade (melee) join the catalogue, and with what identity beyond "adjacent, cheap"?</li></ul></div>
+<p class="src">Source: notebook page 1 (Weapon: Bow, Gun).</p>
+</section>
+
+<section class="concept" id="crown" data-design="decided" data-impl="drift" data-title="Crown slot">
+<header><h2>Crown slot</h2></header>
+<p class="lead">"This is where spells come from and are used." The crown grants the hero's spell-lane <a href="#attacks">attacks</a> and Magic. A crown may also carry an innate <a href="#elements">element</a>.</p>
+<ol>
+  <li>Every base crown lists exactly two spells. More spells arrive through <a href="#sigil">Sigils</a>.</li>
+  <li>An <a href="#enchant">Enchant</a> on the crown can add an element to every spell it grants ("fire on crown" = all crown spells are tagged fire and gain a fire rider).</li>
+  <li>Spells are attacks in the spell lane; they may ignore some targeting rules by data (e.g. <code>minRange</code>), but always need <a href="#line-of-sight">line of sight</a>.</li>
+</ol>
+<div class="drift-note"><b>Drift.</b> Fire Bolt is a mage class ability with lane <code>magic</code>. Becomes a crown ability with lane <code>spell</code> and <code>element: fire</code>.</div>
+<div class="open-q"><h3>Open questions</h3><ul><li id="q-crown-utility">Can crowns grant non-damage spells (heal, shield, slow)? Needs an effect vocabulary beyond damage. Proposed: not at launch.</li></ul></div>
+<p class="src">Source: notebook page 1 (Crown).</p>
+</section>
+
+<section class="concept" id="boots" data-design="decided" data-impl="drift" data-title="Boots slot">
+<header><h2>Boots slot</h2></header>
+<p class="lead">"Gives different kinds of movement." Every hero can <b>walk</b> innately (1 hex per AP, climb 1); boots grant one extra <a href="#movement">movement mode</a> (jump, teleport, later fly or dash) and may alter walk parameters.</p>
+<ol>
+  <li>Walk is innate and never removed; it is listed in <code>rules.innateAbilities</code> rather than on any item.</li>
+  <li>Boots grant <code>abilities[]</code> (movement kind) and may set <code>walkRange</code> / <code>maxClimb</code> overrides via stats (proposed keys <code>walk.range</code>, <code>walk.climb</code>).</li>
+  <li><a href="#sigil">Sigils</a> can add a second movement mode to boots ("teleport on boots").</li>
+</ol>
+<div class="drift-note"><b>Drift.</b> Jump and teleport are class abilities; walk is granted by classes listing <code>move</code>. Boots do not exist.</div>
+<p class="src">Source: notebook page 1 (Boots).</p>
+</section>
+
+<section class="concept" id="armour" data-design="decided" data-impl="drift" data-title="Armour slot">
+<header><h2>Armour slot</h2></header>
+<p class="lead">Armour negates damage with two separate numbers: <code>defense.weapon</code> and <code>defense.spell</code>. It is also the main source of Health. Plate can be great against weapons and weak against spells; robes the reverse.</p>
+<ol>
+  <li>Defence is flat and subtractive per hit (see <a href="#damage">Damage</a>). It never reduces a hit below 0.</li>
+  <li>Elemental resistances and immunities are <em>not</em> armour numbers; they are <a href="#modifiers">modifiers</a> from Blessings or Enchants on the armour.</li>
+  <li>Armour has no HP pool of its own (ablative armour rejected).</li>
+</ol>
+<div class="drift-note"><b>Drift.</b> Defence values sit on classes as <code>defense.melee/ranged/magic</code>.</div>
+<p class="src">Source: notebook page 1 (Armour negates damage); round-2 answer "separate weapon and spell reduction".</p>
+</section>
+
+<!-- ============================================================ -->
+<div class="grp-title" data-group="Combat">Combat</div>
+
+<section class="concept" id="abilities" data-design="decided" data-impl="partial" data-title="Abilities">
+<header><h2>Abilities</h2></header>
+<p class="lead">An ability is anything a unit spends AP on. Two types exist: <a href="#movement">movement</a> and <a href="#attacks">attack</a>. Every ability is data (<code>abilities/*.json</code>) with a flat AP <code>cost</code>, a HUD <code>category</code> (movement, weapon, spell) and an <code>icon</code>. Abilities come from gear and sigils, never from the character directly.</p>
+<ol>
+  <li>Fields shared by all: <code>id</code>, <code>type</code>, <code>name</code>, <code>description</code>, <code>icon</code>, <code>category</code>, <code>cost</code> (default 1).</li>
+  <li>An ability's owner is the item that grants it (or the innate list). The HUD groups by category; the examine panel groups by item.</li>
+  <li>Abilities are <a href="#hidden-info">hidden</a> from the opponent until first used, even when the granting item is public.</li>
+  <li>Enchants may alter an ability's numbers (range, damage, cost) through the item they attach to; the ability definition itself is immutable.</li>
+</ol>
+<div class="drift-note"><b>Partial.</b> Abilities load and resolve; the "owner item" link and enchant overrides do not exist (abilities are referenced straight from classes).</div>
+<h3>Depends on</h3><ul><li><a href="#turns">Turns and AP</a>, <a href="#equipment">Equipment</a>, <a href="#sigil">Sigil</a></li></ul>
+<p class="src">Source: ADR-012, ADR-016; docs/data.md.</p>
+</section>
+
+<section class="concept" id="movement" data-design="decided" data-impl="implemented" data-title="Movement">
+<header><h2>Movement</h2></header>
+<p class="lead">Movement kinds differ in <em>geometry</em>; everything else is a data table. Modes: <b>walk</b> (path search, terrain cost, climb limit, cannot cross units), <b>jump</b> (straight line, arc clearance by height), <b>teleport</b> (point pick, optionally needs sight). <b>Fly</b> is a walk whose cost table says everything costs 1 plus <code>ignoreHeight</code>.</p>
+<ol>
+  <li>Destination must exist, be enterable and unoccupied. Origin is never a destination.</li>
+  <li>Walk refuses to cross occupied tiles; jump and teleport cross anything, including holes, and enter only their destination.</li>
+  <li><code>terrainCosts</code> per ability overrides the terrain catalogue (an integer makes even stone enterable; <code>null</code> makes even grass impassable).</li>
+  <li>A move produces a <code>MovePlan</code>: <code>Path</code> to animate and <code>EnteredTiles</code> for <a href="#tile-effects">tile effects</a>.</li>
+  <li>New modes are one resolver class plus one JSON; unknown modes fail closed.</li>
+</ol>
+<p class="src">Source: pillar 12; ADR-012; docs/data.md "Movement abilities".</p>
+</section>
+
+<section class="concept" id="attacks" data-design="decided" data-impl="drift" data-title="Attacks">
+<header><h2>Attacks</h2></header>
+<p class="lead">An attack targets one living enemy unit inside a <code>minRange..range</code> band with clear <a href="#line-of-sight">line of sight</a>, always, even at range 1. It declares its <b>lane</b> (weapon or spell), a flat base damage, optional <a href="#elements">element</a> and tags.</p>
+<pre><code>{ "version": 1, "id": "fire-bolt", "name": "Fire Bolt", "type": "attack", "category": "spell", "cost": 2,
+  "attack": { "damage": 6, "damageType": "spell", "range": 3, "minRange": 1, "element": "fire" },
+  "tags": ["bolt"] }</code></pre>
+<ol>
+  <li><code>category</code> is <code>weapon</code> or <code>spell</code> and must match the lane (an attack granted by a crown is a spell; by a weapon, a weapon). HUD only reads category; rules read the lane.</li>
+  <li>Targeting and legality come from one function used by HUD, server and bots.</li>
+  <li>Multi-target shapes (cone, line, area) are <mark>not designed</mark>; Sigils like Triple Shot will need a <code>shape</code> or a multi-hit count. See open question.</li>
+</ol>
+<div class="drift-note"><b>Drift.</b> Lane values in code are <code>melee / ranged / magic</code>; there is no <code>element</code> field. See <a href="#stats">Stats</a> for the migration.</div>
+<div class="open-q"><h3>Open questions</h3><ul>
+<li id="q-attacks-multi">Multi-hit and area attacks (Triple Shot, Cleave): repeated single resolution vs a shape. Proposed: <code>hits: 3</code> repeats the single-target resolution; shapes later.</li>
+</ul></div>
+<p class="src">Source: ADR-017; design v0.1 targeting decision.</p>
+</section>
+
+<section class="concept" id="damage" data-design="decided" data-impl="drift" data-title="Damage">
+<header><h2>Damage</h2></header>
+<p class="lead">Deterministic. No dice, no hit chance. Two lanes, weapon and spell; each lane has a power stat (Strength or Magic) and an armour defence. Elements and everything else are flat modifiers on top.</p>
+<pre><code>damage = max(0,  base
+               + power.&lt;lane&gt;            (attacker: Strength or Magic)
+               - defense.&lt;lane&gt;          (target's armour, weapon or spell)
+               + Σ flat modifiers )      (elements, high ground, blessings, enchants, terrain)</code></pre>
+<ol>
+  <li>The result is a fixed-order list of signed lines (base, power, defence, then modifiers grouped attacker unit / attacker tile / globals, target unit / target tile / globals, sorted by id) plus the total. This is what the tooltip shows.</li>
+  <li><b>Preview and actual are the same function.</b> The preview uses the attacker's <a href="#hidden-info">knowledge</a> (hidden enemy modifiers dropped and counted as "?"); the server resolves with full knowledge. When they differ, the modifier that caused it is revealed.</li>
+  <li>Immunity (from a Blessing) is a modifier whose effect <code>nullify</code> sets the total to 0 after everything else. Shown as one line "Immune (fire)".</li>
+  <li>Percentages are not allowed. If ever needed they are computed in integer basis points, never floats.</li>
+  <li>Enemy health is fully visible (pillar 8 surprise lives in abilities and modifiers, not in the health bar).</li>
+</ol>
+<div class="drift-note"><b>Drift.</b> Formula and calculator exist exactly like this, but lanes are melee/ranged/magic and there is no <code>nullify</code> effect.</div>
+<h3>Depends on</h3><ul><li><a href="#stats">Stats</a>, <a href="#modifiers">Modifiers</a>, <a href="#elements">Elements</a>, <a href="#hidden-info">Hidden information</a></li></ul>
+<p class="src">Source: ADR-017; round-1 answer "everything is either WP or SP".</p>
+</section>
+
+<section class="concept" id="elements" data-design="decided" data-impl="not-started" data-title="Elements and modifier classes">
+<header><h2>Elements and modifier classes</h2></header>
+<p class="lead">An element (fire, frost, lightning, …) is a <b>modifier class</b>: a tag an attack carries that resistances, immunities and riders match on. It is not a third damage lane. Other modifier classes (e.g. bleed, holy) can be added the same way later.</p>
+<ol>
+  <li><code>rules.json</code> declares <code>elements[]</code>. An attack may carry at most one innate <code>element</code>; an <a href="#enchant">Enchant</a> can add one to every attack of an item.</li>
+  <li>A <b>rider</b> is a <code>dealDamage</code> modifier with <code>when.elements</code> and a positive <code>effect.damage</code> ("+2 fire").</li>
+  <li>A <b>resistance</b> is a <code>takeDamage</code> modifier with <code>when.elements</code> and a negative <code>effect.damage</code>; an <b>immunity</b> uses <code>effect.nullify</code>.</li>
+  <li>Elements have no rock-paper-scissors table at launch (fire beats frost etc.). Any such interaction is a modifier in data.</li>
+  <li>Elements are shown as an icon on the ability button and as a line in the damage tooltip.</li>
+</ol>
+<div class="open-q"><h3>Open questions</h3><ul>
+<li id="q-elements-list">Launch element list. Proposed: fire, frost, lightning (one per lineage flavour is tempting but lineages should share elements).</li>
+<li id="q-elements-status">Do elements ever apply a status (burn per turn, frost slows)? Needs a status system; not at launch.</li>
+</ul></div>
+<p class="src">Source: notebook page 2 (Damage types: weapon, spell, elemental); round-1 answer "elemental has its own class (fire, frost, etc), other kinds of damage modifiers later".</p>
+</section>
+
+<section class="concept" id="modifiers" data-design="decided" data-impl="partial" data-title="Modifiers">
+<header><h2>Modifiers</h2></header>
+<p class="lead">A modifier is one trigger, a conjunction of conditions, and one flat effect. Who owns it is the attachment, never the file: a unit (via Blessing or Enchant), a terrain, a map hex, or the global rules.</p>
+<pre><code>{ "version": 1, "id": "agni-fire", "name": "Agni's Fire", "trigger": "dealDamage",
+  "when": { "damageTypes": ["spell"], "elements": ["fire"] }, "effect": { "damage": 2 }, "visibility": "hidden" }</code></pre>
+<table>
+<tr><th>Field</th><th>Values</th></tr>
+<tr><td><code>trigger</code></td><td><code>dealDamage</code> (attacker side) · <code>takeDamage</code> (target side)</td></tr>
+<tr><td><code>when</code></td><td><code>damageTypes[]</code> (lane) · <code>tags[]</code> · <code>elements[]</code> (new) · <code>heightAdvantage</code> · <code>itemKinds[]</code> (new: attack granted by a bow) · all must hold</td></tr>
+<tr><td><code>effect</code></td><td><code>damage</code> (signed flat) · <code>nullify</code> (new, immunity) · more effect keys are design decisions</td></tr>
+<tr><td><code>visibility</code></td><td><code>public</code> (tiles, globals) · <code>hidden</code> (boons) until it changes a result</td></tr>
+</table>
+<ol>
+  <li>The same id twice on one unit does not stack.</li>
+  <li>Order never matters for the total (all flat, then floor, then nullify).</li>
+  <li>Modifiers never change AP, range or stats; those are <a href="#enchant">Enchant</a> stat effects. Modifiers only touch damage results.</li>
+</ol>
+<div class="drift-note"><b>Partial.</b> Trigger, <code>damageTypes</code>, <code>tags</code>, <code>heightAdvantage</code>, <code>effect.damage</code>, visibility and reveal exist. <code>elements</code>, <code>itemKinds</code>, <code>nullify</code> are new.</div>
+<p class="src">Source: ADR-017; docs/data.md "Modifiers".</p>
+</section>
+
+<!-- ============================================================ -->
+<div class="grp-title" data-group="Divine">Divine</div>
+
+<section class="concept" id="lineage" data-design="decided" data-impl="not-started" data-title="Divine lineage">
+<header><h2>Divine lineage</h2></header>
+<p class="lead">At character select, after picking gear, the player chooses the divine lineage they pray to. Launch lineages: <b>Greek</b>, <b>Norse</b>, <b>Hindu</b>. A lineage grants one fixed <b>starting Blessing</b> immediately and defines the <b>pool of boons</b> offered in every <a href="#draft">draft</a>. Lineages shape a build; they do not lock a playstyle.</p>
+<ol>
+  <li>Each lineage has: <code>id</code>, <code>name</code>, <code>startingBlessing</code> (a Blessing id), <code>pool[]</code> (boon ids), one-line flavour, presentation keys.</li>
+  <li>The pool must contain all three <a href="#boons">boon kinds</a> and cover every item kind at least once, so no gear choice makes a lineage empty. The content loader enforces this.</li>
+  <li>The lineage and its starting Blessing are <a href="#hidden-info">hidden</a>. The lineage is revealed the first time any of its boons is revealed (a boon's name shows its god).</li>
+  <li>Flavour direction (proposed, not rules): Greek = precision and control (Apollo range, Athena defence, Hermes movement); Norse = aggression and endurance (Thor lightning, berserk trades, Odin knowledge); Hindu = elements and transformation (Agni fire, Vayu wind movement, Indra storms).</li>
+  <li>Adding a lineage is data plus art. Balance goal: every lineage viable with every kit.</li>
+</ol>
+<h3>Data (proposed, <code>lineages/*.json</code>)</h3>
+<pre><code>{ "version": 1, "id": "hindu", "name": "Hindu", "description": "Pray to Agni, Vayu and Indra.",
+  "startingBlessing": "breath-of-vayu",
+  "pool": ["agni-crown", "vayu-boots", "indra-bolt", "trimurti-vigour", "..."] }</code></pre>
+<div class="open-q"><h3>Open questions</h3><ul>
+<li id="q-lineage-starting">Starting Blessing per lineage (three concrete passives to write).</li>
+<li id="q-lineage-mirror">Mirror matches (both Greek): fine, or any special rule? Proposed: fine.</li>
+<li id="q-lineage-names">Naming style for boons: "<god>'s <thing>" consistently, so the reveal also reveals the lineage.</li>
+</ul></div>
+<p class="src">Source: notebook page 1 (Divine Blessing); round-1 answers.</p>
+</section>
+
+<section class="concept" id="boons" data-design="decided" data-impl="not-started" data-title="Boons">
+<header><h2>Boons</h2></header>
+<p class="lead"><b>Boon</b> is the umbrella term for anything a lineage grants. Three kinds: a <a href="#blessing">Blessing</a> (a passive on the character), an <a href="#enchant">Enchant</a> (a change to one equipped item), a <a href="#sigil">Sigil</a> (a new active ability on one equipped item). Boons are drafted between rounds and last the session.</p>
+<table>
+<tr><th>Kind</th><th>Attaches to</th><th>What it can do</th><th>Examples</th></tr>
+<tr><td>Blessing</td><td>Character</td><td>Stat change; a modifier (resist, immunity, rider); AP change</td><td>Immune to fire · +4 Health · +1 AP</td></tr>
+<tr><td>Enchant</td><td>One item (by slot / kind)</td><td>Change an item's numbers (range, damage, cost of its abilities); add an element to its abilities; add a modifier while equipped</td><td>+1 range on bow · fire on crown · shots cost 1</td></tr>
+<tr><td>Sigil</td><td>One item (by slot / kind)</td><td>Add a new ability to the item</td><td>Triple Shot on gun · Blink on boots · Cleave on blade</td></tr>
+</table>
+<h3>Rules</h3>
+<ol>
+  <li>A boon has: <code>id</code>, <code>name</code>, <code>kind</code>, <code>lineage</code>, <code>requires</code> (slot and/or item kind; none for most Blessings), <code>effects[]</code>, <code>stackable</code> (default false), description, icon.</li>
+  <li>Effect vocabulary (proposed, closed list, each one handler in Core): <code>stat</code> (key, amount), <code>modifier</code> (id, attached to unit), <code>abilityOverride</code> (ability id or item, field, amount: range / damage / cost), <code>addElement</code> (item, element), <code>grantAbility</code> (item, ability id). New effect types are design decisions.</li>
+  <li>Boons are <a href="#hidden-info">hidden</a>: a Blessing reveals when its modifier or stat changes a result; an Enchant reveals when an altered number is observed (a shot lands from beyond normal range, a preview differs); a Sigil reveals when its ability is used.</li>
+  <li>The starting Blessing from the <a href="#lineage">lineage</a> is an ordinary Blessing, granted at select instead of drafted.</li>
+  <li>Boons never remove abilities or items.</li>
+</ol>
+<h3>Data (proposed, <code>boons/*.json</code>)</h3>
+<pre><code>{ "version": 1, "id": "agni-crown", "name": "Agni's Crown", "kind": "enchant", "lineage": "hindu",
+  "requires": { "slot": "crown" },
+  "effects": [ { "type": "addElement", "target": "crown", "element": "fire" },
+               { "type": "modifier", "id": "agni-fire" } ] }
+
+{ "version": 1, "id": "hermes-heels", "name": "Heels of Hermes", "kind": "sigil", "lineage": "greek",
+  "requires": { "slot": "boots" }, "effects": [ { "type": "grantAbility", "target": "boots", "ability": "blink" } ] }
+
+{ "version": 1, "id": "trimurti-vigour", "name": "Trimurti's Vigour", "kind": "blessing", "lineage": "hindu",
+  "effects": [ { "type": "stat", "key": "hp", "amount": 4 } ] }</code></pre>
+<div class="drift-note"><b>Not started.</b> <code>boons/</code> is an empty folder; the catalogue rejects unknown files, so the loader needs the schema first. Units can already carry modifiers (<code>Unit.ModifierIds</code>), which is what a Blessing resolves to.</div>
+<h3>Depends on</h3><ul><li><a href="#lineage">Lineage</a>, <a href="#draft">Draft</a>, <a href="#equipment">Equipment</a>, <a href="#modifiers">Modifiers</a>, <a href="#hidden-info">Hidden information</a></li></ul>
+<div class="open-q"><h3>Open questions</h3><ul>
+<li id="q-boons-cap">Is there a cap on boons per session (best of 3 gives at most 2 drafts + 1 starting)? With longer series, a cap or tiering may be needed.</li>
+<li id="q-boons-exclusive">Exclusivity groups (only one element per crown)? Proposed: yes, <code>exclusive</code> tag list.</li>
+</ul></div>
+<p class="src">Source: notebook page 2; round-1 and round-2 naming answers (Boon umbrella; Blessing / Enchant / Sigil).</p>
+</section>
+
+<section class="concept" id="blessing" data-design="decided" data-impl="not-started" data-title="Blessing (boon kind)">
+<header><h2>Blessing (boon kind)</h2></header>
+<p class="lead">A passive on the character. Examples from the notebook: immune to fire damage, increased max health. Implemented as stat effects and/or unit-attached <a href="#modifiers">modifiers</a>.</p>
+<ol>
+  <li>Requires nothing (any kit).</li>
+  <li>The lineage's starting Blessing is one of these.</li>
+  <li>Hidden until it changes a result; stat Blessings on visible stats (hp) are effectively public at round start.</li>
+</ol>
+<p class="src">Source: notebook page 2.</p>
+</section>
+
+<section class="concept" id="enchant" data-design="decided" data-impl="not-started" data-title="Enchant (boon kind)">
+<header><h2>Enchant (boon kind)</h2></header>
+<p class="lead">A property change on one equipped item. Examples from the notebook: increase range on bow; add fire damage on crown (adds a fire rider to every spell). The notebook called this kind "boon"; renamed to avoid clashing with the umbrella term.</p>
+<ol>
+  <li><code>requires</code> names a slot and optionally an item kind; the draft never offers an Enchant the player cannot attach.</li>
+  <li>An Enchant may override numbers of the item's abilities (range, damage, cost), add an element, or attach a modifier while the item is equipped (always, since gear is locked).</li>
+  <li>Overrides are additive integers; the ability definition file is never edited.</li>
+</ol>
+<p class="src">Source: notebook page 2.</p>
+</section>
+
+<section class="concept" id="sigil" data-design="decided" data-impl="not-started" data-title="Sigil (boon kind)">
+<header><h2>Sigil (boon kind)</h2></header>
+<p class="lead">A new active ability inscribed on one equipped item. Examples from the notebook: triple shot on gun, teleport on boots. The notebook called this kind "gift"; renamed Sigil (a mark on the item that unlocks a power).</p>
+<ol>
+  <li><code>requires</code> names a slot and usually an item kind (Triple Shot needs a gun).</li>
+  <li>The granted ability is an ordinary <a href="#abilities">ability</a> file; it appears in the HUD section of its category and in examine under the item.</li>
+  <li>Hidden until first used, like every ability.</li>
+</ol>
+<p class="src">Source: notebook page 2; round-2 naming answer.</p>
+</section>
+
+<!-- ============================================================ -->
+<div class="grp-title" data-group="Information">Information</div>
+
+<section class="concept" id="hidden-info" data-design="decided" data-impl="partial" data-title="Hidden information and reveal">
+<header><h2>Hidden information and reveal</h2></header>
+<p class="lead">The server holds the truth; each client only ever receives a <code>PlayerView</code>. What the opponent knows at the start of round 1 and what becomes known over the session:</p>
+<table>
+<tr><th>Thing</th><th>At start</th><th>Revealed when</th></tr>
+<tr><td>Health, position, AP</td><td>Public</td><td>always</td></tr>
+<tr><td>Gear (four item identities, their innate stats)</td><td>Public (worn on the model)</td><td>always</td></tr>
+<tr><td>Derived stats (Strength, Magic, Armour)</td><td>Public as far as gear explains them</td><td>a hidden stat effect shows when it changes a result</td></tr>
+<tr><td>Abilities (innate to items or from Sigils)</td><td>Hidden</td><td>first use; then full definition known</td></tr>
+<tr><td>Lineage and starting Blessing</td><td>Hidden</td><td>first reveal of any boon of that lineage; the Blessing when it changes a result</td></tr>
+<tr><td>Drafted boons</td><td>Hidden (opponent sees "picked")</td><td>Blessing / Enchant: first time it changes a result or an observed number; Sigil: first use</td></tr>
+<tr><td>Tile and global modifiers (high ground, terrain)</td><td>Public</td><td>always</td></tr>
+</table>
+<h3>Rules</h3>
+<ol>
+  <li>Revealed sets are per viewer, live in state, persist for the whole <a href="#session">session</a> (ADR-018).</li>
+  <li>Reveal events precede the event that needed them, so a client updates atomically.</li>
+  <li>The damage preview is computed with the attacker's knowledge; hidden enemy modifiers count as "?" lines. Preview and actual share one function (ADR-017).</li>
+  <li>A passive hidden modifier that has no visible effect produces no event for the opponent.</li>
+  <li>The examine panel shows unknown abilities as "?" slots under each item, so the <em>count</em> of abilities per item is public while their identity is not. A later Sigil therefore shows as an extra "?", which is a fair tell.</li>
+</ol>
+<div class="drift-note"><b>Partial.</b> Ability and modifier reveal exist. Lineage, boon and enchant-observation reveals, and series-long persistence, are not started.</div>
+<div class="open-q"><h3>Open questions</h3><ul>
+<li id="q-hidden-enchant-obs">Precise definition of "observed number" for Enchant reveal (range: the shot lands; cost: the AP dots differ; damage: the preview differs).</li>
+</ul></div>
+<p class="src">Source: pillar 8; ADR-010, ADR-017, ADR-018; round-2 answer "gear visible, everything else hidden".</p>
+</section>
+
+<section class="concept" id="determinism" data-design="decided" data-impl="implemented" data-title="Determinism and replays">
+<header><h2>Determinism and replays</h2></header>
+<p class="lead">Same seed + same commands = same state on server, client and tests. All randomness (draft offers, first mover, bots) goes through the seeded <code>Rng</code>. No floats in rules, no clock in the command log (timeouts are commands).</p>
+<ol><li>Enables replays, spectating, balance simulations with bots, and cheap server validation.</li><li>Content parity is checked by a SHA-256 over canonical JSON before a match.</li></ol>
+<p class="src">Source: CLAUDE.md golden rule 4; ADR-014, ADR-018.</p>
+</section>
+
+<!-- ============================================================ -->
+<div class="grp-title" data-group="Meta">Meta</div>
+
+<section class="concept" id="bots" data-design="proposed" data-impl="partial" data-title="Bots">
+<header><h2>Bots</h2></header>
+<p class="lead">Bots exist for practice, balance simulation and filling a queue. <code>RandomBot</code> picks uniformly over legal commands. A <mark>greedy bot</mark> (maximise expected damage, avoid death) is the next step for balance runs.</p>
+<div class="open-q"><h3>Open questions</h3><ul><li id="q-bots-draft">Bots must also pick gear, lineage and drafts once those exist.</li></ul></div>
+</section>
+
+<section class="concept" id="online" data-design="proposed" data-impl="not-started" data-title="Online: matchmaking, ratings, accounts">
+<header><h2>Online: matchmaking, ratings, accounts</h2></header>
+<ol>
+  <li>Guest auth first (name only); accounts later (M5).</li>
+  <li>One queue per time control; rating window widens with wait.</li>
+  <li>Rating: Glicko-2 per time control (proposed), updated per session, not per round.</li>
+  <li>Reconnect: client keeps a session token; the server replays the current <code>PlayerView</code>. Grace period <mark>60 s</mark> (proposed), the clock keeps running.</li>
+</ol>
+<div class="open-q"><h3>Open questions</h3><ul><li id="q-online-rating">Confirm Glicko-2 and per-time-control pools.</li></ul></div>
+<p class="src">Source: docs/networking.md; docs/architecture.md.</p>
+</section>
+
+<section class="concept" id="presentation" data-design="decided" data-impl="partial" data-title="Presentation">
+<header><h2>Presentation</h2></header>
+<p class="lead">Rules never depend on presentation. The client is a renderer of events: 3D low-poly hexes and heroes, URP on WebGL2, UI Toolkit HUD, FMOD audio, Shuriken VFX.</p>
+<h4 id="camera">Camera</h4>
+<p>3D tilted view with a toggle to full top-down (BG3 "O"). Two Cinemachine cameras blended on toggle.</p>
+<h4 id="hud">HUD (package D, ADR-019)</h4>
+<ul>
+  <li>Thin segmented hp bar plus number under every unit, faded until hovered or an action is armed.</li>
+  <li>AP dots on the action bar; hovering an ability tints the dots it would spend; each button shows its cost; unaffordable buttons desaturate.</li>
+  <li>Action bar bottom-centre, sectioned movement / weapon / spell (item icons mark which item an ability belongs to, proposed). End Turn bottom-right. Turn owner and rope top-centre. Examine panel left.</li>
+  <li>Attack preview: ghosted hp delta on the target's bar plus a line-item tooltip with a "?" row for unrevealed modifiers.</li>
+  <li>Feedback: damage flyover; when actual differs from preview, a second line names the revealed modifier whose icon then stays on the unit.</li>
+  <li>Nothing is armed by default; clicking a unit with nothing armed opens examine.</li>
+</ul>
+<h4 id="examine">Examine</h4>
+<p>Inspect any unit, tile or item: for enemies, items are shown by name with their innate stats, abilities as "?" until revealed, revealed boons listed with their lineage. For tiles: terrain, height, modifiers.</p>
+<h4 id="audio-vfx">Audio and VFX</h4>
+<p>FMOD music that stays out of the way; distinct SFX per ability category and per element; VFX via Shuriken and Shader Graph (no VFX Graph on WebGL2).</p>
+<h4>Art direction</h4>
+<p>Low-poly stylised; gear must read at the tilted camera distance (silhouette per weapon kind, colour per lineage once revealed). Rules of readability come before beauty.</p>
+<div class="open-q"><h3>Open questions</h3><ul><li id="q-pres-select">Character select and draft screens are not mocked yet (follow the research-then-options workflow).</li></ul></div>
+<p class="src">Source: pillars 9-13; ADR-015, ADR-019.</p>
+</section>
+
+<section class="concept" id="data-model" data-design="decided" data-impl="drift" data-title="Data model (JSON folders)">
+<header><h2>Data model (JSON folders)</h2></header>
+<p class="lead">All content is JSON under <code>MimasClient/Assets/_Game/Data/</code>, loaded by one fail-closed catalogue on every peer. This table is the target layout; field-level schemas live in <code>docs/data.md</code>.</p>
+<table>
+<tr><th>File / folder</th><th>Contents</th><th>Design</th><th>Code</th></tr>
+<tr><td><code>rules.json</code></td><td><code>damageTypes</code> (weapon, spell), <code>elements[]</code>, <code>globalModifiers[]</code>, <code>baseStats</code>, <code>innateAbilities[]</code>, <code>series</code> (best of)</td><td><a href="#stats">Stats</a>, <a href="#elements">Elements</a></td><td>drift (lanes), missing fields</td></tr>
+<tr><td><code>terrains.json</code></td><td>terrain catalogue</td><td><a href="#board">Board</a></td><td>in code</td></tr>
+<tr><td><code>timecontrols.json</code></td><td>time controls</td><td><a href="#time-controls">Time controls</a></td><td>in code</td></tr>
+<tr><td><code>abilities/</code></td><td>movement and attack abilities (attack gains <code>element</code>)</td><td><a href="#abilities">Abilities</a></td><td>partial</td></tr>
+<tr><td><code>items/</code></td><td>gear: slot, kind, stats, abilities, tags</td><td><a href="#equipment">Equipment</a></td><td>not started</td></tr>
+<tr><td><code>lineages/</code></td><td>starting blessing, pool</td><td><a href="#lineage">Lineage</a></td><td>not started</td></tr>
+<tr><td><code>boons/</code></td><td>blessings, enchants, sigils</td><td><a href="#boons">Boons</a></td><td>not started (empty folder)</td></tr>
+<tr><td><code>modifiers/</code></td><td>flat damage modifiers (gain <code>elements</code>, <code>itemKinds</code>, <code>nullify</code>)</td><td><a href="#modifiers">Modifiers</a></td><td>partial</td></tr>
+<tr><td><code>maps/</code></td><td>hex lists, spawns, ladder position</td><td><a href="#maps">Maps</a></td><td>in code</td></tr>
+<tr><td><code>classes/</code></td><td><s>class definitions</s></td><td><a href="#classes">superseded</a></td><td>drift: to be removed</td></tr>
+<tr><td><code>presets/</code> (client only)</td><td>suggested kits for character select</td><td><a href="#character-select">Character select</a></td><td>not started</td></tr>
+</table>
+<p class="src">Source: ADR-004, ADR-014; docs/data.md.</p>
+</section>
+
+<section class="concept" id="roadmap" data-design="decided" data-impl="partial" data-title="Roadmap">
+<header><h2>Roadmap</h2></header>
+<table>
+<tr><th>M</th><th>Goal</th><th>Done when</th><th>Status</th></tr>
+<tr><td>M0</td><td>Setup</td><td>Web build loads; tests green; CLI connected; server echoes</td><td>in progress</td></tr>
+<tr><td>M1</td><td>Core loop, offline</td><td>Hex map, one unit each, move + attack, AP turns, win by kill, vs random bot; deterministic damage with preview and reveal; HUD package D</td><td>done 15 Sep 2026</td></tr>
+<tr><td>M2</td><td>Online</td><td>Same round over WebSocket; guest auth; queue; server clocks; reconnect</td><td>next</td></tr>
+<tr><td>M3</td><td>Depth</td><td>Gear (items replace classes), two lanes + elements, three lineages with starting blessings, boons (blessing / enchant / sigil) with draft, session best-of-3 across three ladder maps, session-long reveals, character select and draft screens</td><td></td></tr>
+<tr><td>M4</td><td>Presentation</td><td>Camera toggle, examine polish, VFX, FMOD, low-poly heroes with visible gear</td><td></td></tr>
+<tr><td>M5</td><td>Ship</td><td>Glicko-2, VPS deploy, size and load optimisation, mobile browser check, accounts and presets</td><td></td></tr>
+</table>
+<p class="small">Detailed progress log stays in <code>docs/roadmap.md</code>. The M3 line above supersedes the older "3 classes" wording.</p>
+</section>
+
+<section class="concept" id="decisions" data-design="decided" data-impl="implemented" data-title="Decision log">
+<header><h2>Decision log</h2></header>
+<p class="lead">Design decisions with the date they were made. Architectural ones also have an ADR in <code>docs/decisions.md</code>. Newest at the bottom.</p>
+<table>
+<tr><th>Date</th><th>Decision</th><th>Section</th><th>ADR</th></tr>
+<tr><td>2026-09-14</td><td>Hex tiles; JSON data; custom WebSocket server with shared C# rules; Web build only</td><td><a href="#board">Board</a>, <a href="#data-model">Data</a></td><td>001-011</td></tr>
+<tr><td>2026-09-15</td><td>Alternating turns, per-turn cap, timeout = skip, rope and idle penalty</td><td><a href="#turns">Turns</a></td><td>015</td></tr>
+<tr><td>2026-09-15</td><td>3 AP per turn, flat costs, unlimited reuse, no carry-over</td><td><a href="#turns">Turns</a></td><td>016</td></tr>
+<tr><td>2026-09-15</td><td>Deterministic damage; preview and actual share one function; hidden modifiers revealed on first effect; enemy HP visible; line of sight always</td><td><a href="#damage">Damage</a></td><td>017</td></tr>
+<tr><td>2026-09-15</td><td>Validate / Apply / EnumerateLegal core shape; PlayerView + EventFilter</td><td><a href="#hidden-info">Hidden info</a></td><td>018</td></tr>
+<tr><td>2026-09-15</td><td>HUD package D</td><td><a href="#hud">HUD</a></td><td>019</td></tr>
+<tr><td>2026-09-16</td><td>Character = gear (weapon, crown, boots, armour) + lineage + boons; no classes; gear picked first, then lineage; gear locked for the session</td><td><a href="#character">Character</a>, <a href="#character-select">Select</a></td><td>020</td></tr>
+<tr><td>2026-09-16</td><td>Two damage lanes (weapon, spell) with Strength / Magic power and per-lane armour defence; elements are a modifier class, not a lane; more modifier classes later</td><td><a href="#damage">Damage</a>, <a href="#elements">Elements</a>, <a href="#armour">Armour</a></td><td>021</td></tr>
+<tr><td>2026-09-16</td><td>Lineage grants a starting Blessing and defines the draft pool; vocabulary: Boon = Blessing / Enchant / Sigil</td><td><a href="#lineage">Lineage</a>, <a href="#boons">Boons</a></td><td>022</td></tr>
+<tr><td>2026-09-16</td><td>Gear identity and innate stats are public; lineage, abilities and boons hidden until used or triggered</td><td><a href="#hidden-info">Hidden info</a></td><td>022</td></tr>
+<tr><td>2026-09-16</td><td>Loadout slice scoped: same base stats for every hero in <code>rules.baseStats</code>; walk innate, boots add a mode; every base weapon and crown has exactly two abilities; no negative item stats; launch catalogue bow (1..5) + gun (1..7), one crown, jump + teleport boots, one armour; ability count per item visible as "?" slots; blade deferred. Spec: <code>docs/specs/2026-09-16-loadout-slice.md</code></td><td><a href="#stats">Stats</a>, <a href="#equipment">Equipment</a>, <a href="#weapon">Weapon</a>, <a href="#boots">Boots</a>, <a href="#hidden-info">Hidden info</a></td><td>—</td></tr>
+</table>
+</section>
+
+<section class="concept" id="drift" data-design="decided" data-impl="implemented" data-title="Drift register (generated)">
+<header><h2>Drift register (generated)</h2></header>
+<p class="lead">Every section flagged <span class="badge drift">drift</span>, with its note. Generated from the page on load. Empty means the code matches the design.</p>
+<div id="drift-table"></div>
+</section>
+
+<section class="concept" id="open-questions" data-design="decided" data-impl="implemented" data-title="Open questions (generated)">
+<header><h2>Open questions (generated)</h2></header>
+<p class="lead">Every open question on this page, grouped by section. Answer one by editing its section: write the rule, delete the question, log the decision.</p>
+<div id="oq-list"></div>
+</section>
+
+<section class="concept" id="changelog" data-design="decided" data-impl="implemented" data-title="Changelog">
+<header><h2>Changelog</h2></header>
+<table>
+<tr><th>Date</th><th>Change</th></tr>
+<tr><td>2026-09-16</td><td>v0.2.1. Loadout question round: base stats, boots, two abilities per weapon/crown, no negative stats, launch catalogue, bow/gun ranges, "?" ability slots. Five open questions closed, two added. Spec written for the next session.</td></tr>
+<tr><td>2026-09-16</td><td>v0.2. First HTML edition. Migrated design.md v0.1 (pillars, win conditions, resolved questions). Added from the notebook: character = gear + lineage + boons, four equipment slots, stats (Health / Strength / Magic / Armour per lane), two damage lanes + elements, lineages (Greek, Norse, Hindu), boon kinds Blessing / Enchant / Sigil, draft rules, hidden-information table, character select flow. Marked classes superseded and recorded drift against the M1 code.</td></tr>
+</table>
+</section>
+
+</main>
+</div>
+
+<script>
+(function(){
+  const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+  const root=document.documentElement;
+  const store={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+
+  // theme
+  const savedTheme=store.get('mimas-theme'); if(savedTheme) root.setAttribute('data-theme',savedTheme);
+  $('#theme-btn').onclick=()=>{const cur=root.getAttribute('data-theme'); const dark=cur?cur==='dark':matchMedia('(prefers-color-scheme: dark)').matches; const next=dark?'light':'dark'; root.setAttribute('data-theme',next); store.set('mimas-theme',next);};
+  $('#menu-btn').onclick=()=>$('#side').classList.toggle('open');
+  $('#side').addEventListener('click',e=>{ if(e.target.closest('a.item') && innerWidth<=900) $('#side').classList.remove('open'); });
+
+  const sections=$$('section.concept');
+  const implLabel={implemented:'in code',partial:'partial','not-started':'not started',drift:'DRIFT'};
+
+  // badges + anchor
+  sections.forEach(s=>{
+    const h=$('header',s); const d=s.dataset.design, i=s.dataset.impl;
+    const b1=document.createElement('span'); b1.className='badge '+d; b1.textContent=d;
+    const b2=document.createElement('span'); b2.className='badge '+i; b2.textContent=implLabel[i]||i;
+    const a=document.createElement('a'); a.className='anchor'; a.href='#'+s.id; a.textContent='#'+s.id;
+    h.append(b1,b2,a);
+  });
+
+  // nav
+  const nav=$('#nav'); let group=null;
+  $$('main > *').forEach(el=>{
+    if(el.classList.contains('grp-title')){ group=document.createElement('div'); group.className='grp'; group.textContent=el.dataset.group; nav.append(group); }
+    else if(el.classList.contains('concept')){
+      const a=document.createElement('a'); a.className='item'; a.href='#'+el.id; a.dataset.for=el.id;
+      const dot=document.createElement('i'); dot.className='dot '+el.dataset.design;
+      const t=document.createElement('span'); t.textContent=el.dataset.title||$('h2',el).textContent;
+      const m=document.createElement('span'); m.className='impl-mark '+el.dataset.impl; m.textContent=implLabel[el.dataset.impl]||'';
+      a.append(dot,t,m); nav.append(a);
+    }
+  });
+
+  // backlinks
+  const refs={}; sections.forEach(s=>refs[s.id]=new Set());
+  sections.forEach(s=>{ $$('a[href^="#"]',s).forEach(a=>{ let id=a.getAttribute('href').slice(1); let target=document.getElementById(id); if(!target) return; const sec=target.closest('section.concept'); if(sec && sec!==s && refs[sec.id]) refs[sec.id].add(s.id); }); });
+  sections.forEach(s=>{ const r=[...refs[s.id]]; if(!r.length) return; const d=document.createElement('div'); d.className='backlinks'; d.append('Referenced by: '); r.forEach(id=>{ const t=document.getElementById(id); const a=document.createElement('a'); a.href='#'+id; a.textContent=t.dataset.title||id; d.append(a); }); s.append(d); });
+
+  // drift register
+  const dt=$('#drift-table'); const drifts=sections.filter(s=>s.dataset.impl==='drift');
+  if(drifts.length){ const tb=document.createElement('table'); tb.innerHTML='<tr><th>Section</th><th>Design</th><th>What the code does instead / plan</th></tr>';
+    drifts.forEach(s=>{ const tr=document.createElement('tr'); const n=$('.drift-note',s); tr.innerHTML=`<td><a href="#${s.id}">${s.dataset.title}</a></td><td><span class="badge ${s.dataset.design}">${s.dataset.design}</span></td><td>${n?n.innerHTML.replace(/<b>Drift\.<\/b>\s*/,''):''}</td>`; tb.append(tr); }); dt.append(tb); }
+
+  // open questions register
+  const oq=$('#oq-list'); let total=0;
+  sections.forEach(s=>{ const items=$$('.open-q li',s); if(!items.length) return; const h=document.createElement('h4'); const a=document.createElement('a'); a.href='#'+s.id; a.textContent=s.dataset.title; h.append(a); const ul=document.createElement('ul'); items.forEach(li=>{ total++; const c=document.createElement('li'); const q=document.createElement('a'); q.className='qid'; q.href='#'+(li.id||s.id); q.textContent=li.id||''; c.append(q, ' ', ...Array.from(li.cloneNode(true).childNodes)); ul.append(c); }); oq.append(h,ul); });
+  const oqTitle=$('#open-questions h2'); oqTitle.textContent+=` · ${total}`;
+  $$('.open-q li').forEach(li=>{ if(li.id){ const t=document.createElement('span'); t.className='qid'; t.textContent=li.id; li.prepend(t);} });
+
+  // filters + search
+  const state={design:new Set(['decided','proposed','open','superseded']), impl:new Set(['implemented','partial','not-started','drift']), q:''};
+  function apply(){
+    sections.forEach(s=>{ const ok=state.design.has(s.dataset.design)&&state.impl.has(s.dataset.impl)&&(!state.q||s.textContent.toLowerCase().includes(state.q)); s.classList.toggle('hidden',!ok); const n=$(`a.item[data-for="${s.id}"]`); if(n) n.classList.toggle('hidden',!ok); });
+    $$('.grp',nav).forEach(g=>{ let e=g.nextElementSibling, any=false; while(e&&!e.classList.contains('grp')){ if(!e.classList.contains('hidden')) any=true; e=e.nextElementSibling;} g.style.display=any?'':'none'; });
+  }
+  $$('.chip').forEach(c=>c.onclick=()=>{ c.classList.toggle('on'); const set=state[c.dataset.k]; c.classList.contains('on')?set.add(c.dataset.v):set.delete(c.dataset.v); apply(); });
+  $('#search').oninput=e=>{ state.q=e.target.value.trim().toLowerCase(); apply(); };
+
+  // active section
+  const io=new IntersectionObserver(es=>{ es.forEach(en=>{ if(en.isIntersecting){ $$('a.item',nav).forEach(a=>a.classList.toggle('active',a.dataset.for===en.target.id)); } }); },{rootMargin:'-20% 0px -70% 0px'});
+  sections.forEach(s=>io.observe(s));
+})();
+</script>
+</body>
+</html>

@@ -5,7 +5,7 @@
 | M0 | Setup | Empty Web build loads in browser; `dotnet test` green; Unity CLI + Claude Code connected; server `/ws` echoes ping | in progress |
 | M1 | Core loop, offline | Hex map from JSON, 1 unit each, move + basic attack, turn order, win by kill; playable vs a random bot in the Editor; Core has ≥ 50 tests | **done 15 Sep 2026** |
 | M2 | Online | Same match over WebSocket via `Mimas.Server`; guest auth; matchmaking queue; chess clocks; reconnect | |
-| M3 | Depth | 3 classes, abilities with hidden/reveal, modifiers, tile effects (pickups, terrain), boon draft, best-of-3 series across 3 maps | |
+| M3 | Depth | Gear replaces classes (`items/`), two damage lanes + elements, three lineages with starting blessings, boons (blessing / enchant / sigil) with the between-round draft, session best-of-3 across 3 ladder maps, session-long reveals, character select and draft screens. Spec: `docs/design/index.html` | |
 | M4 | Presentation | Cinemachine tilted/top-down toggle, UI Toolkit HUD + examine mode, Shuriken VFX, FMOD music/SFX, low-poly characters with animations | |
 | M5 | Ship | Ratings (Glicko-2), deploy on VPS, size/load optimisation (Addressables, stripping), mobile browser check | |
 
@@ -38,8 +38,9 @@ examine) since the random bot rarely picks attacks; Fire Bolt and line of sight 
 Web build of the new HUD. Tuning thoughts: the 7 s idle penalty bites on a first turn; a refused far
 click while Move is armed is silent on screen.
 
-Next: M2 (WebSocket rooms, guest auth, matchmaking, server-side clocks that submit
-`EndTurnCommand(Timeout)`, reconnect via `PlayerView` resync). Before that, a short balance pass on the
+Next (decided 16 Sep 2026): the **loadout slice** before M2, so the wire format is built around gear rather
+than classes. Work order: `docs/specs/2026-09-16-loadout-slice.md`. Then M2 (WebSocket rooms, guest auth,
+matchmaking, server-side clocks that submit `EndTurnCommand(Timeout)`, reconnect via `PlayerView` resync). Before that, a short balance pass on the
 shipped numbers (warrior 20 hp / mage 16 hp, jab 1 AP 2 dmg, strike 2 AP 5 dmg, fire bolt 2 AP 6 dmg) by
 letting two random bots play a few hundred seeded games.
 
