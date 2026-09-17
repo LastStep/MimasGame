@@ -15,6 +15,7 @@ using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace Mimas.Client.Editor
 {
@@ -64,6 +65,8 @@ namespace Mimas.Client.Editor
 
             try
             {
+                EnsureAlwaysIncludedShaders();
+
                 PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Brotli;
                 PlayerSettings.WebGL.decompressionFallback = false;
                 PlayerSettings.WebGL.nameFilesAsHashes = true;
@@ -118,6 +121,65 @@ namespace Mimas.Client.Editor
             // After the finally, never inside it: EditorApplication.Exit terminates the process on the
             // spot, so exiting from the try skips the restore above entirely.
             if (failed && Application.isBatchMode) EditorApplication.Exit(1);
+        }
+
+        /// <summary>
+        /// A shader reached only through <c>Shader.Find</c> is in no scene and on no material, so the
+        /// build does not include it and the lookup returns null in the player while working perfectly
+        /// in the Editor. The first Web build hit exactly that:
+        ///
+        ///   [AimPreview] Shader 'Mimas/AimLine' not found; the aim preview will not draw.
+        ///
+        /// and the placeholder units came out magenta, because `GameObject.CreatePrimitive` leaves the
+        /// default material on anything `UnitView._visualMaterial` is not set for.
+        ///
+        /// Always Included Shaders is the sanctioned answer. Doing it here means Unity writes
+        /// `GraphicsSettings.asset` itself rather than an agent hand-editing a protected file, and it
+        /// cannot be forgotten before a deploy.
+        /// </summary>
+        private static void EnsureAlwaysIncludedShaders()
+        {
+            string[] wanted =
+            {
+                "Mimas/AimLine",                        // AimPreview + ProjectilePlayback, via Shader.Find
+                "Mimas/HexTile",                        // the board, in case Tile.mat ever stops referencing it
+                "Universal Render Pipeline/Lit",        // CreatePrimitive's default material
+                "Universal Render Pipeline/Unlit",
+            };
+
+            var settings = new SerializedObject(GraphicsSettings.GetGraphicsSettings());
+            SerializedProperty list = settings.FindProperty("m_AlwaysIncludedShaders");
+            if (list == null)
+            {
+                Debug.LogWarning("[WebBuild] could not find m_AlwaysIncludedShaders; shaders may be stripped");
+                return;
+            }
+
+            var present = new HashSet<string>();
+            for (int i = 0; i < list.arraySize; i++)
+            {
+                var shader = list.GetArrayElementAtIndex(i).objectReferenceValue as Shader;
+                if (shader != null) present.Add(shader.name);
+            }
+
+            foreach (string name in wanted)
+            {
+                if (present.Contains(name)) continue;
+
+                Shader shader = Shader.Find(name);
+                if (shader == null)
+                {
+                    Debug.LogWarning($"[WebBuild] shader '{name}' does not exist; not added");
+                    continue;
+                }
+
+                list.InsertArrayElementAtIndex(list.arraySize);
+                list.GetArrayElementAtIndex(list.arraySize - 1).objectReferenceValue = shader;
+                Debug.Log($"[WebBuild] always-included shader added: {name}");
+            }
+
+            settings.ApplyModifiedProperties();
+            AssetDatabase.SaveAssets();
         }
 
         /// <summary>

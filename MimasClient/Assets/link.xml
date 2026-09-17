@@ -1,5 +1,26 @@
-<!-- Copy to MimasClient/Assets/link.xml. Keeps reflection-based JSON types alive under Managed Stripping = High. -->
+<!-- Keeps things alive that Managed Stripping = High cannot see being used.
+     Golden rule 9: this file must stay current, because nothing but a Web build ever proves it. -->
 <linker>
+  <!-- Reflection-based JSON: the catalogue is deserialised by name, so nothing references these types
+       statically and the stripper would remove them. -->
   <assembly fullname="Newtonsoft.Json" preserve="all" />
   <assembly fullname="Mimas.Core" preserve="all" />
+
+  <!-- Colliders reach the build only through GameObject.CreatePrimitive, which adds them natively.
+       No managed code names CapsuleCollider or SphereCollider, so engine code stripping dropped the
+       whole Physics module and the first Web build said, eleven times:
+
+         Can't add component because class 'CapsuleCollider' doesn't exist!
+
+       That is not cosmetic: the body collider is what the cursor picks (design #presentation), so
+       without it nothing on the board can be clicked. UnitView builds a Capsule body and a Cube nose,
+       PropView a Cube and a Cylinder, ProjectilePlayback a Sphere. -->
+  <assembly fullname="UnityEngine.PhysicsModule">
+    <type fullname="UnityEngine.Collider" preserve="all" />
+    <type fullname="UnityEngine.CapsuleCollider" preserve="all" />
+    <type fullname="UnityEngine.SphereCollider" preserve="all" />
+    <type fullname="UnityEngine.BoxCollider" preserve="all" />
+    <type fullname="UnityEngine.MeshCollider" preserve="all" />
+    <type fullname="UnityEngine.Physics" preserve="all" />
+  </assembly>
 </linker>
