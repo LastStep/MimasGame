@@ -168,6 +168,20 @@ namespace Mimas.Core.Match
             _props = props;
         }
 
+        /// <summary>
+        /// Builds a view from parts rather than from a state: what <c>Mimas.Core.Protocol.Wire.ReadView</c>
+        /// calls after decoding a frame, and the only way a client ever obtains one. <see cref="Build"/>
+        /// remains the only path from a <see cref="MatchState"/>.
+        /// </summary>
+        public static PlayerView Create(int viewer, int activePlayer, int turnNumber, bool acted, bool isOver, int winner, string mapId,
+            List<UnitView> units, List<PropView> props)
+        {
+            if (viewer < 0 || viewer >= MatchSetup.PlayerCount) throw new ArgumentOutOfRangeException(nameof(viewer));
+            if (mapId == null) throw new ArgumentNullException(nameof(mapId));
+            return new PlayerView(viewer, activePlayer, turnNumber, acted, isOver, winner, mapId,
+                units ?? new List<UnitView>(), props ?? new List<PropView>());
+        }
+
         public UnitView FindUnit(int id)
         {
             for (int i = 0; i < _units.Count; i++) if (_units[i].Id == id) return _units[i];
