@@ -59,6 +59,7 @@ namespace Mimas.Client.UI
         private bool _busy;
         private bool _loading;
         private bool _bound;
+        private bool _subscribed;
 
         // ---- lifecycle -------------------------------------------------------------------------------
 
@@ -69,41 +70,61 @@ namespace Mimas.Client.UI
 
         private void OnEnable()
         {
-            _net = NetClient.Instance;
-            if (_net == null)
-            {
-                Debug.LogError("[LobbyView] No NetClient in the scene; nothing can be played.", this);
-                return;
-            }
-
-            _net.MessageReceived += HandleMessage;
-            _net.Disconnected += HandleDisconnected;
-            _net.MatchLost += HandleMatchLost;
+            TrySubscribe();
         }
 
         private void OnDisable()
         {
-            if (_net != null)
+            if (_net != null && _subscribed)
             {
                 _net.MessageReceived -= HandleMessage;
+                _net.Connected -= HandleConnected;
                 _net.Disconnected -= HandleDisconnected;
                 _net.MatchLost -= HandleMatchLost;
             }
+            _subscribed = false;
             Unbind();
+        }
+
+        /// <summary>
+        /// Finds the connection and listens to it. Called from both OnEnable and Start because Unity runs
+        /// Awake and OnEnable per object in scene order: this view's OnEnable can run before the Net object's
+        /// Awake has set the singleton, and did.
+        /// </summary>
+        private void TrySubscribe()
+        {
+            if (_subscribed) return;
+            _net = NetClient.Instance;
+            if (_net == null) return;
+
+            _net.MessageReceived += HandleMessage;
+            _net.Connected += HandleConnected;
+            _net.Disconnected += HandleDisconnected;
+            _net.MatchLost += HandleMatchLost;
+            _subscribed = true;
         }
 
         private void Start()
         {
+            TrySubscribe();
+            if (_net == null)
+            {
+                Debug.LogError("[LobbyView] No NetClient in the scene; nothing can be played.", this);
+                enabled = false;
+                return;
+            }
+
             if (!TryBind()) return;
 
             // A page reload mid-match lands here first: say so, and go straight back into the match when
             // the server confirms the seat is still ours.
-            if (_net != null && _net.CurrentMatchId != 0)
+            if (_net.CurrentMatchId != 0)
             {
                 SetStatus("Reconnecting…");
                 _busy = true;
+                _authenticateWhenConnected = true;
                 _net.Connect();
-                _net.Authenticate(_name.value);
+                if (_net.State == NetState.Connected) HandleConnected();
             }
         }
 
@@ -245,9 +266,9 @@ namespace Mimas.Client.UI
             }
 
             SetStatus("Connecting…");
+            _authenticateWhenConnected = true;
             _net.Connect();
-            if (_net.State == NetState.Connected) _net.Authenticate(chosen);
-            else _authenticateWhenConnected = true;
+            if (_net.State == NetState.Connected) HandleConnected();
         }
 
         private string _pendingType;
@@ -345,8 +366,10 @@ namespace Mimas.Client.UI
             switch (type)
             {
                 case Messages.AuthOk:
-                    if (_authenticateWhenConnected) _authenticateWhenConnected = false;
-                    SendPending();
+                    // Nothing queued means we authenticated for our own reasons (a reconnection that came
+                    // to nothing). Let go of the wait, or every button stays dead.
+                    if (string.IsNullOrEmpty(_pendingType)) { _busy = false; SetButtonsEnabled(true); }
+                    else SendPending();
                     break;
 
                 case Messages.RoomState:
@@ -380,6 +403,17 @@ namespace Mimas.Client.UI
                     else SetStatus(message);
                     break;
             }
+        }
+
+        /// <summary>
+        /// The socket is up. Connecting is asynchronous, so everything a button press wants to do waits
+        /// here: say who we are, and only then send what was asked for (on auth.ok).
+        /// </summary>
+        private void HandleConnected()
+        {
+            if (!_authenticateWhenConnected) return;
+            _authenticateWhenConnected = false;
+            _net.Authenticate(_name != null ? _name.value : null);
         }
 
         private void HandleDisconnected(string reason)

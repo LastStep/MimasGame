@@ -21,6 +21,12 @@ namespace Mimas.Client.Presentation
     /// </summary>
     public sealed class OnlineMatchDriver : IMatchDriver
     {
+        /// <summary>
+        /// <see cref="OpponentStatus"/> when the server no longer has this match — it was restarted, or the
+        /// room closed while we were away. There is no result to show, only a way out.
+        /// </summary>
+        public const string LostStatus = "Match lost";
+
         private readonly ContentCatalog _catalog;
         private readonly NetClient _net;
         private readonly int _matchId;
@@ -38,6 +44,7 @@ namespace Mimas.Client.Presentation
         private string _opponentStatus;
         private float _graceRemaining;
         private bool _matchOver;
+        private bool _lost;
 
         public int LocalPlayer { get; private set; }
         public MatchState Rules { get { return _rules; } }
@@ -57,7 +64,7 @@ namespace Mimas.Client.Presentation
         }
 
         /// <summary>You may concede any time the match is running, including while the other player is thinking.</summary>
-        public bool CanResign { get { return Ready && !_matchOver; } }
+        public bool CanResign { get { return Ready && !_matchOver && !_lost; } }
 
         public event Action<IReadOnlyList<MatchEvent>> EventsArrived;
         public event Action Resynced;
@@ -75,6 +82,7 @@ namespace Mimas.Client.Presentation
             _net.MessageReceived += HandleMessage;
             _net.Disconnected += HandleDisconnected;
             _net.Connected += HandleConnected;
+            _net.MatchLost += HandleMatchLost;
         }
 
         /// <summary>Hands the presenter the events that came with <c>match.start</c> (normally one turn starting).</summary>
@@ -138,6 +146,7 @@ namespace Mimas.Client.Presentation
                 _net.MessageReceived -= HandleMessage;
                 _net.Disconnected -= HandleDisconnected;
                 _net.Connected -= HandleConnected;
+                _net.MatchLost -= HandleMatchLost;
             }
             EventsArrived = null;
             Resynced = null;
@@ -218,14 +227,26 @@ namespace Mimas.Client.Presentation
 
         private void HandleDisconnected(string reason)
         {
-            if (_matchOver) return;
+            if (_matchOver || _lost) return;
             SetStatus("Reconnecting…");
         }
 
         private void HandleConnected()
         {
-            if (_matchOver) return;
+            if (_matchOver || _lost) return;
             SetStatus("Reconnecting…");
+        }
+
+        /// <summary>
+        /// We got back to a server that has never heard of this match. Nothing here can be recovered and
+        /// nobody won: say so plainly rather than counting down a reconnection that will never arrive.
+        /// </summary>
+        private void HandleMatchLost()
+        {
+            if (_matchOver || _lost) return;
+            _lost = true;
+            _graceRemaining = 0f;
+            SetStatus(LostStatus);
         }
 
         /// <summary>Replaces the mirror and the clock from whatever the server just sent.</summary>

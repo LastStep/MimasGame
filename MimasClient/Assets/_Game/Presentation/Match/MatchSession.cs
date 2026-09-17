@@ -581,7 +581,20 @@ namespace Mimas.Client.Presentation
 
         private void HandleStatusChanged()
         {
-            if (_ready) RaiseStateChanged();
+            if (!_ready) return;
+
+            // The server no longer has this match. There is no result and no winner, only a way back; say
+            // that instead of leaving the player watching a board nothing can move again.
+            if (_banner == null && _driver.OpponentStatus == OnlineMatchDriver.LostStatus)
+            {
+                _banner = "MATCH LOST";
+                _bannerDetail = "the server no longer has this match";
+                _backToLobbyAt = Time.time;
+                Disarm();
+                Debug.Log("[MatchSession] the match is gone from the server; offering the lobby.");
+            }
+
+            RaiseStateChanged();
         }
 
         private void PlayPendingEvents()

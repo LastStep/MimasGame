@@ -60,6 +60,9 @@ namespace Mimas.Client.Net
         private bool _retriedAsGuest;
         private bool _wantsConnection;
 
+        /// <summary>We dropped mid-match and are chasing the connection back, rather than waiting to be asked.</summary>
+        private bool _reconnecting;
+
         public static NetClient Instance { get; private set; }
 
         public NetState State => _state;
@@ -185,6 +188,7 @@ namespace Mimas.Client.Net
         public void Disconnect()
         {
             _wantsConnection = false;
+            _reconnecting = false;
             _retryIn = 0f;
             CloseSocket();
             _state = NetState.Disconnected;
@@ -206,6 +210,12 @@ namespace Mimas.Client.Net
         {
             _state = NetState.Connected;
             Debug.Log("[NetClient] connected");
+
+            // A reconnection has nobody to press a button for it: the socket coming back is the whole of
+            // the intent, so say who we are at once. Without this the Arena sits on "Reconnecting…" with a
+            // perfectly good socket and never finds out whether its seat is still there.
+            if (_reconnecting) Authenticate(PlayerName);
+
             Action handler = Connected;
             if (handler != null) handler();
         }
@@ -229,6 +239,7 @@ namespace Mimas.Client.Net
             // decides when to try again, which is when the player presses something.
             if (_wantsConnection && CurrentMatchId != 0)
             {
+                _reconnecting = true;
                 _retryIn = ReconnectDelaySeconds;
                 if (wasAuthenticated) Debug.Log("[NetClient] will retry in " + ReconnectDelaySeconds + " s");
             }
@@ -316,6 +327,7 @@ namespace Mimas.Client.Net
             PlayerPrefs.SetString(NamePref, PlayerName ?? "");
             SavePrefs();
             _retriedAsGuest = false;
+            _reconnecting = false;
             Debug.Log("[NetClient] authenticated as " + PlayerName + " (#" + PlayerId + ")");
 
             // If we believed we were in a match, the server has this moment to say so.
@@ -341,9 +353,16 @@ namespace Mimas.Client.Net
 
             // The server has been restarted and has never heard of us. Start again, once.
             _retriedAsGuest = true;
+            bool wasInMatch = CurrentMatchId != 0;
             Token = "";
             ForgetMatch();
             Send(Messages.AuthGuest, new JObject { ["name"] = PlayerName ?? "" });
+
+            // If we thought we were still seated somewhere, we were wrong, and whoever is waiting on that
+            // has to be told — otherwise the lobby waits for a reconnection that can never happen.
+            if (!wasInMatch) return;
+            Action handler = MatchLost;
+            if (handler != null) handler();
         }
 
         /// <summary>The Arena scene takes the pending start and clears it, so coming back to the lobby does not reload it.</summary>
