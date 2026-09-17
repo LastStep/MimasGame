@@ -8,6 +8,10 @@ artifacts/
 TestResults/
 *.trx
 
+# ---------- Node (tools/smoke, ladder rung 10) ----------
+node_modules/
+package-lock.json
+
 # ---------- Local / OS ----------
 .DS_Store
 Thumbs.db

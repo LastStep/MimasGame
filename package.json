@@ -1,0 +1,13 @@
+{
+  "name": "mimas-tools",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Node tooling for Mimas. The game is C# and Unity; this exists so ladder rung 10 (browser smoke) is repeatable.",
+  "type": "module",
+  "scripts": {
+    "smoke": "node tools/smoke/browser-smoke.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.63.0"
+  }
+}

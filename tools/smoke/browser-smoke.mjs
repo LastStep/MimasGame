@@ -1,0 +1,195 @@
+#!/usr/bin/env node
+// Ladder rung 10 — browser smoke.
+//
+// Loads a served Mimas Web build in headless Chromium, waits for Unity to boot, and fails loudly on
+// anything the browser complains about. This is the gate between "it built" and "a friend can play
+// it": nothing else in the ladder ever executes the WebGL-specific paths — the NativeWebSocket jslib
+// socket, PlayerPrefs reaching IndexedDB, `?room=` off the page URL, Brotli.
+//
+//   node tools/smoke/browser-smoke.mjs --expect "\\[NetClient\\] connected"
+//   node tools/smoke/browser-smoke.mjs --url http://localhost:7777/?room=ABCD --shot artifacts/smoke
+//   node tools/smoke/browser-smoke.mjs --do "wait:2000,click:480,420,shot:after-click,wait:8000"
+//
+// Exit 0 = the page loaded, Unity booted, `--expect` was seen, and nothing wrote to console.error.
+// Exit 1 = a real failure, with the browser's own words in the output. Never retry it away.
+//
+// On "booted": it means createUnityInstance resolved. Unity's splash screen is still on the canvas
+// for a few seconds after that, so booted is NOT playable — pass `--expect` with a line the game
+// itself logs (`[ContentBootstrap] Content loaded`, `[NetClient] connected`) when you need to know
+// the game is alive. An earlier version of this script gated on the template's loading bar being
+// hidden; that is `display: none` in the stylesheet until the loader shows it, so it passed in 906 ms
+// against a page that had not started loading. Do not reintroduce that check.
+
+import { chromium } from 'playwright';
+import { mkdir, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+
+const args = parseArgs(process.argv.slice(2));
+const url = args.url ?? 'http://localhost:7777/';
+const bootTimeout = Number(args.timeout ?? 120_000);
+const shotDir = args.shot ?? 'artifacts/smoke';
+const headed = 'headed' in args;
+// Errors that are known-benign and must be justified in the run report, never added casually.
+const allow = args.allow ? new RegExp(args.allow) : null;
+
+const errors = [];
+const log = [];
+
+function note(line) {
+  log.push(line);
+  console.log(line);
+}
+
+// Two things were tried before this and both were wrong, so they are written down rather than
+// rediscovered: polling for `window.createUnityInstance` loses the race (the loader defines it during
+// script evaluation and calls it from that same script's onload), and an Object.defineProperty
+// accessor is simply overwritten, because the loader declares it as a global `function`. What is left
+// is the template's own loading bar, which is honest as long as BOTH phases are checked.
+const browser = await chromium.launch({ headless: !headed });
+const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+const page = await context.newPage();
+
+// A line the game itself must print before this run counts as a pass.
+const expect = args.expect ? new RegExp(args.expect) : null;
+let expectSeen = false;
+
+page.on('console', (msg) => {
+  const text = msg.text();
+  const line = `[console.${msg.type()}] ${text}`;
+  log.push(line);
+  if (expect && expect.test(text)) expectSeen = true;
+  if (msg.type() === 'error') {
+    if (allow && allow.test(text)) note(`[allowed] ${text}`);
+    else errors.push(line);
+  } else if (msg.type() === 'warning') {
+    console.log(line);
+  } else if (/^\[[A-Za-z]/.test(text)) {
+    console.log(line);   // the game's own [Tag] lines are the interesting ones
+  }
+});
+
+page.on('pageerror', (err) => {
+  const line = `[pageerror] ${err.message}`;
+  log.push(line);
+  errors.push(line);
+});
+
+page.on('requestfailed', (req) => {
+  const line = `[requestfailed] ${req.url()} — ${req.failure()?.errorText ?? 'unknown'}`;
+  log.push(line);
+  errors.push(line);
+});
+
+page.on('response', (res) => {
+  if (res.status() >= 400) {
+    const line = `[http ${res.status()}] ${res.url()}`;
+    log.push(line);
+    errors.push(line);
+  }
+});
+
+let failure = null;
+try {
+  note(`> ${url}`);
+  const started = Date.now();
+  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+
+  await page.waitForSelector('#unity-canvas', { timeout: 30_000 });
+  note(`canvas present (${Date.now() - started} ms)`);
+
+  // Phase 1: the template shows the loading bar the moment it starts fetching. Without this check the
+  // "hidden" test below passes instantly, because the stylesheet hides the bar to begin with.
+  await page.waitForFunction(() => {
+    const bar = document.querySelector('#unity-loading-bar');
+    return bar && getComputedStyle(bar).display !== 'none';
+  }, { timeout: 30_000 });
+  note(`loader started (${Date.now() - started} ms)`);
+
+  // Phase 2: the template hides it again from createUnityInstance's .then, i.e. the instance exists.
+  await page.waitForFunction(() => {
+    const bar = document.querySelector('#unity-loading-bar');
+    return bar && getComputedStyle(bar).display === 'none';
+  }, { timeout: bootTimeout });
+  const bootMs = Date.now() - started;
+  note(`unity booted (${bootMs} ms) — splash is still on the canvas at this point`);
+
+  if (expect) {
+    await page.waitForFunction(() => true);   // yield once so queued console events flush
+    const deadline = Date.now() + Number(args['expect-timeout'] ?? 60_000);
+    while (!expectSeen && Date.now() < deadline) await page.waitForTimeout(250);
+    if (!expectSeen) throw new Error(`never saw a console line matching /${args.expect}/`);
+    note(`saw /${args.expect}/ (${Date.now() - started} ms)`);
+  }
+
+  await mkdir(shotDir, { recursive: true });
+  await runSteps(page, args.do ?? '', shotDir, note);
+  await page.screenshot({ path: path.join(shotDir, 'final.png') });
+  note(`screenshot ${path.join(shotDir, 'final.png')}`);
+  note(`cold boot to instance: ${bootMs} ms`);
+} catch (e) {
+  failure = e;
+} finally {
+  try {
+    await mkdir(shotDir, { recursive: true });
+    if (failure) await page.screenshot({ path: path.join(shotDir, 'failure.png') }).catch(() => {});
+    await writeFile(path.join(shotDir, 'console.log'), log.join('\n') + '\n');
+  } catch {}
+  await browser.close();
+}
+
+if (failure) {
+  console.error(`\nFAILED: ${failure.message}`);
+  if (errors.length) console.error(errors.join('\n'));
+  process.exit(1);
+}
+
+if (errors.length) {
+  console.error(`\nFAILED: ${errors.length} browser error(s)\n` + errors.join('\n'));
+  process.exit(1);
+}
+
+note('\nOK — no pageerror, no console.error, no failed request.');
+
+/** `wait:2000,click:480,420,shot:lobby` — ordered steps, so a scenario needs no second file. */
+async function runSteps(page, spec, dir, say) {
+  if (!spec) return;
+  const parts = spec.split(',').map((s) => s.trim()).filter(Boolean);
+  for (let i = 0; i < parts.length; i++) {
+    const [verb, first] = parts[i].split(':');
+    if (verb === 'wait') {
+      await page.waitForTimeout(Number(first));
+      say(`wait ${first} ms`);
+    } else if (verb === 'shot') {
+      const file = path.join(dir, `${first}.png`);
+      await page.screenshot({ path: file });
+      say(`screenshot ${file}`);
+    } else if (verb === 'click') {
+      // Canvas-relative CSS pixels: the next part is the y, since the split ate the comma.
+      const x = Number(first);
+      const y = Number(parts[++i]);
+      const box = await page.locator('#unity-canvas').boundingBox();
+      if (!box) throw new Error('cannot click: #unity-canvas has no box');
+      await page.mouse.move(box.x + x, box.y + y);
+      await page.waitForTimeout(120);
+      await page.mouse.click(box.x + x, box.y + y);
+      say(`click ${x},${y} (canvas-relative)`);
+    } else if (verb === 'key') {
+      await page.keyboard.press(first);
+      say(`key ${first}`);
+    } else {
+      throw new Error(`unknown step "${parts[i]}"`);
+    }
+  }
+}
+
+function parseArgs(argv) {
+  const out = {};
+  for (let i = 0; i < argv.length; i++) {
+    if (!argv[i].startsWith('--')) continue;
+    const key = argv[i].slice(2);
+    const next = argv[i + 1];
+    if (next && !next.startsWith('--')) { out[key] = next; i++; }
+    else out[key] = true;
+  }
+  return out;
+}
