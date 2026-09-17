@@ -69,3 +69,7 @@ MimasClient/[Aa]ssets/AssetStoreTools*.meta
 Build/
 # Unity CLI / pipeline package local state (verify after install)
 MimasClient/.unity/
+
+# ---------- Editor tooling config (com.unity.pipeline bridge: port, telemetry, log verbosity; machine-local) ----------
+MimasClient/Assets/Settings/Pipeline/
+MimasClient/Assets/Settings/Pipeline.meta

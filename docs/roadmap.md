@@ -4,7 +4,7 @@
 |---|---|---|---|
 | M0 | Setup | Empty Web build loads in browser; `dotnet test` green; Unity CLI + Claude Code connected; server `/ws` echoes ping | in progress |
 | M1 | Core loop, offline | Hex map from JSON, 1 unit each, move + basic attack, turn order, win by kill; playable vs a random bot in the Editor; Core has ≥ 50 tests | **done 15 Sep 2026** |
-| M2 | Online | Same match over WebSocket via `Mimas.Server`; guest auth; matchmaking queue; chess clocks; reconnect | |
+| M2 | Online | Same match over WebSocket via `Mimas.Server`; guest auth; matchmaking queue; chess clocks; reconnect | **next** (spec 17 Sep 2026) |
 | M3 | Depth | Gear replaces classes (`items/`), two damage lanes + elements, three lineages with starting blessings, boons (blessing / enchant / sigil) with the between-round draft, session best-of-3 across 3 ladder maps, session-long reveals, character select and draft screens. Spec: `docs/design/index.html` | |
 | M4 | Presentation | Cinemachine tilted/top-down toggle, UI Toolkit HUD + examine mode, Shuriken VFX, FMOD music/SFX, low-poly characters with animations | |
 | M5 | Ship | Ratings (Glicko-2), deploy on VPS, size/load optimisation (Addressables, stripping), mobile browser check | |
@@ -120,6 +120,19 @@ moved.
 Not done / deferred: real art (models, VFX, sounds) — props, the projectile and the heroes are all
 placeholders; a prop prefab library; tile tinting for movement is unchanged; the `sky` trajectory has a
 placeholder drop and no ability uses it; touch input; a Web build of this slice.
+
+## Review 17 Sep 2026: both aiming specs verified
+
+Two independent read-only reviews (one per spec) walked every decision, data file, test name, doc update and
+commit of `docs/specs/2026-09-16-aiming-rules.md` and `docs/specs/2026-09-16-aiming-client.md` against the
+code. Verdict: rules half all good (287 tests green, no golden-rule violations, the two-edge sampling in
+`ColumnTrajectory` is exact rather than approximate); client half good with notes (Editor compiles, console
+clean, Core and the server untouched, both play-test bugs fixed in code). One nit left open: `ShowAim` in
+`LocalMatchSession` calls the aim preview without the null guard the rest of the file uses. Housekeeping from
+the review: the solution file is `Mimas.slnx` (CLAUDE.md said `.sln`), and the `com.unity.pipeline` editor
+config under `Assets/Settings/Pipeline/` is machine-local tool config and is now git-ignored.
+
+Next: **M2** (see the table). The aiming slice is closed; the specs are history and the design page is the record.
 
 ## Tooling backlog
 

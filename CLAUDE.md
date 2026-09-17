@@ -31,7 +31,7 @@ Mimas is a browser-based, 1v1 online, turn-based tactics game (hex tiles, 3D cha
 
 ```bash
 # Fast loop (no Unity) — run before and after every Core/Server change
-dotnet build Mimas.sln
+dotnet build Mimas.slnx
 dotnet test shared/Mimas.Core.Tests            # exit 0 = green
 dotnet run --project server/Mimas.Server       # http://localhost:7777/health, ws://localhost:7777/ws
 
