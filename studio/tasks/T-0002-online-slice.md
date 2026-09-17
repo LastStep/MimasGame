@@ -88,4 +88,4 @@ as many words that this task's test project becomes rung 5, and the ladder runne
 requires a rung that does not exist yet. That is the gate getting
 stronger, not weaker: rung 5 is `required: true`, so from here on no task can be called done while the
 online game is broken. Nothing else in the file is touched by hand, and `test_count` was raised from
-287 to 320 by `ladder --bless`, which is the tool's own job.
+287 to 321 by `ladder --bless`, which is the tool's own job.
