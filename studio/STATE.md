@@ -83,12 +83,13 @@ to 17 Oct. On today's evidence that date is not at risk from the game code; it i
 
 ## Last playtest
 
+**17 Sep 2026, Rohan, the online slice.** Ran the server with `dotnet run` and played through it;
+looked good, no notes raised. That closes "nobody has ever connected a client to this server".
+
 **16 Sep 2026, Rohan, the aiming slice, Editor on arena-4.** Console clean. Two bugs caught in play,
 both since fixed.
 
-Nothing has been played by a human since the online slice landed. **The next playtest should be the
-first one online**, even just Rohan against the server bot in a browser, because that is the thing no
-test can tell us about.
+Still unplayed: **anything in a browser.** That should be the next session and the next playtest.
 
 ## Next decision due
 

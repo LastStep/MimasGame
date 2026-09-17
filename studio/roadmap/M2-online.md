@@ -62,9 +62,9 @@ format was already built around gear rather than classes, which was the hard par
 
 | Week | What |
 |---|---|
-| 1 (18–24 Sep) | OPT-0001 settled. The spec's server half (§3–§6): data, Core mirror, wire, server, server tests — no Editor needed, and its test project becomes ladder rung 5. Rung 7 (bot batch) so the numbers get one tuning pass. |
-| 2 (25 Sep–1 Oct) | The spec's client half (§7): lobby scene, persistent NetClient, the presenter/driver split. Two browsers play locally. Nightly sim tunes the shipped numbers. |
-| 3 (2–8 Oct) | VPS deploy with HTTPS (the nginx config already exists). Playwright smoke (rung 10). First remote match, Rohan vs Rohan. Lobby text, error states, rematch. |
+| 1 (18–24 Sep) | ~~OPT-0001, server half, client half~~ — **all done on 17 Sep in one session (T-0002)**, a week early. What week 1 is now actually for: the Web build in a browser, then deploy. |
+| 2 (25 Sep–1 Oct) | VPS deploy with HTTPS (the nginx config already exists). Playwright smoke (rung 10). First remote match, Rohan vs Rohan. Rematch (M2-8). |
+| 3 (2–8 Oct) | Slack. Rung 7 (bot batch) so the shipped numbers get their first measured pass. Lobby text and error states from whatever the remote match turns up. |
 | Fri 9 Oct | Build freeze. Rohan plays the deployed build for 30 minutes and writes notes **before** reading any report. |
 | Sat 10 Oct | Friends play. Silent observation, notes via the template and the interview. |
 
@@ -77,9 +77,67 @@ hand rather than on the Friday night.
 
 ## Risks
 
-- **Nobody has ever connected a client to this server.** The first integration is where the unknowns
-  are, which is why rung 5 is week 1 and not week 2.
+- ~~Nobody has ever connected a client to this server.~~ **Closed 17 Sep.** The Editor plays full
+  matches through it, 34 server tests play more, and Rohan ran it against a local `dotnet run` server
+  the same day and it looked good.
+- **Nothing has ever run in a browser.** This is now the top risk, and it replaces the one above. Every
+  WebGL-specific path is written and unexercised: the NativeWebSocket jslib socket, `PlayerPrefs`
+  reaching IndexedDB (which is what makes a refresh rejoin a match), `?room=` and `?ws=` read from the
+  page URL, and Brotli. A Web build is ~20 minutes and answers all of it.
+- **Deploy has never been attempted.** `docs/hosting.md` and the nginx config exist and have never been
+  run. TLS, `wss://` through a proxy, and the 3600 s `proxy_read_timeout` are all untried. This is the
+  whole of M2-7 and the only thing between today and friends playing.
 - **The balance numbers have never been measured.** Arrow shot 1 AP 3 dmg, aimed shot 2 AP 6, fire bolt
   2 AP 6 and the rest are hand-set placeholders. Friends will feel them. Rung 7 gives them one pass.
-- **Unity Web build on a real connection** is untested beyond an empty project (12.5 MB, 14 Sep).
-- **23 days.** Everything above assumes no week is lost. The fallback exists because one might be.
+- **The server has never held more than two rooms.** On 10 October it holds two at once, for four
+  people. Nothing suggests it will not — a room is a lock and a few KB — but nobody has looked.
+- **23 days.** The fallback below still stands, and is now much less likely to be needed.
+
+## What T-0002 did not do, and what that means for the plan
+
+The online slice was executed in one session on 17 Sep (see `studio/runs/R-2026-09-17-T-0002.md` for
+the evidence). These are the honest gaps, in the order they should shape the next plan.
+
+**1. No Web build, so no browser.** Spec §7.11's static-file serving is implemented and inert without
+`MIMAS_WEB_PATH`; `unity build MimasClient --profile "Web Release"` was never run. Everything in the
+browser risk above follows from this one omission. **This is the next task and it is small.**
+
+**2. No repeatable test covers the client at all.** The server half has 34 tests; the client half was
+verified by one agent driving the Editor by hand for an hour. There are no EditMode tests for
+`NetClient`, `OnlineMatchDriver` or `LobbyView`, and rung 6 is still disabled. Four ordering and
+recovery bugs were found that way — which is evidence the method works, and also evidence that nothing
+will catch the fifth. A handful of EditMode tests over the drivers would be cheap.
+
+**3. Rematch (M2-8) matters more than its position suggests.** Friends will play three to five games in
+a sitting. Without it, every game ends with both players back in the lobby re-sharing a code. That is
+small friction repeated at exactly the moment they are deciding whether they want another go. It was
+out of scope by D9 and should probably be promoted ahead of polish.
+
+**4. Rung 3 (determinism sweep) is still not built, and it now carries more weight.** The client mirror
+rests entirely on "same inputs, same result"; determinism is currently checked at two seeds. It was
+listed as a gap before M2 and is a bigger one after it.
+
+**5. Nobody has verified T-0002.** The ledger is untouched on purpose — `pass` is the verifier's, not
+the builder's. M2-1 and M2-3..M2-6 look ready for one. **M2-2's wording still says "mechanism open:
+OPT-0001" and needs rewording to room codes** before it can be ticked honestly.
+
+**6. One design question was opened and not answered:** should a room show the other seat's chosen
+preset before the match starts? Hidden today, because showing it would invent a counter-pick rule the
+design page does not have — but gear is public the moment the match begins, so hiding it for the last
+ten seconds may be theatre. Design page `#q-online-room-loadout`. It blocks nothing.
+
+**7. Two small things worth knowing before the playtest.** Two browser tabs at the same origin share
+one guest token (`PlayerPrefs` is per-origin), so they are the same player — testing two seats needs
+the Editor plus a browser, or an incognito window. And the asset guard blocks several harmless commands,
+including `unity command get_scene_hierarchy`; the false positives and the route through are in the run
+report and in the agent's memory.
+
+## Suggested next tasks
+
+| Task | What | Size | Why this order |
+|---|---|---|---|
+| T-0003 | Web build, served by `MIMAS_WEB_PATH`, played in a browser. Refresh mid-match, `?room=` link, two seats across Editor + browser | half a session | Answers the single largest unknown, and every later task assumes it works |
+| T-0004 | Deploy on the VPS over HTTPS (`F-deploy`, M2-7) | one session | The only thing between this and 10 October |
+| T-0005 | Rematch without leaving the room (M2-8) | small | Disproportionate effect on a playtest |
+| T-0006 | Verifier over T-0002; reword M2-2 and tick what passes | short | Nothing is done because the builder says so |
+| T-0007 | Rung 3 determinism sweep, and rung 7 bot-vs-bot batch for the first measured balance pass | one session | Both were already overdue; the mirror makes the first one load-bearing |
