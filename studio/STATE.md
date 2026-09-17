@@ -11,47 +11,47 @@ updated_by: builder
 
 ## Right now
 
-Mimas is playable offline against a bot, in the Unity Editor, on arena-4. A hero is four items rather
-than a class; attacks aim at a point on a body and resolve against real heights, with line of sight and
-three trajectory types; props (walls and pillars) are cover you can shoot down. 287 Core tests green.
-Rohan last played it on **16 Sep** and won by elimination with a clean console.
+**The match is on the server.** From the Editor you open a lobby, press **Play vs bot** or **Create
+room**, get a four-letter code, pick your gear in the room, press Ready, and play a real match whose
+truth lives in `Mimas.Server` — with a 30 s server-authoritative turn, resign, and a reconnect grace.
+The client holds a *mirror* of the match rebuilt from its own `PlayerView` (ADR-026), so every preview
+it already had works unchanged and it can only ever know what the server chose to send.
 
-What does not exist yet: **anything online.** `Mimas.Server` loads the same content and answers
-`/health`, but no client has ever connected to it in a real match. That is all of M2, and M2 is the
-only thing that matters right now, because friends are meant to play on **Sat 10 Oct 2026** — 23 days
-away.
+**321 Core tests and 34 server tests**, the latter playing whole matches over real sockets using the
+client's own mirror as the test double. Both are ladder rungs, both required. Local practice — opening
+`Arena.unity` directly — still plays a whole game against the bot, unchanged.
 
-The studio (`E:\Studios\Trinetra-Game-Studio`) was installed into this repo today. Protocols, roles and
-hooks are live; the ladder runs from `studio/game.yaml`.
+What does not exist yet: **anything on the internet**, and **any of it in a browser**. Everything above
+was verified in the Editor against a server on this machine. The friends playtest is **Sat 10 Oct
+2026** — 23 days away.
 
 ## Current milestone: M2 — online
 
 Target: **Sat 10 Oct 2026**, friends playing over the internet.
 
-Scope is specified in full by **`docs/specs/2026-09-17-online-slice.md`** (17 Sep, 757 lines, twelve
-locked decisions) with ADR-026 (client mirror), ADR-027 (wire and clock) and ADR-028 (lobby scene and
-the presenter/driver split). Read that before touching M2 — it is the work order.
-
-**OPT-0001 is decided (17 Sep): room codes, not a queue**, with the loadout chosen after the room is
-joined. The spec carries it as Amendment A1 (§2a), which supersedes the queue in §5, §6 and §7.5. The
-queue moves to M5 with ratings. Nothing else in M2 is open.
+The work order was `docs/specs/2026-09-17-online-slice.md` plus its **amendment A1** (room codes). It is
+executed; the spec is now history and `docs/networking.md` is the wire reference.
 
 | Done-when | State |
 |---|---|
-| M2-1 Two browsers play a full match through `Mimas.Server` | not started |
-| M2-2 Two players who want to play each other end up in the same match | in progress (room codes) |
-| M2-3 Guest auth with a resumable token; a reload keeps your identity | not started |
-| M2-4 Server-authoritative 30 s turn; timeout arrives as EndTurnCommand(Timeout) | not started |
-| M2-5 Reload within the 60 s grace resyncs into the running match | not started |
-| M2-6 Resign and disconnect-forfeit end the match correctly | not started |
-| M2-7 Deployed on the VPS over HTTPS, reachable by a friend | not started |
-| M2-8 Rematch without leaving the room | not started |
+| M2-1 Two browsers play a full match through `Mimas.Server` | **done in tests and in the Editor**; not yet two browsers |
+| M2-2 Two players who want to play each other end up in the same match | **done** — by a four-letter room code (OPT-0001, ADR-029) |
+| M2-3 Guest auth with a resumable token; a reload keeps your identity | **done** (tested; browser reload untested) |
+| M2-4 Server-authoritative 30 s turn; timeout arrives as EndTurnCommand(Timeout) | **done**, seen firing live |
+| M2-5 Reload within the 60 s grace resyncs into the running match | **done** (tested server-side and in the Editor) |
+| M2-6 Resign and disconnect-forfeit end the match correctly | **done**, both paths seen |
+| M2-7 Deployed on the VPS over HTTPS, reachable by a friend | **not started** — this is the gap to 10 Oct |
+| M2-8 Rematch without leaving the room | not started (out of scope by D9) |
+
+**Nothing in the ledger is ticked.** `pass` belongs to a verifier, not to the builder who wrote the
+code (`reward-hacking-guards.md`). M2-1 and M2-3..M2-6 are ready for one; M2-2's wording still says
+"mechanism open" and wants updating to room codes.
 
 ## In flight
 
 | Task | What | Status | Who |
 |---|---|---|---|
-| T-0001 | Install the studio and seed `studio/` | running | builder |
+| T-0002 | Execute the online slice | verify | builder |
 
 ## Blocked
 
@@ -64,30 +64,33 @@ queue moves to M5 with ratings. Nothing else in M2 is open.
 | What | File | Since |
 |---|---|---|
 | Edit `pillars.md` — it is a draft distilled from the design page, and the pillars are yours | `studio/pillars.md` | 17 Sep 2026 |
+| Optional: should a room show the other seat's chosen preset before the match starts? Hidden today | design page `#q-online-room-loadout` | 17 Sep 2026 |
+
+## The two things that matter next
+
+1. **A Web build, in a browser.** The WebGL-specific paths are written and *unexercised*: the jslib
+   socket, `PlayerPrefs` reaching IndexedDB, `?room=` and `?ws=` read from the page URL, Brotli. This is
+   the largest remaining unknown in M2 and it is cheap to find out — `unity build MimasClient --profile
+   "Web Release"`, then `MIMAS_WEB_PATH=Build/Web dotnet run --project server/Mimas.Server` serves the
+   page and the socket from one process (already implemented, inert without the variable).
+2. **Deploy** (`F-deploy`, M2-7). Nothing about 10 October works without it.
+
+Then: a verifier over T-0002, and M2-8 (rematch) if there is room.
+
+From `E:\Studios\Trinetra-Game-Studio\docs\PLAN.md` §10: if two browsers cannot play a full match
+through the server by **Fri 2 Oct**, the 10 Oct playtest falls back to the local build and online moves
+to 17 Oct. On today's evidence that date is not at risk from the game code; it is at risk from deploy.
 
 ## Last playtest
 
-**16 Sep 2026, Rohan, the aiming slice, Editor on arena-4.** Circles, a clear arc over a wall, blocked
-shots, out-of-range, a prop shot down and walked onto, a projectile in flight. Console clean. Two bugs
-caught in play, both since fixed: props broke the HUD turn-start loop (their ids are body ids), and
-arming an attack under a stationary cursor drew nothing until the mouse moved.
+**16 Sep 2026, Rohan, the aiming slice, Editor on arena-4.** Console clean. Two bugs caught in play,
+both since fixed.
 
-Not yet exercised and still worth a pass: the bot attacking (its flyover, an EXTRA reveal), Fire Bolt
-and line of sight from the player's side, the DEFEAT banner, and a Web build of the current HUD.
+Nothing has been played by a human since the online slice landed. **The next playtest should be the
+first one online**, even just Rohan against the server bot in a browser, because that is the thing no
+test can tell us about.
 
 ## Next decision due
 
-None open. OPT-0001 was decided on 17 Sep (room codes); T-0002 is executing the spec.
-
-Then, from the studio plan (`E:\Studios\Trinetra-Game-Studio\docs\PLAN.md` §10): if two browsers cannot play a full match through the server by
-**Fri 2 Oct**, the 10 Oct playtest falls back to the local build (Rohan vs bot, shared over screen) and
-online moves to 17 Oct. The Producer raises this in the 2 Oct brief either way.
-
-## This week's intent
-
-Week 1 (18–24 Sep): settle OPT-0001, then run the online slice spec's server half (§3–§6: data, Core,
-server, server tests). It needs no Editor, and its test project becomes ladder rung 5. The client half
-(§7) follows and does need a warm Editor.
-
-Balance is not a week-1 concern, but rung 7 (bot-vs-bot batch) is, because the shipped ability numbers
-have never been measured and friends will feel them on 10 Oct.
+None open. OPT-0001 (room codes) was decided and executed on 17 Sep. The one live question is the
+optional design nit above, which does not block anything.

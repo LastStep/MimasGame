@@ -161,7 +161,7 @@ protected:
 
 # Numbers that may not get worse without an explicit task. Raised by `ladder --bless`.
 ratchets:
-  test_count: 320
+  test_count: 321
   server_test_count: 34
   web_build_mb: 13
 
