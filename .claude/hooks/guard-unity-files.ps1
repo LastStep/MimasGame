@@ -7,7 +7,7 @@ if ($p -match '\.meta$') {
   exit 2
 }
 if ($p -match '[\\/]MimasClient[\\/]ProjectSettings[\\/]') {
-  [Console]::Error.WriteLine("Blocked: ProjectSettings changes need explicit approval from Rohan. Use `unity command set_project_settings` after asking.")
+  [Console]::Error.WriteLine("Blocked: ProjectSettings changes need explicit approval from Rohan. Use 'unity command set_project_settings' after asking.")
   exit 2
 }
 if ($p -match '\.(unity|prefab)$') {
