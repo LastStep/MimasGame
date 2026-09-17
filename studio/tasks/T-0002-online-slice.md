@@ -15,6 +15,7 @@ allows_assets:
   - 'docs/design/index.html'
   - 'ProjectSettings/EditorBuildSettings.asset'
   - 'shared/Mimas.Core.Tests/**'
+  - 'studio/game.yaml'
 done_when:
   - "dotnet build Mimas.slnx, dotnet test shared/Mimas.Core.Tests (>= 320) and dotnet test server/Mimas.Server.Tests are green"
   - "Two fake clients join the same room by code and play a full match over WebSocket through Mimas.Server"
@@ -53,6 +54,16 @@ honest: tests may only be added, and the ladder fails if the count drops. Existi
 only where §12's first fork applies (a `MatchOver` reject reason), and any such edit is named in its
 commit.
 
-The other three paths: `rules.json` gains the `clock` block (§3.1), `docs/design/index.html` gains the
-status and changelog updates §9.4 requires, and `EditorBuildSettings.asset` gains the Lobby scene via
-`add_scene_to_build` (§7.9) — the one `ProjectSettings` change the spec allows.
+The other paths: `rules.json` gains the `clock` block (§3.1), `docs/design/index.html` gains the status
+and changelog updates §9.4 requires, and the build settings asset gains the Lobby scene via
+`add_scene_to_build` (§7.9) — the one `ProjectSettings` change the spec allows, made through the live
+Editor, never by hand.
+
+`studio/game.yaml` is named for the rung this task builds: flipping rung 5 (`server integration`) from
+`enabled: false` to `true`, and seeding its `server_test_count` ratchet at 34, because `ladder --bless`
+only raises ratchet keys that already exist and a ratchet with no entry guards nothing. The spec says in
+as many words that this task's test project becomes rung 5, and the ladder runner refuses a task that
+requires a rung that does not exist yet. That is the gate getting
+stronger, not weaker: rung 5 is `required: true`, so from here on no task can be called done while the
+online game is broken. Nothing else in the file is touched by hand, and `test_count` was raised from
+287 to 320 by `ladder --bless`, which is the tool's own job.

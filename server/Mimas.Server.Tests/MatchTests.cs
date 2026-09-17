@@ -128,6 +128,10 @@ public class MatchTests
         {
             var me = new MirrorPlayer(factory.Catalog, client, start, 3);
 
+            // Who moves first is a seeded coin flip on the server, so wait for our turn rather than
+            // assume it: off turn the refusal would be NotYourTurn and this would prove nothing.
+            await WaitForMyTurnAsync(me, client);
+
             // Somewhere that is not on the map at all: the sort of thing only a broken client sends,
             // and exactly what the server must refuse without losing the match.
             await me.SendAsync(new MoveCommand(me.Seat, me.View.Units.First(u => u.IsMine).Id, "move", new Hex(99, -99)));
@@ -428,6 +432,18 @@ public class MatchTests
         }
 
         throw new XunitException($"{client.Name}: the match did not finish inside {budget.TotalSeconds:0} s");
+    }
+
+    /// <summary>Absorbs messages until this seat is the one to move.</summary>
+    private static async Task WaitForMyTurnAsync(MirrorPlayer me, FakeClient client, TimeSpan? budget = null)
+    {
+        DateTime deadline = DateTime.UtcNow + (budget ?? TimeSpan.FromSeconds(30));
+        while (!me.IsMyTurn)
+        {
+            if (DateTime.UtcNow > deadline) throw new XunitException($"{client.Name}: never got a turn");
+            (string _, JObject payload) = await client.ExpectEitherAsync(Messages.MatchEvents, Messages.MatchRejected, TimeSpan.FromSeconds(20));
+            me.Absorb(payload);
+        }
     }
 
     /// <summary>Waits for a <c>match.events</c> batch containing an event that matches, optionally acting between batches.</summary>

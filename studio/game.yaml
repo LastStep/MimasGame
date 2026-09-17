@@ -76,10 +76,14 @@ ladder:
     command: dotnet test server/Mimas.Server.Tests
     required: true
     timeout_s: 600
-    enabled: false
-    pending_reason: >
-      M2 week 1. Two fake clients join a room, play a full match over WebSocket, and receive identical
-      PlayerView sequences. This is the gate the whole online milestone hangs on.
+    enabled: true
+    ratchet: server_test_count
+    capture:
+      server_test_count: 'Passed:\s+(\d+)'
+    means: the online game broke
+    # Built by T-0002 (17 Sep 2026). Two fake clients join a room by code, play a full match over
+    # WebSocket driven by MatchState.FromView — the client's own mirror as the test double — and each
+    # only ever receives its own PlayerView. This is the gate the whole online milestone hangs on.
 
   - rung: 6
     name: editmode tests
@@ -157,7 +161,8 @@ protected:
 
 # Numbers that may not get worse without an explicit task. Raised by `ladder --bless`.
 ratchets:
-  test_count: 287
+  test_count: 320
+  server_test_count: 34
   web_build_mb: 13
 
 commands:
