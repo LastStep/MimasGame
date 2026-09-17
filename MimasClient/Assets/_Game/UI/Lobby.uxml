@@ -1,0 +1,47 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" xsi="http://www.w3.org/2001/XMLSchema-instance" engine="UnityEngine.UIElements" editor="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
+    <Style src="Lobby.uss" />
+    <ui:VisualElement name="lobby-root" class="lobby-root">
+
+        <!-- One panel at a time. You pick a name and a way in here; you pick your gear once you can see
+             who you are playing (OPT-0001). -->
+        <ui:VisualElement name="lobby-panel" class="panel">
+            <ui:Label class="title" text="MIMAS" />
+            <ui:Label name="last-result" class="last-result" text="" />
+
+            <ui:Label class="field-label" text="NAME" />
+            <ui:TextField name="name" class="field" max-length="24" />
+
+            <ui:Button name="play-bot" class="button button--primary" text="Play vs bot" />
+            <ui:Button name="create-room" class="button" text="Create room" />
+
+            <ui:VisualElement class="join-row">
+                <ui:TextField name="join-code" class="field field--code" max-length="4" />
+                <ui:Button name="join-room" class="button button--join" text="Join room" />
+            </ui:VisualElement>
+
+            <ui:Label name="status" class="status" text="" />
+            <ui:Label name="server" class="server" text="" />
+        </ui:VisualElement>
+
+        <!-- The room: the code to send a friend, who is here, and what you are wearing. -->
+        <ui:VisualElement name="room-panel" class="panel">
+            <ui:Label class="field-label" text="ROOM CODE" />
+            <ui:Label name="room-code" class="room-code" text="FROG" />
+            <ui:Button name="copy-link" class="button button--quiet" text="Copy link" />
+
+            <ui:VisualElement class="seats">
+                <ui:Label name="seat-0" class="seat" text="" />
+                <ui:Label name="seat-1" class="seat" text="" />
+            </ui:VisualElement>
+
+            <ui:Label class="field-label" text="LOADOUT" />
+            <ui:DropdownField name="preset" class="field" />
+
+            <ui:Button name="ready" class="button button--primary" text="Ready" />
+            <ui:Button name="leave-room" class="button button--quiet" text="Leave room" />
+
+            <ui:Label name="room-status" class="status" text="" />
+        </ui:VisualElement>
+
+    </ui:VisualElement>
+</ui:UXML>

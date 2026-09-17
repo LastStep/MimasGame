@@ -30,10 +30,16 @@
                 </ui:VisualElement>
                 <ui:VisualElement name="rope-ember" class="rope-ember" picking-mode="Ignore" />
             </ui:VisualElement>
+            <!-- Only online, and only when there is something to say: the opponent is gone, and for how long. -->
+            <ui:Label name="status-line" class="status-line" text="Opponent disconnected · 47 s" picking-mode="Ignore" />
         </ui:VisualElement>
 
-        <!-- Centre: match result. -->
-        <ui:Label name="banner" class="banner" text="VICTORY" picking-mode="Ignore" />
+        <!-- Centre: match result, how it ended, and the way out of it. -->
+        <ui:VisualElement name="banner-panel" class="banner-panel" picking-mode="Ignore">
+            <ui:Label name="banner" class="banner" text="VICTORY" picking-mode="Ignore" />
+            <ui:Label name="banner-detail" class="banner-detail" text="by elimination" picking-mode="Ignore" />
+            <ui:Button name="banner-button" class="banner-button" text="Back to lobby" />
+        </ui:VisualElement>
 
         <!-- Left: examine panel for the clicked unit. -->
         <ui:VisualElement name="examine" class="examine">
@@ -62,10 +68,13 @@
         </ui:VisualElement>
         <ui:VisualElement name="action-bar" class="action-bar" />
 
-        <!-- Bottom right: pass the turn early. -->
+        <!-- Bottom right: pass the turn early, and give it up entirely. -->
         <ui:Button name="end-turn" class="end-turn">
             <ui:Label name="end-turn-label" class="end-turn-label" text="END TURN" picking-mode="Ignore" />
         </ui:Button>
+
+        <!-- Two clicks, because conceding by accident is the worst possible misclick. -->
+        <ui:Button name="resign" class="resign" text="RESIGN" />
 
     </ui:VisualElement>
 </ui:UXML>

@@ -1,7 +1,11 @@
 {
   "name": "Mimas.Client.UI",
   "rootNamespace": "Mimas.Client.UI",
-  "references": ["Mimas.Core", "Mimas.Client.Presentation"],
+  "references": [
+    "Mimas.Core",
+    "Mimas.Client.Presentation",
+    "Mimas.Client.Net"
+  ],
   "includePlatforms": [],
   "excludePlatforms": [],
   "allowUnsafeCode": false,

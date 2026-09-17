@@ -310,13 +310,43 @@
     text-shadow: 0 1px 3px rgb(0, 0, 0);
 }
 
+/* ---- opponent status ------------------------------------------------------------------------- */
+
+/* Sits under the rope. Hidden unless the driver has something to say, which offline is never. */
+.status-line {
+    margin-top: 6px;
+    align-self: center;
+    padding: 3px 12px;
+    background-color: var(--hud-panel);
+    border-radius: 8px;
+    color: var(--hud-theirs);
+    font-size: 12px;
+    letter-spacing: 1px;
+    -unity-font-style: bold;
+    display: none;
+}
+
+.status-line--visible {
+    display: flex;
+}
+
 /* ---- banner ---------------------------------------------------------------------------------- */
 
-.banner {
+.banner-panel {
     position: absolute;
     top: 38%;
     left: 50%;
     translate: -50% -50%;
+    align-items: center;
+    display: none;
+}
+
+.banner-panel--visible {
+    display: flex;
+}
+
+.banner {
+    margin: 0;
     padding: 18px 48px;
     background-color: var(--hud-panel-solid);
     border-radius: 16px;
@@ -326,15 +356,45 @@
     font-size: 34px;
     letter-spacing: 8px;
     -unity-font-style: bold;
-    display: none;
-}
-
-.banner--visible {
-    display: flex;
 }
 
 .banner--lost {
     color: var(--hud-theirs);
+}
+
+/* How it ended, not just who won: "you resigned" and "opponent left" are different stories. */
+.banner-detail {
+    margin-top: 10px;
+    color: var(--hud-text-dim);
+    font-size: 14px;
+    letter-spacing: 2px;
+    -unity-font-style: bold;
+}
+
+/* Appears a beat after the result, so the result lands first. */
+.banner-button {
+    margin-top: 22px;
+    padding: 10px 24px;
+    background-color: var(--hud-panel-solid);
+    border-radius: 10px;
+    border-width: 1px;
+    border-color: var(--hud-edge);
+    color: var(--hud-text);
+    font-size: 14px;
+    letter-spacing: 2px;
+    -unity-font-style: bold;
+    display: none;
+    transition-property: background-color, scale;
+    transition-duration: 0.1s;
+}
+
+.banner-button--visible {
+    display: flex;
+}
+
+.banner-button:hover {
+    background-color: var(--hud-accent-soft);
+    scale: 1.03 1.03;
 }
 
 .hud-root {
@@ -786,4 +846,51 @@
     -unity-font-style: bold;
     margin: 0;
     padding: 0;
+}
+
+/* ---- resign ----------------------------------------------------------------------------------- */
+
+/* Quiet until you touch it, and it asks again before it does anything. */
+.resign {
+    position: absolute;
+    right: 24px;
+    bottom: 86px;
+    margin: 0;
+    padding: 8px 18px;
+    background-color: rgba(0, 0, 0, 0);
+    border-radius: 10px;
+    border-width: 1px;
+    border-color: var(--hud-edge);
+    color: var(--hud-text-faint);
+    font-size: 12px;
+    letter-spacing: 2px;
+    -unity-font-style: bold;
+    display: none;
+    transition-property: background-color, color;
+    transition-duration: 0.12s;
+}
+
+.resign--visible {
+    display: flex;
+}
+
+.resign:hover {
+    color: var(--hud-text-dim);
+    border-color: var(--hud-text-faint);
+}
+
+/* Second click only: the label says so, and it reverts on its own after a few seconds. */
+.resign--confirm {
+    background-color: var(--hud-end);
+    border-color: var(--hud-end);
+    color: var(--hud-text);
+}
+
+.resign--confirm:hover {
+    background-color: var(--hud-end-hover);
+    color: var(--hud-text);
+}
+
+.resign:disabled {
+    opacity: 0.25;
 }

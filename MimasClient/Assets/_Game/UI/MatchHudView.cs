@@ -32,6 +32,13 @@ namespace Mimas.Client.UI
         };
 
         private const int HpPerSegment = 4;
+
+        /// <summary>How long the resign button stays armed before it goes back to asking.</summary>
+        private const float ResignConfirmSeconds = 3f;
+
+        /// <summary>Longest opponent name the turn banner will show before it truncates.</summary>
+        private const int MaxOpponentNameLength = 16;
+
         private const float FlyoverSeconds = 2f;
         private const float FlyoverRise = 36f;
 
@@ -86,7 +93,15 @@ namespace Mimas.Client.UI
         private Label _previewTotal;
         private Label _previewBlocked;
         private Label _cursorTag;
+        private VisualElement _bannerPanel;
         private Label _banner;
+        private Label _bannerDetail;
+        private Button _bannerButton;
+        private Label _statusLine;
+        private Button _resign;
+
+        /// <summary>When the armed resign button gives up and goes back to asking.</summary>
+        private float _resignArmedUntil;
         private Button _examineClose;
         private Button _endTurn;
 
@@ -162,6 +177,14 @@ namespace Mimas.Client.UI
         {
             if (!_bound && !TryBind()) return;
             UpdateRope();
+
+            // The armed resign button forgets on its own, and the way out of the result turns up a beat
+            // after it. Both are time passing rather than anything changing, so they are polled.
+            if (_resignArmedUntil > 0f && Time.time >= _resignArmedUntil) DisarmResign();
+
+            bool showBack = !string.IsNullOrEmpty(_source.Banner) && _source.ShowBackToLobby;
+            if (showBack != _bannerButton.ClassListContains("banner-button--visible"))
+                _bannerButton.EnableInClassList("banner-button--visible", showBack);
         }
 
         private void LateUpdate()
@@ -211,7 +234,12 @@ namespace Mimas.Client.UI
             _previewLines = root.Q<VisualElement>("preview-lines");
             _cursorTag = root.Q<Label>("cursor-tag");
             _flyLayer = root.Q<VisualElement>("fly-layer");
+            _bannerPanel = root.Q<VisualElement>("banner-panel");
             _banner = root.Q<Label>("banner");
+            _bannerDetail = root.Q<Label>("banner-detail");
+            _bannerButton = root.Q<Button>("banner-button");
+            _statusLine = root.Q<Label>("status-line");
+            _resign = root.Q<Button>("resign");
 
             if (_root == null || _turnPanel == null || _turnOwner == null || _rope == null || _ropeFill == null || _ropeEmber == null
                 || _actionBar == null || _tooltip == null || _tooltipTitle == null || _tooltipDetail == null || _tooltipBody == null
@@ -220,7 +248,8 @@ namespace Mimas.Client.UI
                 || _examineAbilities == null || _examineModifiersCaption == null || _examineModifiers == null || _examineClose == null || _endTurn == null
                 || _unitLayer == null || _preview == null || _previewTitle == null || _previewTotal == null
                 || _previewBlocked == null || _previewLines == null || _cursorTag == null
-                || _flyLayer == null || _banner == null)
+                || _flyLayer == null || _banner == null || _bannerPanel == null || _bannerDetail == null || _bannerButton == null
+                || _statusLine == null || _resign == null)
             {
                 Debug.LogError("[MatchHudView] MatchHud.uxml is missing one of the named elements.", this);
                 enabled = false;
@@ -229,6 +258,8 @@ namespace Mimas.Client.UI
 
             _endTurn.clicked += HandleEndTurnClicked;
             _examineClose.clicked += HandleExamineCloseClicked;
+            _resign.clicked += HandleResignClicked;
+            _bannerButton.clicked += HandleBackToLobbyClicked;
             _bound = true;
             _barSignature = null;
             _ropeVisible = true;      // force the first UpdateRope to apply the real state
@@ -242,6 +273,8 @@ namespace Mimas.Client.UI
             if (!_bound) return;
             _endTurn.clicked -= HandleEndTurnClicked;
             _examineClose.clicked -= HandleExamineCloseClicked;
+            _resign.clicked -= HandleResignClicked;
+            _bannerButton.clicked -= HandleBackToLobbyClicked;
             ClearSlots();
             foreach (UnitTag tag in _unitTags.Values) tag.Root.RemoveFromHierarchy();
             _unitTags.Clear();
@@ -259,9 +292,11 @@ namespace Mimas.Client.UI
 
             bool mine = _source.IsMyTurn;
             bool over = !string.IsNullOrEmpty(_source.Banner);
-            _turnOwner.text = over ? "MATCH OVER" : (mine ? "YOUR TURN  ·  " + _source.TurnNumber : "OPPONENT'S TURN");
+            _turnOwner.text = over ? "MATCH OVER" : (mine ? "YOUR TURN  ·  " + _source.TurnNumber : OpponentTurnLabel());
             _turnPanel.EnableInClassList("turn-panel--theirs", !mine && !over);
             _endTurn.SetEnabled(_source.CanEndTurn);
+            RefreshStatusLine();
+            RefreshResign();
 
             RefreshActionBar();
             RefreshExamine();
@@ -441,8 +476,38 @@ namespace Mimas.Client.UI
             string banner = _source.Banner;
             bool visible = !string.IsNullOrEmpty(banner);
             _banner.text = banner ?? string.Empty;
-            _banner.EnableInClassList("banner--visible", visible);
+            _bannerPanel.EnableInClassList("banner-panel--visible", visible);
             _banner.EnableInClassList("banner--lost", visible && banner != "VICTORY");
+
+            string detail = _source.BannerDetail;
+            _bannerDetail.text = string.IsNullOrEmpty(detail) ? string.Empty : detail.ToUpperInvariant();
+            _bannerButton.EnableInClassList("banner-button--visible", visible && _source.ShowBackToLobby);
+        }
+
+        /// <summary>The opponent's connection, when there is anything to say about it. Offline there never is.</summary>
+        private void RefreshStatusLine()
+        {
+            string status = _source.OpponentStatus;
+            bool visible = !string.IsNullOrEmpty(status);
+            _statusLine.text = status ?? string.Empty;
+            _statusLine.EnableInClassList("status-line--visible", visible);
+        }
+
+        private void RefreshResign()
+        {
+            bool can = _source.CanResign;
+            _resign.EnableInClassList("resign--visible", can);
+            _resign.SetEnabled(can);
+            if (!can) DisarmResign();
+        }
+
+        /// <summary>"ROHAN'S TURN", trimmed to something that fits. A long name must not push the panel about.</summary>
+        private string OpponentTurnLabel()
+        {
+            string name = _source.OpponentName;
+            if (string.IsNullOrEmpty(name)) return "OPPONENT'S TURN";
+            if (name.Length > MaxOpponentNameLength) name = name.Substring(0, MaxOpponentNameLength - 1) + "…";
+            return name.ToUpperInvariant() + "'S TURN";
         }
 
         private void UpdateRope()
@@ -849,6 +914,39 @@ namespace Mimas.Client.UI
         private void HideTooltip()
         {
             if (_tooltip != null) _tooltip.RemoveFromClassList("tooltip--visible");
+        }
+
+        /// <summary>
+        /// First click arms it and says so; the second concedes. It disarms itself after a few seconds,
+        /// because a resign button that stays armed is a resign button you press by accident.
+        /// </summary>
+        private void HandleResignClicked()
+        {
+            if (!_source.CanResign) return;
+
+            if (Time.time < _resignArmedUntil)
+            {
+                DisarmResign();
+                _source.Resign();
+                return;
+            }
+
+            _resignArmedUntil = Time.time + ResignConfirmSeconds;
+            _resign.text = "CONFIRM RESIGN";
+            _resign.AddToClassList("resign--confirm");
+        }
+
+        private void DisarmResign()
+        {
+            if (_resignArmedUntil <= 0f) return;
+            _resignArmedUntil = 0f;
+            _resign.text = "RESIGN";
+            _resign.RemoveFromClassList("resign--confirm");
+        }
+
+        private void HandleBackToLobbyClicked()
+        {
+            _source.BackToLobby();
         }
 
         private void HandleEndTurnClicked() => _source.EndTurn();
