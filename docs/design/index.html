@@ -420,7 +420,7 @@ figure{margin:12px 0} figure svg{width:100%; height:auto; display:block} figcapt
   <li><b>Resign</b> concedes the session (in M2 a session is one round). <b>Forfeit</b>: a player who does not reconnect within the grace (<a href="#online">Online</a>) loses the session. <b>Flag fall</b>: see <a href="#q-round-flag">open question</a> (no bank in M2, so none yet).</li>
   <li><b>Simultaneous death</b> (both heroes at 0 in the same resolution, possible once environment damage exists): <mark>the active player loses</mark> (proposed, punishes the reckless actor).</li>
 </ol>
-<div class="drift-note"><b>Partial.</b> Elimination win exists (<code>MatchEndedEvent</code>); resign and forfeit are M2 (<code>ResignCommand</code>, <code>MatchEndReason.Resign / Forfeit</code>); series score and simultaneous death are not in code.</div>
+<div class="drift-note"><b>Partial.</b> Elimination, <b>resign and forfeit</b> all exist (<code>ResignCommand</code> with reason <code>Player</code> or <code>Disconnect</code>; <code>MatchEndReason.Elimination / Resign / Forfeit</code>), and a resign is legal off turn. Series score and simultaneous death are not in code.</div>
 <div class="open-q"><h3>Open questions</h3><ul><li id="q-win-draw">Confirm the simultaneous-death rule or allow a drawn round.</li></ul></div>
 </section>
 
@@ -891,6 +891,7 @@ r=+4        . . . , .</code></pre>
 
 <section class="concept" id="hidden-info" data-design="decided" data-impl="partial" data-title="Hidden information and reveal">
 <header><h2>Hidden information and reveal</h2></header>
+<p class="note"><b>The client mirror shipped 17 Sep 2026</b> (ADR-026): the client rebuilds a knowledge-limited <code>MatchState</code> from the <code>PlayerView</code> on every message and asks it every preview question, so it can only ever reason with what the server chose to send, and a hidden entry keeps its "?" slot rather than quietly becoming a certainty. A test sweeps a whole match to check no hidden damage line ever arrives before its reveal.</p>
 <p class="lead">The server holds the truth; each client only ever receives a <code>PlayerView</code>. What the opponent knows at the start of round 1 and what becomes known over the session:</p>
 <table>
 <tr><th>Thing</th><th>At start</th><th>Revealed when</th></tr>
@@ -932,17 +933,17 @@ r=+4        . . . , .</code></pre>
 <section class="concept" id="bots" data-design="proposed" data-impl="partial" data-title="Bots">
 <header><h2>Bots</h2></header>
 <p class="lead">Bots exist for practice, balance simulation and filling a queue. <code>RandomBot</code> picks uniformly over legal commands. A <mark>greedy bot</mark> (maximise expected damage, avoid death) is the next step for balance runs.</p>
-<p>Decided 17 Sep 2026: <b>Play vs bot runs on the server.</b> The lobby button opens a room with the bot in seat 1 through the same wire as a human match, so one client code path serves both; the bot never resigns and never times out. The bot wears the flintlock / blink preset and carries the two hidden passives the local practice bot has, so reveals happen online too. The client-side practice mode stays as an Editor fallback.</p>
+<p>Decided 17 Sep 2026, <b>shipped the same day</b>: <b>Play vs bot runs on the server.</b> The lobby button opens a room with the bot in seat 1 through the same wire as a human match, so one client code path serves both; the bot never resigns and never times out. The bot wears the flintlock / blink preset and carries the two hidden passives the local practice bot has, so reveals happen online too. The client-side practice mode stays as an Editor fallback — opening the Arena scene directly still plays a whole local game.</p>
 <div class="open-q"><h3>Open questions</h3><ul><li id="q-bots-draft">Bots must also pick gear, lineage and drafts once those exist.</li></ul></div>
 </section>
 
-<section class="concept" id="online" data-design="decided" data-impl="not-started" data-title="Online: matchmaking, ratings, accounts">
+<section class="concept" id="online" data-design="decided" data-impl="implemented" data-title="Online: matchmaking, ratings, accounts">
 <header><h2>Online: matchmaking, ratings, accounts</h2></header>
-<p class="lead">The server holds the truth for every online match; a client only ever receives its own <code>PlayerView</code> and the events filtered for it. M2 ships the smallest online game that is honest: a guest name, one queue, a server bot, one flat turn clock, resign, and a reconnect grace.</p>
+<p class="lead">The server holds the truth for every online match; a client only ever receives its own <code>PlayerView</code> and the events filtered for it. M2 ships the smallest online game that is honest: a guest name, a room you reach by a four-letter code, a server bot, one flat turn clock, resign, and a reconnect grace.</p>
 <h3>Rules (M2 scope, decided 17 Sep 2026)</h3>
 <ol>
   <li><b>Guest auth</b>: a name only. The server issues a resumable token; the client keeps it in browser storage so a page reload rejoins. Accounts later (M5).</li>
-  <li><b>One queue</b>, first come first served, no rating. Pairing is immediate when two players wait. Rating-bucketed queues per time control come with ratings (below).</li>
+  <li><b>Room codes</b> (decided 17 Sep 2026, OPT-0001). Create a room and you get a four-letter code from an alphabet with no <code>I</code>, <code>O</code>, <code>0</code> or <code>1</code>, and a link that carries it; a friend joins by pasting either. Codes are case-insensitive. <mark>Gear is chosen in the room</mark>, after you can see who you are playing, and the match starts when both seats press Ready. A matchmaking queue is <a href="#q-online-rating">M5</a>, with ratings: four friends in two arranged pairs are not a matchmaking problem, and a queue would pair them in the order they clicked.</li>
   <li><b>Play vs bot</b> opens a room on the server against <code>RandomBot</code> at once, through the same wire as a human match (see <a href="#bots">Bots</a>).</li>
   <li><b>Clock</b>: see <a href="#time-controls">Time controls</a>. The server is the timekeeper and ends a turn itself by submitting <code>EndTurnCommand(Timeout)</code>.</li>
   <li><b>Reconnect</b>: a dropped seat is kept for <mark>60 s</mark> (<code>rules.clock.reconnectGraceMs</code>); the clock keeps running; the opponent sees a countdown; a return within the grace replays the current <code>PlayerView</code>; no return = forfeit (see <a href="#win-conditions">Win conditions</a>).</li>
@@ -955,8 +956,8 @@ r=+4        . . . , .</code></pre>
   <li>Rating: Glicko-2 per time control, updated per session, not per round; the queue window widens with wait.</li>
   <li>Accounts, presets stored server-side, spectating.</li>
 </ul>
-<div class="drift-note"><b>Not started.</b> The server is the M0 echo scaffold. Spec: <code>docs/specs/2026-09-17-online-slice.md</code>; ADR-026, ADR-027, ADR-028.</div>
-<div class="open-q"><h3>Open questions</h3><ul><li id="q-online-rating">Confirm Glicko-2 and per-time-control pools when ratings are built.</li></ul></div>
+<div class="drift-note"><b>Implemented for the M2 scope</b> (17 Sep 2026): guest auth with a resumable token, rooms by code, the server bot, the 30 s server-authoritative turn with its lag grace, resign, the 60 s reconnect grace and forfeit, and the client mirror. <b>Later:</b> a matchmaking queue, ratings and pools, accounts and server-side presets, spectating, and rematch without leaving the room. There is no database: nothing survives a server restart. Spec: <code>docs/specs/2026-09-17-online-slice.md</code> and its amendment A1; ADR-026, ADR-027, ADR-028.</div>
+<div class="open-q"><h3>Open questions</h3><ul><li id="q-online-rating">Confirm Glicko-2 and per-time-control pools when ratings are built.</li><li id="q-online-room-loadout">Should a room show the other seat's chosen preset before the match starts? It is hidden today, because showing it would invent a counter-pick rule this page does not have — but gear is public the moment the match begins, so hiding it for the last ten seconds may be theatre.</li></ul></div>
 <p class="src">Source: docs/networking.md; docs/architecture.md; 17 Sep 2026 question round.</p>
 </section>
 
@@ -994,10 +995,10 @@ r=+4        . . . , .</code></pre>
 <p class="small">Props render as code-built placeholder boxes with a hit-mark ring, and the projectile as a flat sphere, until there is art. Implemented 16 Sep 2026; ADR-025.</p>
 <h3>Lobby (decided 17 Sep 2026)</h3>
 <ul>
-  <li>The lobby is its own scene and the first thing that loads: a name, a loadout preset, <b>Play vs bot</b>, <b>Find match</b>, a status line, the last result. It is the future home of <a href="#character-select">character select</a> and the <a href="#draft">draft</a>.</li>
+  <li>The lobby is its own scene and the first thing that loads: a name, <b>Play vs bot</b>, <b>Create room</b>, <b>Join room</b>, a status line and the last result. All three lead to a <b>room</b>, which shows its four-letter code large, a Copy link button, both seats and their readiness, a loadout preset and Ready. It is the future home of <a href="#character-select">character select</a> and the <a href="#draft">draft</a>.</li>
   <li>The connection lives on a persistent object that survives scene loads. The arena scene loads when the server starts the match, behind a loading line, and the lobby returns after the result banner.</li>
   <li>In a match: a resign button (two clicks), an opponent status line with the reconnect countdown, and a result detail ("by elimination", "by resignation", "opponent left").</li>
-  <li>Presets are client data (four at launch from the shipped items); the chosen loadout travels with the queue request, and the opponent sees the gear at match start as the <a href="#hidden-info">hidden-info</a> table says.</li>
+  <li>Presets are client data (four at launch from the shipped items); the loadout is chosen in the room and the opponent sees the gear at match start as the <a href="#hidden-info">hidden-info</a> table says — not before (<a href="#q-online-room-loadout">open question</a>).</li>
 </ul>
 <p class="small">Not started; ADR-028; spec <code>docs/specs/2026-09-17-online-slice.md</code>.</p>
 <div class="open-q"><h3>Open questions</h3><ul><li id="q-pres-select">Character select and draft screens are not mocked yet (follow the research-then-options workflow).</li></ul></div>
@@ -1031,7 +1032,7 @@ r=+4        . . . , .</code></pre>
 <tr><th>M</th><th>Goal</th><th>Done when</th><th>Status</th></tr>
 <tr><td>M0</td><td>Setup</td><td>Web build loads; tests green; CLI connected; server echoes</td><td>in progress</td></tr>
 <tr><td>M1</td><td>Core loop, offline</td><td>Hex map, one unit each, move + attack, AP turns, win by kill, vs random bot; deterministic damage with preview and reveal; HUD package D</td><td>done 15 Sep 2026</td></tr>
-<tr><td>M2</td><td>Online</td><td>Same round over WebSocket; guest auth; one queue; server bot; 30 s server turn clock; resign; reconnect; lobby scene</td><td>next (spec 17 Sep 2026)</td></tr>
+<tr><td>M2</td><td>Online</td><td>Same round over WebSocket; guest auth; rooms by code; server bot; 30 s server turn clock; resign; reconnect; lobby scene</td><td>local end-to-end done 17 Sep 2026; deploy outstanding</td></tr>
 <tr><td>M3</td><td>Depth</td><td>Gear (items replace classes), two lanes + elements, three lineages with starting blessings, boons (blessing / enchant / sigil) with draft, session best-of-3 across three ladder maps, session-long reveals, character select and draft screens</td><td></td></tr>
 <tr><td>M4</td><td>Presentation</td><td>Camera toggle, examine polish, VFX, FMOD, low-poly heroes with visible gear</td><td></td></tr>
 <tr><td>M5</td><td>Ship</td><td>Glicko-2, VPS deploy, size and load optimisation, mobile browser check, accounts and presets</td><td></td></tr>
@@ -1088,6 +1089,7 @@ r=+4        . . . , .</code></pre>
 <header><h2>Changelog</h2></header>
 <table>
 <tr><th>Date</th><th>Change</th></tr>
+<tr><td>2026-09-17</td><td><b>M2 shipped (local end to end).</b> The match moved onto the server: guest auth with a resumable token, rooms reached by a four-letter code, gear chosen in the room, the server bot, a 30&nbsp;s server-authoritative turn with a measured lag grace, resign, a 60&nbsp;s reconnect grace ending in forfeit, and the client mirror. <a href="#online">Online</a> becomes implemented for that scope; <a href="#win-conditions">Win conditions</a> gains resign and forfeit in code; the Lobby in <a href="#presentation">Presentation</a> is built. <b>OPT-0001 decided: room codes, not a queue</b>, with the loadout chosen after joining — the queue moves to M5 with ratings. 321 Core tests, 34 server tests (two whole matches played over real sockets by the client's own mirror). Not done: deploy.</td></tr>
 <tr><td>2026-09-17</td><td>v0.2.2. Both aiming specs verified by review. Online question round: M2 scoped to guest auth, one queue, a server bot, one flat 30 s server turn with a lag grace, resign, a 60 s reconnect grace, the client mirror and a lobby scene. <a href="#online">Online</a> becomes decided, <a href="#time-controls">Time controls</a> becomes proposed-for-later, the idle penalty is deferred, <a href="#presentation">Presentation</a> gains Lobby. ADR-026..028. Spec written for the next session.</td></tr>
 <tr><td>2026-09-16</td><td>Aiming slice shipped (client half): range circles in the tile shader, the four-state path preview with blocked reasons and a cursor tag, props on the board with hp tags and examine, the projectile, and facing. <a href="#presentation">Presentation</a> gains a decided "Targeting" subsection; ADR-025.</td></tr>
 <tr><td>2026-09-16</td><td>Aiming slice shipped (rules half): height-aware ray sight between aim points, trajectories (direct / arc / sky) with an apex, circular range bands, props (wall and pillar) as bodies, arena-4 reworked. New sections <a href="#trajectories">Trajectories</a> and <a href="#props">Props</a>; <a href="#line-of-sight">Line of sight</a> rewritten and its "do units block sight" question answered yes. Client half shipped the same day.</td></tr>

@@ -8,8 +8,8 @@ Numbers are integers (no floats in rules).
 | File | Contents | Status |
 |---|---|---|
 | `terrains.json` | Terrain catalogue: `id`, `walkable`, `moveCost`, `modifiers[]` | loaded |
-| `rules.json` | Match-wide rules: `damageTypes[]` (the two lanes), `globalModifiers[]` (height advantage lives here as data), `heights` (levels → body units), `baseStats` (every hero's numbers before gear), `innateAbilities[]` (the walk) | loaded |
-| `timecontrols.json` | `{ "version": 1, "timeControls": [ { "id": "3+2", "name", "baseMs", "incrementMs", "turnCapMs" } ] }` | loaded |
+| `rules.json` | Match-wide rules: `damageTypes[]` (the two lanes), `globalModifiers[]` (height advantage lives here as data), `heights` (levels → body units), `baseStats` (every hero's numbers before gear), `innateAbilities[]` (the walk), `clock` (the turn deadline both sides time by) | loaded |
+| `timecontrols.json` | `{ "version": 1, "timeControls": [ { "id": "3+2", "name", "baseMs", "incrementMs", "turnCapMs" } ] }` | loaded, unused until time controls return (design: `#time-controls`) |
 | `abilities/*.json` | One ability per file; `type` picks the schema (`movement`, `attack`). Every ability has an AP `cost` (default 1) | loaded |
 | `items/*.json` | One item per file: `id`, `slot`, `kind`, `stats`, `abilities`, `tags` | loaded |
 | `maps/*.json` | Map: name, hexes[] (`q,r,terrain,height,effect?,prop?`), spawns (`p1`,`p2`), symmetry type, ladder position | loaded |
@@ -96,7 +96,8 @@ standing on the terrain carries for combat (see *Modifiers*); the catalogue reje
   "globalModifiers": ["high-ground"],
   "heights": { "unitsPerLevel": 3, "body": 6, "aim": 4 },
   "baseStats": { "hp": 20, "ap": 3, "power.weapon": 1, "power.spell": 1, "defense.weapon": 0, "defense.spell": 0 },
-  "innateAbilities": ["move"]
+  "innateAbilities": ["move"],
+  "clock": { "turnMs": 30000, "lagGraceMs": 1000, "reconnectGraceMs": 60000 }
 }
 ```
 
@@ -104,6 +105,14 @@ standing on the terrain carries for combat (see *Modifiers*); the catalogue reje
 `damageType` and every modifier `damageTypes` condition must name one, so adding a lane is one line here.
 `globalModifiers` apply to every attack (height advantage is the shipped example); they are ordinary
 modifier ids. `baseStats` and `innateAbilities` are both required and are described below.
+
+`clock` is required and all three values must be positive. It is a **rule**, not balance, because both
+sides read it: the server times the turn by `turnMs` and the client draws the same rope from the same
+number. `lagGraceMs` caps the measured round-trip allowance the server adds before it ends a turn, so a
+command that left the client before the deadline is never refused for arriving after it.
+`reconnectGraceMs` is how long a dropped seat is held before the server forfeits it. Banks, increments
+and a choice of time control are a later design (`#time-controls`); `timecontrols.json` stays loaded and
+unused until then.
 
 ## Heights (`rules.json`, `heights`)
 
@@ -261,11 +270,24 @@ every attack (`rules.globalModifiers`). The same id twice on one unit does not s
 
 `MatchState(catalog, MatchSetup, seed)` builds the map, spawns one hero per player from that player's
 `Loadout` (four item ids, each checked against its slot) on `spawns.p1` / `p2`, then `Start()` begins turn 1. Commands: `MoveCommand`, `AttackCommand`, `EndTurnCommand` (reason
-`Player` or `Timeout`; the server submits the latter when the clock runs out, so replays need no clock).
+`Player` or `Timeout`; the server submits the latter when the clock runs out, so replays need no clock)
+and `ResignCommand` (reason `Player` or `Disconnect`; the server submits the latter when a dropped seat
+does not come back, so a forfeit goes through the same rules path as a move). A resign is legal for either
+player at any moment while the match runs, **including off turn**, and is never offered to a bot;
+`MatchEndReason` is `Elimination`, `Resign` or `Forfeit`.
 `Validate` is pure; `Apply` is the only mutator and returns `MatchEvent`s; `EnumerateLegal` lists every
 legal command (bots, highlights). Each turn refreshes the active player's units to `stats.ap`; a unit at 0
 hp is dead, stops occupying its tile, and a player with no living unit loses (`MatchEndedEvent`). Clients
 only ever see `MatchState.ViewFor(player)` (`PlayerView`) and events passed through `EventFilter`.
+
+**The client's copy is a mirror** (`MatchState.FromView`, ADR-026): the same class rebuilt from one
+player's `PlayerView` and nothing else, so every preview question is answered by the same rules code
+online and offline, and it can only ever know what the server chose to send. A mirror answers questions
+and refuses to be advanced — `Start`, `Apply` and `TryApply` all throw on one.
+
+Everything that crosses a socket is encoded by `Mimas.Core.Protocol.Wire`: a hand-written JSON codec with
+no attributes, no reflection and no `TypeNameHandling` (ADR-027). See `docs/networking.md`, which is the
+wire reference.
 
 ## Tile height (`maps/*.json`, `height`)
 

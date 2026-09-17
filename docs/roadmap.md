@@ -4,7 +4,7 @@
 |---|---|---|---|
 | M0 | Setup | Empty Web build loads in browser; `dotnet test` green; Unity CLI + Claude Code connected; server `/ws` echoes ping | in progress |
 | M1 | Core loop, offline | Hex map from JSON, 1 unit each, move + basic attack, turn order, win by kill; playable vs a random bot in the Editor; Core has ≥ 50 tests | **done 15 Sep 2026** |
-| M2 | Online | Same match over WebSocket via `Mimas.Server`; guest auth; matchmaking queue; chess clocks; reconnect | **next** (spec 17 Sep 2026) |
+| M2 | Online | Same match over WebSocket via `Mimas.Server`; guest auth; rooms by code; server-authoritative turn clock; resign; reconnect | **local end to end done 17 Sep 2026**; deploy outstanding (M2-7) |
 | M3 | Depth | Gear replaces classes (`items/`), two damage lanes + elements, three lineages with starting blessings, boons (blessing / enchant / sigil) with the between-round draft, session best-of-3 across 3 ladder maps, session-long reveals, character select and draft screens. Spec: `docs/design/index.html` | |
 | M4 | Presentation | Cinemachine tilted/top-down toggle, UI Toolkit HUD + examine mode, Shuriken VFX, FMOD music/SFX, low-poly characters with animations | |
 | M5 | Ship | Ratings (Glicko-2), deploy on VPS, size/load optimisation (Addressables, stripping), mobile browser check | |
@@ -137,6 +137,44 @@ one flat 30 s server turn with a lag grace, resign, 60 s reconnect grace, the cl
 clock (ADR-027), lobby scene and the presenter / driver split (ADR-028). The aiming slice is closed; the specs are
 history and the design page is the record.
 
+## M2 progress (17 Sep 2026): the online slice
+
+**The match is on the server.** Two browsers — or the Editor and a browser — can play the same game, and
+a bot match runs through exactly the same wire so there is one client code path rather than two.
+
+Before any code, one open question was settled. The spec locked a FIFO **queue**; the studio plan,
+approved the same day, recorded **room codes** and the queue moving to M5. Both were dated 17 Sep and
+`OPT-0001` put it to Rohan: **room codes**, with the loadout chosen *after* joining a room. Carried into
+the spec as amendment A1. The reason is the playtest, not the engineering: four friends in two arranged
+pairs pressing "Find match" get paired in the order they click, and two of them end up playing the wrong
+person in the first thirty seconds of the only session that matters.
+
+- **Core.** `rules.json` gains a `clock` block (turn 30 s, lag grace 1 s, reconnect grace 60 s) — a rule,
+  not balance, because both sides read it. `ResignCommand` (reason `Player` or `Disconnect`) with
+  `MatchEndReason.Resign / Forfeit`: legal off turn, never offered to a bot, and the path a server-side
+  forfeit takes, so replaying a command list still reproduces the match.
+  `Mimas.Core.Protocol.Wire` is a hand-written JSON codec — no attributes, no reflection, no
+  `TypeNameHandling` (ADR-027). `MatchState.FromView` is the **client mirror** (ADR-026).
+- **Server.** Rooms reached by a four-letter code, guest identities with resumable tokens, a bot seat, the
+  turn deadline with a measured lag allowance, the reconnect grace and forfeit, and hidden information
+  filtered per seat in the one method anything leaves a room through.
+- **Client.** `NetClient` (one socket, alive across scenes), the Lobby scene, and `MatchSession` split
+  into a presenter and an `IMatchDriver` (ADR-028) — local practice and an online match are the same
+  presenter over a different driver, and opening the Arena scene directly still plays a whole local game.
+
+**Numbers:** 287 → 321 Core tests, and a new `Mimas.Server.Tests` (34 tests, ~6 s) which is now ladder
+rung 5 and `required`. Those tests play whole matches over real sockets using `MatchState.FromView` as the
+client — the client's own architecture as the test double — so a match they can play is a match a browser
+can play.
+
+**What the Editor caught that no test could:** four ordering and recovery bugs — the lobby looking for the
+connection before it existed, a button press that opened a socket and then waited forever, a reconnection
+that never re-authenticated, and a match that was gone from the server leaving the board frozen with no way
+out. All four are the kind that need a scene and a real socket, which is why section 8 of the spec exists.
+
+**Not done:** deploy (M2-7, `F-deploy`), rematch without leaving the room (M2-8), and a Web build served to
+a real browser — everything above was verified in the Editor against a real server on this machine.
+
 ## Tooling backlog
 
 Small editor/authoring tools, in the order they are likely to be worth building.
@@ -162,3 +200,5 @@ Small editor/authoring tools, in the order they are likely to be worth building.
 | Core test count / runtime | 197 / 0.30 s (+ items, loadouts, base stats, ability sources, shipped-data conventions) | 16 Sep 2026 |
 | Core test count / runtime | 203 / 0.27 s (+ item slot vs ability category, schema tolerance, attack lane conventions) | 16 Sep 2026 |
 | Core test count / runtime | 287 / 0.24 s (+ ballistics, ray sight, trajectories, props and bodies, circular ranges) | 16 Sep 2026 |
+| Core test count / runtime | 321 / 6 s (+ clock, resign, the wire codec, the client mirror) | 17 Sep 2026 |
+| Server test count / runtime | 34 / 6 s (auth, rooms by code, whole matches over sockets, clocks, hidden info, reconnect, forfeit) | 17 Sep 2026 |

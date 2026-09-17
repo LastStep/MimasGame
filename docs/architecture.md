@@ -5,10 +5,10 @@
 ```
 ┌──────────────────────────┐   wss (JSON)   ┌──────────────────────────┐
 │  MimasClient (Unity Web) │ ◄────────────► │  Mimas.Server (ASP.NET)  │
-│  rendering, input, UI,   │                │  matchmaking, rooms,     │
-│  audio, camera           │                │  clocks, hidden info,    │
-│  ─ uses Core for:        │                │  ratings, persistence    │
-│    legal-move preview,   │                │  ─ uses Core for:        │
+│  rendering, input, UI,   │                │  rooms by code, guest    │
+│  audio, camera           │                │  auth, clocks, bot seat, │
+│  ─ uses Core for:        │                │  hidden info             │
+│    the MIRROR (ADR-026), │                │  ─ uses Core for:        │
 │    local bot / practice  │                │    THE authoritative sim │
 └───────────┬──────────────┘                └───────────┬──────────────┘
             │                                           │
@@ -25,10 +25,11 @@
 | `Pathfinding` | BFS/Dijkstra for movement range per movement type (walk / jump / fly / teleport), A* for paths |
 | `Units` | `Unit` (owner, class, position, hp, ap, ability ids, modifier ids), `UnitSet` (occupancy; dead units occupy nothing) |
 | `Combat` | `AttackTargeting` (range band + line of sight), `DamageCalculator` -> `DamageBreakdown` (fixed-order signed lines, floor 0), `Knowledge` (full vs one player's view: preview and actual share one code path) |
-| `Match` | `MatchState` (full truth; `Validate` pure, `Apply` sole mutator -> events, `EnumerateLegal`), `Command`s (move / attack / end turn incl. timeout), `MatchEvent`s, `PlayerView` (what one player may see), `EventFilter` (per-player event trimming), `MatchSetup` |
+| `Match` | `MatchState` (full truth; `Validate` pure, `Apply` sole mutator -> events, `EnumerateLegal`; also `FromView`, the client's read-only **mirror**, ADR-026), `Command`s (move / attack / end turn incl. timeout / resign incl. disconnect forfeit), `MatchEvent`s, `PlayerView` (what one player may see), `EventFilter` (per-player event trimming), `MatchSetup` |
+| `Protocol` | `Wire` (hand-written JSON codec for commands, events and views), `Messages` (every wire type and error code as a constant), `WireException`. No attributes, no reflection, no `TypeNameHandling` (ADR-027) |
 | `Bots` | `IBot`, `RandomBot` (uniform over `EnumerateLegal`, own RNG) |
 | `Boons` | Draft offers and application (M3) |
-| `Data` | JSON parsers for terrains, rules, maps, abilities (movement, attack), classes + stat blocks, modifiers, time controls into immutable definition objects |
+| `Data` | JSON parsers for terrains, rules (including the `clock` block both sides time a turn by), maps, abilities (movement, attack), gear + stat blocks, modifiers, time controls into immutable definition objects |
 | `Content` | `ContentCatalog`: loads the whole data folder from `(path, text)` pairs, links cross references, sorted `DefinitionTable<T>`s, content hash for client/server parity |
 | `Movement` | `MovementDef` (data) + one `IMovementResolver` per geometry (walk / jump / teleport) behind a string-keyed registry; `MovePlan` = path to animate + tiles entered |
 | `Rng` | Seeded deterministic RNG (xoshiro/PCG) |
@@ -39,13 +40,14 @@ Design rule: **Commands in, Events out.** `MatchState.Apply(Command) → IReadOn
 
 | Component | Responsibility |
 |---|---|
-| `WsEndpoint` | `/ws` WebSocket; envelope `{ "t": "<type>", "p": {...} }` |
-| `Sessions` | Auth (guest token first; accounts later), connection ↔ player |
-| `Matchmaker` | Queue per time-control; rating window widens with wait time |
-| `Room` | One `MatchState` + two connections + clocks; validates and applies Commands; broadcasts filtered Events; handles reconnect |
-| `Clocks` | Per-player chess clocks; server is the timekeeper |
-| `Ratings` | Glicko-2 (planned) |
-| `Persistence` | SQLite first (single VPS); Postgres if needed |
+| `Program` | Loads the catalogue before it can serve, `/health` (rooms, waiting rooms, players), `/ws`, and optionally the Web build when `MIMAS_WEB_PATH` is set |
+| `Net/WsConnection` | One socket: a capped text-only read loop, a channel drained by one writer so frames never interleave, server pings for the round-trip estimate, and which registry a message belongs to |
+| `Players/PlayerRegistry` | Guests by id and by token. In memory only (D4) — no database, but a token that survives a page refresh |
+| `Rooms/RoomRegistry` | Every open room, by match id and by four-letter code; owns code generation and who is allowed near which room |
+| `Rooms/Room` | One `MatchState` + two seats, all under one lock. Validates and applies commands, broadcasts per-seat views and filtered events, runs the turn deadline, the bot and the reconnect graces |
+| `Rooms/RoomClock` | A turn's deadline and the measured lag allowance. Pure arithmetic, testable without sockets |
+| `Rooms/Seat` | Who is in a place, what they chose, whether they are ready, and the socket they are on — which outlives the connection, because that is what a reconnect grace is |
+| Ratings, persistence | M5. There is no database in M2 and nothing survives a restart |
 
 One process hosts many rooms (`Dictionary<MatchId, Room>`); a 1v1 turn-based room costs ~KBs, so a €4 VPS handles thousands.
 
@@ -62,8 +64,29 @@ One process hosts many rooms (`Dictionary<MatchId, Room>`); a 1v1 turn-based roo
 | Networking | NativeWebSocket (jslib on WebGL) + Newtonsoft JSON |
 | Assets | Addressables (LZ4) for anything not needed at first frame |
 
-Folder layout: `Assets/_Game/{Content,Presentation,UI,Audio,Data,Art,Scenes,Editor,Tests}` each with an `.asmdef`. Core comes in as local package `com.mimas.core` from `../../shared/Mimas.Core` (see `Packages/manifest.json`). `Content` holds the generated `GameDataManifest` asset and `ContentBootstrap`, the one place the client loads JSON; `Presentation` depends on it and on Core only.
+Folder layout: `Assets/_Game/{Content,Net,Presentation,UI,Audio,Data,Art,Scenes,Editor,Tests}` each with an `.asmdef`. Core comes in as local package `com.mimas.core` from `../../shared/Mimas.Core` (see `Packages/manifest.json`). `Content` holds the generated `GameDataManifest` asset and `ContentBootstrap`, the one place the client loads JSON; `Presentation` depends on it, on `Net` and on Core.
+
+Two scenes: **Lobby** (build index 0) and **Arena** (1).
+
+| Piece | Responsibility |
+|---|---|
+| `Net/NetClient` | The one socket, alive across scene loads. Owns the connection, the guest identity and `match.start`; knows nothing about matches or rules |
+| `UI/LobbyView` | Name, `Play vs bot` / `Create room` / `Join room`, then the room: code, seats, loadout preset, Ready |
+| `Presentation/MatchSession` | The presenter: board, HUD, aiming, playback, facing. Does not know whether the match is local |
+| `Presentation/IMatchDriver` | Where the match comes from. `LocalMatchDriver` (the truth, the bot, the ADR-015 clock) or `OnlineMatchDriver` (the mirror, the server's clock) — ADR-028 |
+
+**Core comes into the client for the mirror.** `OnlineMatchDriver` rebuilds a `MatchState` from the
+`PlayerView` on every message and asks it every preview question, so the online game and the practice
+game are answered by one implementation of the rules rather than two.
 
 ## Determinism contract
 
 Same `(seed, map, commands)` ⇒ identical `MatchState` on client and server. Enables replays, spectating, bots, balance simulations, and cheap server-side validation.
+
+Two rules keep it honest:
+
+- **The client mirror is rebuilt from views, never advanced by commands.** It answers questions and
+  refuses to be mutated (`Start`, `Apply`, `TryApply` all throw on a mirror), so it cannot drift.
+- **Every clock decision is a command.** A timeout is `EndTurnCommand(Timeout)` and a disconnect forfeit
+  is `ResignCommand(Disconnect)`, both submitted by the server through the same path a player uses — so
+  replaying the command list reproduces the match with no clock and no sockets.

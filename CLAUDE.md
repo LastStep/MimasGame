@@ -19,7 +19,8 @@ information, ladder of maps, TFT-style boons).
 |---|---|---|
 | `shared/Mimas.Core/` | **Pure C# rules engine** (netstandard2.1, C# 9). No `UnityEngine`. Hex math, tiles, units, abilities, turn resolution, RNG, boons, JSON data. Also a Unity local package. | `dotnet`, and compiled by Unity |
 | `shared/Mimas.Core.Tests/` | xUnit tests. **Run constantly.** | `dotnet test` (~1 s) |
-| `server/Mimas.Server/` | ASP.NET Core WebSocket server: rooms, clocks, hidden-info filtering. Hosts Core. | `dotnet run` |
+| `server/Mimas.Server/` | ASP.NET Core WebSocket server: rooms by code, guest auth, clocks, bot seat, hidden-info filtering. Hosts Core. | `dotnet run` |
+| `server/Mimas.Server.Tests/` | xUnit. Two fake clients play whole matches over real sockets. Ladder rung 5. | `dotnet test` (~6 s) |
 | `MimasClient/` | Unity 6000.4.4f1 URP → **Web (WebGL2)**. Presentation only. | Unity CLI (`unity …`) |
 | `studio/` | Production state: STATE, pillars, roadmap, features, tasks, plans, playtests, runs, ledger | markdown + yaml |
 | `tools/` | Build/deploy scripts, JSON schemas, nginx config | — |
@@ -31,7 +32,7 @@ information, ladder of maps, TFT-style boons).
 3. `shared/Mimas.Core` stays Unity-free: no `UnityEngine`, no threads, no `dynamic`, no reflection-emit (IL2CPP). C# 9 max — no `record`, no `required`, no file-scoped namespaces.
 4. **Determinism.** All randomness through `Mimas.Core.Rng`, seeded per match. No `DateTime.Now`, no `Guid.NewGuid()`, no dictionary-order dependence, no floats in rules. Same inputs + seed ⇒ same result on server and client.
 5. **Game data is JSON** under `MimasClient/Assets/_Game/Data/`. Never hard-code balance numbers in C#. Schema change ⇒ update `docs/data.md` **and** `tools/schemas/`.
-6. **Hidden information lives on the server.** A client only ever receives a `PlayerView`. Never send full `MatchState`.
+6. **Hidden information lives on the server.** A client only ever receives a `PlayerView`. Never send full `MatchState`. (The client's `MatchState` is a *mirror* built from a `PlayerView` — ADR-026 — which answers questions and refuses to be advanced.)
 7. Do not touch `ProjectSettings/**`, `Packages/manifest.json` or `packages-lock.json` without asking first.
 8. Renamed serialized fields get `[FormerlySerializedAs("_old")]`. Compare `UnityEngine.Object` with `== null`, never `is null` / `?.`.
 9. Web build: WebGL2 only — no compute shaders, so **no VFX Graph** (use Shuriken), no managed threads, no sync GPU readback, Brotli, Managed Stripping High (keep `link.xml` current).
@@ -44,7 +45,9 @@ information, ladder of maps, TFT-style boons).
 # Fast loop (no Unity) — before and after every Core/Server change
 dotnet build Mimas.slnx
 dotnet test shared/Mimas.Core.Tests              # exit 0 = green
+dotnet test server/Mimas.Server.Tests            # the online game, end to end over sockets
 dotnet run --project server/Mimas.Server         # http://localhost:7777/health, ws://localhost:7777/ws
+MIMAS_WEB_PATH=Build/Web dotnet run --project server/Mimas.Server   # also serves the Web build at /
 
 # The ladder — what turns "it works" into a fact
 node E:/Studios/Trinetra-Game-Studio/tools/ladder/ladder.mjs --project mimas --task T-NNNN
