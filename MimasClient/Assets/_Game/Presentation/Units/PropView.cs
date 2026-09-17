@@ -146,6 +146,9 @@ namespace Mimas.Client.Presentation
         {
             Renderer renderer = go.GetComponent<Renderer>();
             if (renderer == null) return;
+
+            // CreatePrimitive leaves a Built-in-pipeline material behind, which is magenta under URP.
+            PlaceholderMaterial.Apply(go);
             if (_block == null) _block = new MaterialPropertyBlock();
             renderer.GetPropertyBlock(_block);
             _block.SetColor(BaseColorId, color);

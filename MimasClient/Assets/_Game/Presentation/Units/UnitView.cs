@@ -187,6 +187,12 @@ namespace Mimas.Client.Presentation
                 Renderer renderer = go.GetComponent<Renderer>();
                 if (renderer != null) renderer.sharedMaterial = _visualMaterial;
             }
+            else
+            {
+                // Not "leave Unity's default": that default is a Built-in-pipeline material and draws
+                // magenta under URP, which is how the first Web build looked.
+                PlaceholderMaterial.Apply(go);
+            }
 
             return go;
         }

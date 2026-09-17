@@ -113,16 +113,18 @@ try {
   const bootMs = Date.now() - started;
   note(`unity booted (${bootMs} ms) — splash is still on the canvas at this point`);
 
+  await mkdir(shotDir, { recursive: true });
+
+  // Steps first, then the assertion. The client connects lazily — nothing reaches the socket until
+  // something is clicked — so checking --expect before the steps can only ever time out.
+  await runSteps(page, args.do ?? '', shotDir, note);
+
   if (expect) {
-    await page.waitForFunction(() => true);   // yield once so queued console events flush
     const deadline = Date.now() + Number(args['expect-timeout'] ?? 60_000);
     while (!expectSeen && Date.now() < deadline) await page.waitForTimeout(250);
     if (!expectSeen) throw new Error(`never saw a console line matching /${args.expect}/`);
     note(`saw /${args.expect}/ (${Date.now() - started} ms)`);
   }
-
-  await mkdir(shotDir, { recursive: true });
-  await runSteps(page, args.do ?? '', shotDir, note);
   await page.screenshot({ path: path.join(shotDir, 'final.png') });
   note(`screenshot ${path.join(shotDir, 'final.png')}`);
   note(`cold boot to instance: ${bootMs} ms`);

@@ -114,13 +114,28 @@ namespace Mimas.Client.Editor
                 // it, leaving the file still reading None after a build that had set it. Player settings
                 // are a separate serialized object and need saving by name.
                 PlayerSettings.WebGL.exceptionSupport = ShippedExceptionSupport;
-                AssetDatabase.SaveAssets();
-                EditorApplication.ExecuteMenuItem("File/Save Project");
+                SaveProjectSettings();
             }
 
             // After the finally, never inside it: EditorApplication.Exit terminates the process on the
             // spot, so exiting from the try skips the restore above entirely.
             if (failed && Application.isBatchMode) EditorApplication.Exit(1);
+        }
+
+        /// <summary>
+        /// Writes `ProjectSettings/ProjectSettings.asset`.
+        ///
+        /// <para>Two things that do not work, established by watching the file not change: setting a
+        /// value through the static <c>PlayerSettings</c> API and calling <c>AssetDatabase.SaveAssets()</c>
+        /// (the object is never marked dirty), and <c>ExecuteMenuItem("File/Save Project")</c> in batch
+        /// mode. The `GraphicsSettings` edit above persists because a `SerializedObject` marks its target
+        /// dirty itself, so the same has to be done by hand here.</para>
+        /// </summary>
+        private static void SaveProjectSettings()
+        {
+            var settings = Resources.FindObjectsOfTypeAll<PlayerSettings>();
+            for (int i = 0; i < settings.Length; i++) EditorUtility.SetDirty(settings[i]);
+            AssetDatabase.SaveAssets();
         }
 
         /// <summary>
