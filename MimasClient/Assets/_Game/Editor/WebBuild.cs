@@ -60,6 +60,8 @@ namespace Mimas.Client.Editor
             foreach (var scene in EditorBuildSettings.scenes)
                 if (scene.enabled) scenePaths.Add(scene.path);
 
+            bool failed = false;
+
             try
             {
                 PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Brotli;
@@ -97,16 +99,25 @@ namespace Mimas.Client.Editor
                 if (summary.result != BuildResult.Succeeded)
                 {
                     Debug.LogError($"[WebBuild] FAILED: {summary.result}");
-                    if (Application.isBatchMode) EditorApplication.Exit(1);
+                    failed = true;
                 }
             }
             finally
             {
                 // Not "whatever it was before": the decided value, so a debug build cannot leave the
                 // repo recording FullWithStacktrace and a release build cannot re-record None.
+                //
+                // SaveAssets() alone does not write ProjectSettings.asset — the first run of this proved
+                // it, leaving the file still reading None after a build that had set it. Player settings
+                // are a separate serialized object and need saving by name.
                 PlayerSettings.WebGL.exceptionSupport = ShippedExceptionSupport;
                 AssetDatabase.SaveAssets();
+                EditorApplication.ExecuteMenuItem("File/Save Project");
             }
+
+            // After the finally, never inside it: EditorApplication.Exit terminates the process on the
+            // spot, so exiting from the try skips the restore above entirely.
+            if (failed && Application.isBatchMode) EditorApplication.Exit(1);
         }
 
         /// <summary>
