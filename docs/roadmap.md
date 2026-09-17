@@ -132,7 +132,10 @@ clean, Core and the server untouched, both play-test bugs fixed in code). One ni
 the review: the solution file is `Mimas.slnx` (CLAUDE.md said `.sln`), and the `com.unity.pipeline` editor
 config under `Assets/Settings/Pipeline/` is machine-local tool config and is now git-ignored.
 
-Next: **M2** (see the table). The aiming slice is closed; the specs are history and the design page is the record.
+Next: **M2**, spec `docs/specs/2026-09-17-online-slice.md` (17 Sep 2026): guest auth, one queue, server bot,
+one flat 30 s server turn with a lag grace, resign, 60 s reconnect grace, the client mirror (ADR-026), wire and
+clock (ADR-027), lobby scene and the presenter / driver split (ADR-028). The aiming slice is closed; the specs are
+history and the design page is the record.
 
 ## Tooling backlog
 
