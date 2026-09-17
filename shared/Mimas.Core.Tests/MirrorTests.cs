@@ -392,6 +392,42 @@ namespace Mimas.Core.Tests
                 after.ViewFor(1).Units.Single(u => u.Owner == 0).Abilities.Select(a => a.Id));
         }
 
+        /// <summary>
+        /// The HUD's other preview: what a shot that is <em>refused</em> would have done. It goes through
+        /// PreviewAgainst rather than PreviewAttack, so the mirror's "?" correction has to live there too, or
+        /// an out-of-range tooltip online would claim a certainty the player has not earned.
+        /// </summary>
+        [Fact]
+        public void Mirror_PreviewAgainst_MatchesTruthEvenWhenTheShotIsRefused()
+        {
+            ContentCatalog catalog = Catalog();
+            var truth = new MatchState(catalog, Setup(), 6);
+            truth.Start();
+
+            Unit mine = truth.Units.All.Single(u => u.Owner == 0);
+            Unit theirs = truth.Units.All.Single(u => u.Owner == 1);
+            MatchState mirror = MatchState.FromView(catalog, truth.ViewFor(0));
+
+            var attack = (AttackDef)mine.AbilityIds
+                .Select(id => catalog.Abilities.TryGet(id, out var a) ? a : null)
+                .First(a => a is AttackDef);
+
+            // Eight hexes apart on arena-4: nothing player 0 owns can legally reach player 1 from here.
+            Assert.Null(truth.PreviewAttack(0, mine.Id, attack.Id, theirs.Position));
+
+            DamageBreakdown a = truth.PreviewAgainst(0, mine.Id, attack, theirs);
+            DamageBreakdown b = mirror.PreviewAgainst(0, mine.Id, attack, theirs);
+
+            Assert.NotNull(a);
+            Assert.NotNull(b);
+            Assert.Equal(a.Total, b.Total);
+            Assert.Equal(a.UnknownCount, b.UnknownCount);
+            Assert.False(b.IsExact);
+            Assert.Equal(a.Lines.Select(l => l.Id + ":" + l.Amount), b.Lines.Select(l => l.Id + ":" + l.Amount));
+
+            Assert.Throws<InvalidOperationException>(() => mirror.PreviewAgainst(1, mine.Id, attack, theirs));
+        }
+
         private static IEnumerable<string> Destinations(MovementOptions options) =>
             options.Plans.Select(p => p.Destination.ToString()).OrderBy(s => s, StringComparer.Ordinal).ToList();
     }

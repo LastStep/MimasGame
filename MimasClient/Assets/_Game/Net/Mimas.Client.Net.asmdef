@@ -1,12 +1,17 @@
 {
   "name": "Mimas.Client.Net",
   "rootNamespace": "Mimas.Client.Net",
-  "references": ["Mimas.Core"],
+  "references": [
+    "Mimas.Core",
+    "endel.nativewebsocket"
+  ],
   "includePlatforms": [],
   "excludePlatforms": [],
   "allowUnsafeCode": false,
   "overrideReferences": true,
-  "precompiledReferences": ["Newtonsoft.Json.dll"],
+  "precompiledReferences": [
+    "Newtonsoft.Json.dll"
+  ],
   "autoReferenced": false,
   "defineConstraints": [],
   "versionDefines": [],

@@ -594,12 +594,34 @@ namespace Mimas.Core.Match
             var command = new AttackCommand(ActivePlayer, unitId, abilityId, target);
             if (IsOver || TurnNumber == 0) return null;
             if (!ValidateAttack(command, out attacker, out def, out victim).Ok) return null;
-            DamageBreakdown breakdown = _damage.Compute(Map, attacker, victim, def, Knowledge.For(viewer, this));
+            return PreviewAgainst(viewer, unitId, def, victim);
+        }
+
+        /// <summary>
+        /// What an attack would do to a body from what one player knows, <em>without</em> asking whether it is
+        /// legal: the number a HUD shows behind a "No line of sight" line, so a refused shot can still explain
+        /// itself. Null when the unit or the target is not there.
+        /// <para>
+        /// On a mirror this adds back the hidden modifiers the viewer was never sent. The calculator counts an
+        /// unknown for every hidden modifier it can see but may not show; a mirror does not have those
+        /// modifiers at all, so without this the "?" row would quietly disappear online and the player would
+        /// be told a guess was a certainty (ADR-026).
+        /// </para>
+        /// </summary>
+        public DamageBreakdown PreviewAgainst(int viewer, int unitId, AttackDef attack, IBody target)
+        {
+            if (attack == null) throw new ArgumentNullException(nameof(attack));
+            if (IsMirror && viewer != MirrorViewer)
+                throw new InvalidOperationException($"This mirror belongs to player {MirrorViewer} and cannot preview for player {viewer}.");
+            if (target == null) return null;
+
+            Unit attacker;
+            if (!Units.TryGet(unitId, out attacker)) return null;
+
+            DamageBreakdown breakdown = _damage.Compute(Map, attacker, target, attack, Knowledge.For(viewer, this));
             if (!IsMirror) return breakdown;
 
-            // On the truth the calculator counts a hidden modifier it may not show; on a mirror that modifier
-            // was never sent, so nothing would be counted and the "?" row would quietly disappear.
-            var victimUnit = victim as Unit;
+            var victimUnit = target as Unit;
             return breakdown.WithUnknown(attacker.HiddenModifierCount + (victimUnit != null ? victimUnit.HiddenModifierCount : 0));
         }
 
