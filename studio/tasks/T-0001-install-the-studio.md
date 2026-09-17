@@ -5,7 +5,7 @@ project: mimas
 feature:
 milestone: M2
 lane: full
-status: running
+status: verify
 owner: builder
 model: opus
 worktree:
@@ -22,7 +22,7 @@ done_when:
 ladder: [0, 1, 2]
 created: 2026-09-17
 started: 2026-09-17
-finished:
+finished: 2026-09-17
 cost_usd: 0
 blocked_by:
 ---
