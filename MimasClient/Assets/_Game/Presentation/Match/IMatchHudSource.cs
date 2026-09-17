@@ -209,6 +209,27 @@ namespace Mimas.Client.Presentation
         /// <summary>Centre-screen text once the match is over ("VICTORY" / "DEFEAT"), else null.</summary>
         string Banner { get; }
 
+        /// <summary>
+        /// The line under the banner: how it ended, not just who won ("by elimination", "you resigned",
+        /// "opponent left"). Null while the match runs.
+        /// </summary>
+        string BannerDetail { get; }
+
+        /// <summary>True once the way out of the result should appear, a beat after the banner.</summary>
+        bool ShowBackToLobby { get; }
+
+        /// <summary>Who is on the other side, for the turn banner. Null before the match is ready.</summary>
+        string OpponentName { get; }
+
+        /// <summary>
+        /// A line about the opponent's connection, or null when there is nothing to say
+        /// ("Opponent disconnected · 47 s", "Reconnecting…"). The HUD hides the row when it is null.
+        /// </summary>
+        string OpponentStatus { get; }
+
+        /// <summary>False when resigning would do nothing: local practice, or a match that is over.</summary>
+        bool CanResign { get; }
+
         /// <summary>The camera the board is rendered with, for anchoring overlays.</summary>
         Camera WorldCamera { get; }
 
@@ -225,5 +246,11 @@ namespace Mimas.Client.Presentation
 
         /// <summary>Closes the examine panel.</summary>
         void CloseExamine();
+
+        /// <summary>Concedes the match. The HUD asks twice before calling this; ignored when <see cref="CanResign"/> is false.</summary>
+        void Resign();
+
+        /// <summary>Leaves the finished match: the lobby online, a fresh Arena in practice.</summary>
+        void BackToLobby();
     }
 }

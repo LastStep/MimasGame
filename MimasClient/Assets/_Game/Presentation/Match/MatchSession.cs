@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using Newtonsoft.Json.Linq;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using Mimas.Client.Content;
-using Mimas.Core.Bots;
+using Mimas.Client.Net;
 using Mimas.Core.Combat;
 using Mimas.Core.Content;
 using Mimas.Core.Data;
@@ -14,22 +16,24 @@ using Mimas.Core.Units;
 namespace Mimas.Client.Presentation
 {
     /// <summary>
-    /// A match played locally against a bot: the one place on the client that owns a <see cref="MatchState"/>.
-    /// It is deliberately shaped like the networked session that replaces it in M2: commands go in through
-    /// <see cref="Submit"/>, events come back out, get filtered for the local player (<see cref="EventFilter"/>)
-    /// and are played one at a time onto the board (moves animate, hits pause), and everything the HUD
-    /// reads comes from the <see cref="PlayerView"/> projection or from the events, never from the state
-    /// directly. So the HUD and the board interaction already behave as if the truth lived elsewhere.
+    /// The presenter for one match: board, HUD, aiming, playback and facing. Where the match comes from is
+    /// an <see cref="IMatchDriver"/> and nothing here knows which (ADR-028) — a practice game against a bot
+    /// in this process, or a real one whose truth is on the server. Commands go in through
+    /// <see cref="Submit"/>, events come back out already filtered for the local player and are played one
+    /// at a time onto the board (moves animate, hits pause), and everything the HUD reads comes from the
+    /// <see cref="PlayerView"/> projection or from the events, never from a state this process owns.
     ///
     /// Board interaction: arm an action from the bar; a movement paints reachable tiles and previews paths,
     /// an attack paints legal targets and previews damage; a click submits the command. After an action the
     /// same ability stays armed while it is still affordable (three steps are three clicks, not six).
     /// Nothing is armed at the start of a turn (ADR-015); clicking a unit with nothing armed examines it.
-    /// The clock is the local fake from ADR-015 (turn cap, rope, idle penalty); a timeout becomes an
-    /// <see cref="EndTurnCommand"/> with reason <see cref="EndTurnReason.Timeout"/>, exactly as the server will do.
+    /// The clock belongs to the driver: locally it is the fake from ADR-015 (turn cap, rope, idle penalty),
+    /// online it is the server's, counted down between messages and re-anchored by every one of them. Either
+    /// way a timeout is an <see cref="EndTurnCommand"/> with reason <see cref="EndTurnReason.Timeout"/>,
+    /// submitted by whoever is keeping time.
     /// </summary>
     [DisallowMultipleComponent]
-    public sealed class LocalMatchSession : MonoBehaviour, IMatchHudSource
+    public sealed class MatchSession : MonoBehaviour, IMatchHudSource
     {
         [Header("Match setup")]
         [Tooltip("Map, classes, clock, bot and passive knobs. Assets/_Game/Settings/DefaultMatchSettings.asset.")]
@@ -69,23 +73,24 @@ namespace Mimas.Client.Presentation
         [Tooltip("Placeholder colour for props whose id is 'pillar'.")]
         [SerializeField] private Color _pillarColor = new Color(0.784f, 0.706f, 0.541f, 1f);
 
-        private const int LocalPlayer = 0;
-        private const int BotPlayer = 1;
         private const int None = -1;
+
+        /// <summary>How long the result sits before the way out of it appears.</summary>
+        private const float BackToLobbyDelaySeconds = 3f;
 
         // Rules.
         private ContentCatalog _catalog;
-        private MatchState _state;
-        private RandomBot _bot;
-        private PlayerView _view;
+        private IMatchDriver _driver;
         private int _localUnitId = None;
 
-        /// <summary>
-        /// The same calculator the rules use (ADR-017: preview and actual share one function). The session owns
-        /// one so it can also ask what a <em>refused</em> shot would have done — the number the tooltip shows
-        /// behind a "No line of sight" line. The networked session will get that number from the server instead.
-        /// </summary>
-        private DamageCalculator _damage;
+        /// <summary>The seat the person at this screen is playing. 0 in practice; either seat online.</summary>
+        private int LocalPlayer => _driver != null ? _driver.LocalPlayer : 0;
+
+        /// <summary>The truth in practice, the mirror online (ADR-026). Either way, the same rules code.</summary>
+        private MatchState Rules => _driver != null ? _driver.Rules : null;
+
+        /// <summary>The latest projection for the local player.</summary>
+        private PlayerView View => _driver != null ? _driver.View : null;
 
         // Views.
         private readonly Dictionary<int, UnitView> _unitViews = new Dictionary<int, UnitView>();
@@ -117,31 +122,24 @@ namespace Mimas.Client.Presentation
         private HudUnit _previewUnit;
         private string _cursorTag;
         private string _banner;
+        private string _bannerDetail;
+        private float _backToLobbyAt = -1f;
         private bool _ready;
 
-        // Clock (local fake, see ADR-015).
-        private float _turnSeconds = 30f;
         private float _ropeSeconds = 10f;
-        private float _idleTurnSeconds = 7f;
-        private float _turnTotal;
-        private float _turnRemaining;
-        private bool _penaltyPending;
-        private bool _penalised;
-        private bool _clockRunning;
         private int _localTurnNumber;
-        private float _botTimer;
 
         // ---- IMatchHudSource -------------------------------------------------------------------------
 
         public IReadOnlyList<HudAction> Actions => _actions;
         public int ActiveActionIndex => _armed;
-        public bool IsMyTurn => _ready && _view != null && _view.IsMyTurn;
+        public bool IsMyTurn => _ready && View != null && View.IsMyTurn;
         public bool CanEndTurn => CanAct;
         public int TurnNumber => _localTurnNumber;
         public int ApCurrent => LocalUnitView != null ? LocalUnitView.Ap : 0;
         public int ApPerTurn => LocalUnitView != null ? LocalUnitView.ApPerTurn : 0;
-        public float TurnSecondsRemaining => _turnRemaining > 0f ? _turnRemaining : 0f;
-        public float TurnSecondsTotal => _turnTotal;
+        public float TurnSecondsRemaining => _driver != null ? _driver.TurnSecondsRemaining : 0f;
+        public float TurnSecondsTotal => _driver != null ? _driver.TurnSecondsTotal : 0f;
         public float RopeSeconds => _ropeSeconds;
         public HudExamine Examine => _examine;
         public IReadOnlyList<HudUnit> Units => _hudUnits;
@@ -149,22 +147,30 @@ namespace Mimas.Client.Presentation
         public string CursorTag => _cursorTag;
         public Vector2 CursorScreenPosition => _input != null ? _input.PointerPosition : Vector2.zero;
         public string Banner => _banner;
+        public string BannerDetail => _bannerDetail;
+        public bool ShowBackToLobby => _backToLobbyAt >= 0f && Time.time >= _backToLobbyAt;
+        public string OpponentName => _driver != null ? _driver.OpponentName : null;
+        public string OpponentStatus => _driver != null ? _driver.OpponentStatus : null;
+        public bool CanResign => _driver != null && _driver.CanResign && !IsPlaying;
         public Camera WorldCamera => _input != null ? _input.ActiveCamera : Camera.main;
 
         public event Action StateChanged;
         public event Action<HudFlyover> Flyover;
 
         /// <summary>The rules state. Exposed for tests and tooling; presentation code must go through the view and events.</summary>
-        public MatchState State => _state;
+        public MatchState State => Rules;
 
-        private Mimas.Core.Match.UnitView LocalUnitView => _view != null && _localUnitId != None ? _view.FindUnit(_localUnitId) : null;
+        /// <summary>The driver, for tests and the Editor: which kind of match this is, and its clock.</summary>
+        public IMatchDriver Driver => _driver;
+
+        private Mimas.Core.Match.UnitView LocalUnitView => View != null && _localUnitId != None ? View.FindUnit(_localUnitId) : null;
 
         private bool IsPlaying => _movingUnitId != None || Time.time < _pauseUntil || _pending.Count > 0 || ProjectileInFlight;
 
         private bool ProjectileInFlight => _projectiles != null && _projectiles.IsPlaying;
 
         /// <summary>The local player may arm an action or pick a target right now.</summary>
-        private bool CanAct => _ready && !_state.IsOver && _state.ActivePlayer == LocalPlayer && !IsPlaying;
+        private bool CanAct => _ready && !Rules.IsOver && Rules.ActivePlayer == LocalPlayer && !IsPlaying;
 
         public void SelectAction(int index)
         {
@@ -189,6 +195,37 @@ namespace Mimas.Client.Presentation
             Submit(new EndTurnCommand(LocalPlayer));
         }
 
+        /// <summary>Concede. The HUD asks twice before it calls this.</summary>
+        public void Resign()
+        {
+            if (_driver == null || !_driver.CanResign) return;
+            Debug.Log("[MatchSession] resigning");
+            _driver.Resign();
+        }
+
+        /// <summary>
+        /// Leaves the result behind. Online that means the lobby, carrying the result for its one-line
+        /// summary; in practice there is no lobby to go to, so the Arena simply starts again.
+        /// </summary>
+        public void BackToLobby()
+        {
+            NetClient net = NetClient.Instance;
+            if (net == null)
+            {
+                SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+                return;
+            }
+
+            net.LastResult = new MatchResult
+            {
+                Won = Rules != null && Rules.Winner == LocalPlayer,
+                Reason = _bannerDetail,
+                OpponentName = OpponentName,
+            };
+            net.ForgetMatch();
+            SceneManager.LoadScene("Lobby");
+        }
+
         public void CloseExamine()
         {
             if (_examinedUnitId == None && _examinedPropId == None) return;
@@ -204,14 +241,14 @@ namespace Mimas.Client.Presentation
         {
             if (_content == null || _board == null || _input == null || _unit == null || _opponent == null)
             {
-                Debug.LogError("[LocalMatchSession] _content, _board, _input, _unit and _opponent must all be assigned.", this);
+                Debug.LogError("[MatchSession] _content, _board, _input, _unit and _opponent must all be assigned.", this);
                 enabled = false;
                 return;
             }
 
             if (_settings == null)
             {
-                Debug.LogWarning("[LocalMatchSession] No MatchSettings assigned; using built-in defaults.", this);
+                Debug.LogWarning("[MatchSession] No MatchSettings assigned; using built-in defaults.", this);
                 _settings = ScriptableObject.CreateInstance<MatchSettings>();
             }
 
@@ -224,7 +261,6 @@ namespace Mimas.Client.Presentation
         private void OnEnable()
         {
             if (_board == null || _input == null) return;
-            _board.BoardBuilt += HandleBoardBuilt;
             _input.Clicked += HandleClicked;
             _input.HoverChanged += HandleHoverChanged;
             _input.RightClicked += HandleRightClicked;
@@ -235,7 +271,6 @@ namespace Mimas.Client.Presentation
         private void OnDisable()
         {
             if (_board == null || _input == null) return;
-            _board.BoardBuilt -= HandleBoardBuilt;
             _input.Clicked -= HandleClicked;
             _input.HoverChanged -= HandleHoverChanged;
             _input.RightClicked -= HandleRightClicked;
@@ -247,12 +282,17 @@ namespace Mimas.Client.Presentation
         {
             StateChanged = null;
             Flyover = null;
+            if (_driver == null) return;
+            _driver.EventsArrived -= HandleEventsArrived;
+            _driver.Resynced -= HandleResynced;
+            _driver.StatusChanged -= HandleStatusChanged;
+            _driver.Dispose();
+            _driver = null;
         }
 
         private void Start()
         {
-            // BoardView builds in Awake, so the event may already have fired before we subscribed.
-            if (_board.IsBuilt) HandleBoardBuilt();
+            BeginMatch();
         }
 
         private void Update()
@@ -271,71 +311,89 @@ namespace Mimas.Client.Presentation
             }
             _wasPlaying = playing;
 
-            if (_state.IsOver) return;
+            // The clock, the bot and the opponent's countdown all belong to the driver; the presenter only
+            // says how much time has passed and draws whatever comes back.
+            _driver.Tick(Time.deltaTime);
 
-            if (_clockRunning) TickClock();
-
-            if (_state.ActivePlayer == BotPlayer && !IsPlaying)
-            {
-                _botTimer -= Time.deltaTime;
-                if (_botTimer <= 0f)
-                {
-                    _botTimer = _settings.OpponentThinkSeconds;
-                    Command choice = _bot.Choose(_state, BotPlayer);
-                    if (choice != null) Submit(choice);
-                }
-            }
+            // The "Back to lobby" button appears a beat after the banner, so the result can land first.
+            if (_backToLobbyAt >= 0f && Time.time >= _backToLobbyAt && Time.time - Time.deltaTime < _backToLobbyAt)
+                RaiseStateChanged();
         }
 
         // ---- setup ----------------------------------------------------------------------------------
 
-        private void HandleBoardBuilt()
+        /// <summary>
+        /// Picks where the match comes from and gets everything else ready for it. Online the map is not known
+        /// until the server has said so, so the board is built from the driver rather than from a serialized
+        /// id in <c>Awake</c> — which is why <c>_buildOnAwake</c> is off on the Arena's board.
+        /// </summary>
+        private void BeginMatch()
         {
             if (_ready) return;
-            if (_board.MapData == null)
+
+            _catalog = _content.EnsureLoaded();
+            if (_catalog == null)
             {
-                Debug.LogError("[LocalMatchSession] Board reported built but has no map data.", this);
+                Debug.LogError("[MatchSession] Content failed to load; no match.", this);
                 return;
             }
 
-            _catalog = _content.EnsureLoaded();
-            if (_catalog == null) return;
+            NetClient net = NetClient.Instance;
+            JObject start = net != null ? net.ConsumePendingMatch() : null;
 
-            MatchSetup setup;
             try
             {
-                setup = new MatchSetup(_board.MapData.Id, _settings.PlayerLoadout.ToLoadout(),
-                    _settings.OpponentLoadout.ToLoadout(), _settings.FirstPlayer);
-                foreach (string id in _settings.PlayerModifierIds) if (!string.IsNullOrEmpty(id)) setup.WithModifier(LocalPlayer, id);
-                foreach (string id in _settings.OpponentModifierIds) if (!string.IsNullOrEmpty(id)) setup.WithModifier(BotPlayer, id);
-                _state = new MatchState(_catalog, setup, _settings.Seed);
+                if (start != null)
+                {
+                    _driver = new OnlineMatchDriver(_catalog, net, start);
+                    Debug.Log("[MatchSession] online: match " + start.Value<int>("matchId") + ", seat " + start.Value<int>("youAre")
+                        + " vs " + start.Value<string>("opponentName"));
+                }
+                else
+                {
+                    string mapId = _settings != null && !string.IsNullOrEmpty(_settings.MapId) ? _settings.MapId : "arena-4";
+                    _driver = new LocalMatchDriver(_catalog, _settings, mapId, () => IsPlaying);
+                    Debug.Log("[MatchSession] local practice: " + _settings.PlayerLoadout.Weapon + " vs "
+                        + _settings.OpponentLoadout.Weapon + " on " + mapId + ", seed " + _settings.Seed + ".");
+                }
             }
             catch (Exception e) when (e is ArgumentException || e is KeyNotFoundException)
             {
-                Debug.LogError("[LocalMatchSession] Match setup refused: " + e.Message, this);
+                Debug.LogError("[MatchSession] Match setup refused: " + e.Message, this);
                 return;
             }
 
-            _bot = new RandomBot(_settings.Seed ^ 0x9E3779B9u);
-            _damage = new DamageCalculator(_catalog);
+            if (!_board.IsBuilt) _board.Build(_driver.Rules.MapData.Id);
+            if (!_board.IsBuilt || _board.MapData == null)
+            {
+                Debug.LogError("[MatchSession] The board could not be built for map '" + _driver.Rules.MapData.Id + "'.", this);
+                return;
+            }
+
+            _driver.EventsArrived += HandleEventsArrived;
+            _driver.Resynced += HandleResynced;
+            _driver.StatusChanged += HandleStatusChanged;
 
             _unitViews.Clear();
             _propViews.Clear();
             _hudUnits.Clear();
             _hudUnitsById.Clear();
-            for (int i = 0; i < _state.Units.All.Count; i++)
+            // Which prefab plays which side is decided by ownership, not by seat number: online you may be
+            // seat 1, and your hero should still be the one that looks like yours.
+            for (int i = 0; i < View.Units.Count; i++)
             {
-                Unit unit = _state.Units.All[i];
-                UnitView view = unit.Owner == LocalPlayer ? _unit : _opponent;
+                Mimas.Core.Match.UnitView unit = View.Units[i];
+                UnitView view = unit.IsMine ? _unit : _opponent;
                 _unitViews[unit.Id] = view;
-                view.gameObject.SetActive(true);
+                view.gameObject.SetActive(unit.IsAlive);
                 view.SnapTo(unit.Position, _board);
-                if (unit.Owner == LocalPlayer) _localUnitId = unit.Id;
+                if (unit.IsMine) _localUnitId = unit.Id;
 
                 var hud = new HudUnit
                 {
                     Id = unit.Id,
-                    IsMine = unit.Owner == LocalPlayer,
+                    IsMine = unit.IsMine,
+                    IsAlive = unit.IsAlive,
                     Hp = unit.Hp,
                     MaxHp = unit.MaxHp,
                     Ap = unit.Ap,
@@ -347,9 +405,7 @@ namespace Mimas.Client.Presentation
                 _hudUnitsById[unit.Id] = hud;
             }
 
-            _turnSeconds = _settings.ResolveTurnSeconds(_catalog);
-            _ropeSeconds = Mathf.Min(_settings.RopeSeconds, _turnSeconds);
-            _idleTurnSeconds = _settings.IdleTurnSeconds;
+            _ropeSeconds = Mathf.Min(_settings.RopeSeconds, Mathf.Max(1f, _driver.TurnSecondsTotal));
 
             _ready = true;
             RefreshView();
@@ -358,10 +414,10 @@ namespace Mimas.Client.Presentation
             CollectAbilities();
             RefreshMarkers();
 
-            Debug.Log("[LocalMatchSession] " + _settings.PlayerLoadout.Weapon + " vs " + _settings.OpponentLoadout.Weapon + " on " + _board.MapData.Id
-                + ", seed " + _settings.Seed + ", " + _turnSeconds + " s per turn.");
+            var local = _driver as LocalMatchDriver;
+            if (local != null) local.Begin();
+            else ((OnlineMatchDriver)_driver).Begin(start);
 
-            Enqueue(_state.Start());
             RaiseStateChanged();
         }
 
@@ -373,12 +429,12 @@ namespace Mimas.Client.Presentation
         /// </summary>
         private void BuildBodies()
         {
-            if (_view == null) return;
+            if (View == null) return;
             float worldPerUnit = _board.WorldPerHeightUnit;
 
-            for (int i = 0; i < _view.Units.Count; i++)
+            for (int i = 0; i < View.Units.Count; i++)
             {
-                Mimas.Core.Match.UnitView unit = _view.Units[i];
+                Mimas.Core.Match.UnitView unit = View.Units[i];
                 UnitView view;
                 if (_unitViews.TryGetValue(unit.Id, out view)) view.Configure(unit.AimHeight, unit.BodyHeight, worldPerUnit);
             }
@@ -389,9 +445,9 @@ namespace Mimas.Client.Presentation
                 _propRoot.SetParent(_board.transform, false);
             }
 
-            for (int i = 0; i < _view.Props.Count; i++)
+            for (int i = 0; i < View.Props.Count; i++)
             {
-                Mimas.Core.Match.PropView prop = _view.Props[i];
+                Mimas.Core.Match.PropView prop = View.Props[i];
                 if (_propViews.ContainsKey(prop.Id)) continue;
 
                 var go = new GameObject("Prop_" + prop.DefId + "_" + prop.Id);
@@ -441,7 +497,7 @@ namespace Mimas.Client.Presentation
         {
             _abilities.Clear();
             Unit unit;
-            if (_localUnitId == None || !_state.Units.TryGet(_localUnitId, out unit)) return;
+            if (_localUnitId == None || !Rules.Units.TryGet(_localUnitId, out unit)) return;
             for (int i = 0; i < unit.AbilityIds.Count; i++)
             {
                 AbilityDef def;
@@ -451,28 +507,81 @@ namespace Mimas.Client.Presentation
 
         // ---- commands in, events out ----------------------------------------------------------------
 
-        /// <summary>Validates and applies a command, then queues its events (filtered for the local player) for playback.</summary>
+        /// <summary>
+        /// Offers a command to the driver. It is checked against the rules first either way — locally against
+        /// the truth, online against the mirror — so an illegal click never leaves this machine.
+        /// </summary>
         public bool Submit(Command command)
         {
             if (!_ready) return false;
-            CommandResult check = _state.Validate(command);
-            if (!check.Ok)
-            {
-                Debug.Log("[LocalMatchSession] " + command + " refused: " + check);
-                return false;
-            }
-
-            IReadOnlyList<MatchEvent> events = _state.Apply(command);
-            Enqueue(events);
-            return true;
+            return _driver.Submit(command);
         }
 
-        private void Enqueue(IReadOnlyList<MatchEvent> events)
+        /// <summary>Events the driver has already filtered for this seat, queued for playback one at a time.</summary>
+        private void HandleEventsArrived(IReadOnlyList<MatchEvent> events)
         {
-            _scratchEvents.Clear();
-            EventFilter.ForPlayer(events, LocalPlayer, _state, _scratchEvents);
-            for (int i = 0; i < _scratchEvents.Count; i++) _pending.Enqueue(_scratchEvents[i]);
-            _scratchEvents.Clear();
+            for (int i = 0; i < events.Count; i++) _pending.Enqueue(events[i]);
+        }
+
+        /// <summary>
+        /// A whole fresh state arrived (a reconnect, a resync). Nothing is animated towards it: whatever was
+        /// mid-flight is dropped and everything snaps to what the server says is true now.
+        /// </summary>
+        private void HandleResynced()
+        {
+            if (!_ready) return;
+
+            _pending.Clear();
+            _movingUnitId = None;
+            _movingPlan = null;
+            _pauseUntil = 0f;
+            Disarm();
+
+            for (int i = 0; i < View.Units.Count; i++)
+            {
+                Mimas.Core.Match.UnitView unit = View.Units[i];
+                UnitView view;
+                if (!_unitViews.TryGetValue(unit.Id, out view)) continue;
+                view.gameObject.SetActive(unit.IsAlive);
+                if (unit.IsAlive) view.SnapTo(unit.Position, _board);
+
+                HudUnit hud;
+                if (!_hudUnitsById.TryGetValue(unit.Id, out hud)) continue;
+                hud.Hp = unit.Hp;
+                hud.Ap = unit.Ap;
+                hud.IsAlive = unit.IsAlive;
+                hud.GhostDamage = 0;
+            }
+
+            // A prop the view no longer lists was destroyed while we were away.
+            var gone = new List<int>();
+            foreach (KeyValuePair<int, Mimas.Client.Presentation.PropView> pair in _propViews)
+                if (View.FindProp(pair.Key) == null) gone.Add(pair.Key);
+            for (int i = 0; i < gone.Count; i++)
+            {
+                Mimas.Client.Presentation.PropView prop = _propViews[gone[i]];
+                _propViews.Remove(gone[i]);
+                if (prop != null) Destroy(prop.gameObject);
+                RemoveHudUnit(gone[i]);
+            }
+            for (int i = 0; i < View.Props.Count; i++)
+            {
+                HudUnit hud;
+                if (_hudUnitsById.TryGetValue(View.Props[i].Id, out hud)) hud.Hp = View.Props[i].Hp;
+            }
+
+            if (View.IsOver && _banner == null) ShowResult(View.Winner, MatchEndReason.Elimination, true);
+
+            RefreshView();
+            RefreshMarkers();
+            FaceNearestEnemies();
+            RaiseStateChanged();
+            Debug.Log("[MatchSession] resynced: turn " + View.TurnNumber + ", active player " + View.ActivePlayer);
+        }
+
+        private void HandleStatusChanged()
+        {
+            if (_ready) RaiseStateChanged();
         }
 
         private void PlayPendingEvents()
@@ -550,9 +659,6 @@ namespace Mimas.Client.Presentation
                 }
 
                 case TurnEndedEvent ended:
-                    _clockRunning = false;
-                    if (ended.Player == LocalPlayer && !ended.Acted && ended.Reason == EndTurnReason.Timeout)
-                        _penaltyPending = _idleTurnSeconds > 0f;
                     Disarm();
                     _examinedUnitId = None;
                     _examinedPropId = None;
@@ -561,12 +667,10 @@ namespace Mimas.Client.Presentation
                     break;
 
                 case MatchEndedEvent over:
-                    _clockRunning = false;
-                    _banner = over.Winner == LocalPlayer ? "VICTORY" : "DEFEAT";
+                    ShowResult(over.Winner, over.Reason, false);
                     Disarm();
                     RefreshView();
                     RaiseStateChanged();
-                    Debug.Log("[LocalMatchSession] Match over: player " + over.Winner + " wins by " + over.Reason + ".");
                     break;
             }
         }
@@ -577,30 +681,44 @@ namespace Mimas.Client.Presentation
             {
                 HudUnit hud = _hudUnits[i];
                 if (hud.IsProp) continue;               // a prop's id is a body id, not a unit id, and it has no turn
-                Unit unit = _state.Units.Get(hud.Id);
-                if (unit.Owner == started.Player) hud.Ap = unit.IsAlive ? unit.ApPerTurn : 0;
+                Unit unit;
+                if (!Rules.Units.TryGet(hud.Id, out unit) || unit.Owner != started.Player) continue;
+                hud.Ap = unit.IsAlive ? unit.ApPerTurn : 0;
             }
 
-            if (started.Player == LocalPlayer)
-            {
-                _localTurnNumber++;
-                _penalised = _penaltyPending;
-                _penaltyPending = false;
-                _turnTotal = _penalised ? _idleTurnSeconds : _turnSeconds;
-                if (_penalised) Debug.Log("[LocalMatchSession] Idle penalty: turn " + _localTurnNumber + " starts with " + _idleTurnSeconds + " s until you act.");
-            }
-            else
-            {
-                _penalised = false;
-                _turnTotal = _turnSeconds;
-                _botTimer = _settings.OpponentThinkSeconds;
-            }
-            _turnRemaining = _turnTotal;
-            _clockRunning = true;
+            if (started.Player == LocalPlayer) _localTurnNumber++;
 
             Disarm();
             RefreshView();
             RaiseStateChanged();
+        }
+
+        /// <summary>
+        /// The banner and the line under it. How a match ended matters as much as who won: "you resigned" and
+        /// "opponent left" are different stories about the same DEFEAT, and a player who reconnected into a
+        /// finished match deserves to be told which one happened.
+        /// </summary>
+        private void ShowResult(int winner, MatchEndReason reason, bool fromResync)
+        {
+            bool won = winner == LocalPlayer;
+            _banner = won ? "VICTORY" : "DEFEAT";
+
+            switch (reason)
+            {
+                case MatchEndReason.Resign:
+                    _bannerDetail = won ? "opponent resigned" : "you resigned";
+                    break;
+                case MatchEndReason.Forfeit:
+                    _bannerDetail = won ? "opponent left" : "you were disconnected";
+                    break;
+                default:
+                    _bannerDetail = "by elimination";
+                    break;
+            }
+
+            _backToLobbyAt = Time.time + BackToLobbyDelaySeconds;
+            Debug.Log("[MatchSession] match over: player " + winner + " wins " + _bannerDetail
+                + (fromResync ? " (found on resync)" : "") + ".");
         }
 
         private void PlayMove(UnitMovedEvent moved)
@@ -783,9 +901,12 @@ namespace Mimas.Client.Presentation
 
         // ---- projection -> HUD ----------------------------------------------------------------------
 
+        /// <summary>
+        /// The view is the driver's; this only rebuilds what the HUD draws from it. Called after anything that
+        /// could change what the player may do.
+        /// </summary>
         private void RefreshView()
         {
-            _view = _state.ViewFor(LocalPlayer);
             RebuildActions();
             RefreshExamine();
             RefreshEmphasis();
@@ -793,12 +914,12 @@ namespace Mimas.Client.Presentation
 
         private void RefreshMarkers()
         {
-            if (_view == null) return;
+            if (View == null) return;
             for (int i = 0; i < _hudUnits.Count; i++)
             {
                 HudUnit hud = _hudUnits[i];
                 hud.Markers.Clear();
-                Mimas.Core.Match.UnitView unit = _view.FindUnit(hud.Id);
+                Mimas.Core.Match.UnitView unit = View.FindUnit(hud.Id);
                 if (unit == null) continue;
                 for (int m = 0; m < unit.Modifiers.Count; m++)
                 {
@@ -844,7 +965,7 @@ namespace Mimas.Client.Presentation
                 _examinedPropId = None;            // it was destroyed while the panel was open
             }
 
-            Mimas.Core.Match.UnitView unit = _examinedUnitId == None || _view == null ? null : _view.FindUnit(_examinedUnitId);
+            Mimas.Core.Match.UnitView unit = _examinedUnitId == None || View == null ? null : View.FindUnit(_examinedUnitId);
             if (unit == null)
             {
                 _examine = null;
@@ -904,8 +1025,8 @@ namespace Mimas.Client.Presentation
         /// </summary>
         private HudExamine ExamineProp(int propId)
         {
-            if (_view == null) return null;
-            Mimas.Core.Match.PropView prop = _view.FindProp(propId);
+            if (View == null) return null;
+            Mimas.Core.Match.PropView prop = View.FindProp(propId);
             if (prop == null) return null;
 
             PropDef def;
@@ -1052,7 +1173,7 @@ namespace Mimas.Client.Presentation
 
             if (def is MovementDef)
             {
-                _moveOptions = _state.MoveOptions(_localUnitId, def.Id);
+                _moveOptions = Rules.MoveOptions(_localUnitId, def.Id);
                 for (int i = 0; i < _moveOptions.Plans.Count; i++) _highlight.Add(_moveOptions.Plans[i].Destination);
                 _board.HighlightReachable(_highlight);
                 ClearAim();
@@ -1062,7 +1183,7 @@ namespace Mimas.Client.Presentation
                 var attack = def as AttackDef;
                 if (attack == null) return;
 
-                _state.AttackTargets(_localUnitId, def.Id, _targetScratch);
+                Rules.AttackTargets(_localUnitId, def.Id, _targetScratch);
                 for (int i = 0; i < _targetScratch.Count; i++) _highlight.Add(_targetScratch[i].Position);
                 _targetScratch.Clear();
                 _board.HighlightTargets(_highlight);
@@ -1123,7 +1244,7 @@ namespace Mimas.Client.Presentation
             {
                 if (!CanAct) return;
                 AbilityDef def = ArmedAbility;
-                Unit me = _state.Units.Get(_localUnitId);
+                Unit me = Rules.Units.Get(_localUnitId);
                 if (coord == me.Position)
                 {
                     Disarm();
@@ -1152,7 +1273,7 @@ namespace Mimas.Client.Presentation
             // Nothing armed: clicks on a body open examine, anything else closes it. A prop is worth examining
             // too — "can I bring this down, and what does it block?" is a real question (design: #props).
             Unit clicked;
-            _examinedUnitId = _state.Units.TryGetUnitAt(coord, out clicked) ? clicked.Id : None;
+            _examinedUnitId = Rules.Units.TryGetUnitAt(coord, out clicked) ? clicked.Id : None;
             _examinedPropId = _examinedUnitId == None && hover.Prop != null ? hover.Prop.Id : None;
             RefreshView();
             RaiseStateChanged();
@@ -1199,7 +1320,7 @@ namespace Mimas.Client.Presentation
             Vector3 aimPoint = SnappedAimPoint(hover);
             FaceAim(aimPoint);
 
-            TargetCheck check = _state.CheckTarget(_localUnitId, attack.Id, hover.Hex);
+            TargetCheck check = Rules.CheckTarget(_localUnitId, attack.Id, hover.Hex);
             Func<float, Vector3> curve = BuildCurve(attack, hover, aimPoint);
             int samples = FlightCurve.Samples(attack.Trajectory);
 
@@ -1297,10 +1418,10 @@ namespace Mimas.Client.Presentation
         /// </summary>
         private void FaceNearestEnemies()
         {
-            if (_view == null) return;
-            for (int i = 0; i < _view.Units.Count; i++)
+            if (View == null) return;
+            for (int i = 0; i < View.Units.Count; i++)
             {
-                Mimas.Core.Match.UnitView unit = _view.Units[i];
+                Mimas.Core.Match.UnitView unit = View.Units[i];
                 UnitView view;
                 if (!_unitViews.TryGetValue(unit.Id, out view) || !unit.IsAlive) continue;
 
@@ -1314,9 +1435,9 @@ namespace Mimas.Client.Presentation
         {
             UnitView best = null;
             int bestDistance = int.MaxValue;
-            for (int i = 0; i < _view.Units.Count; i++)
+            for (int i = 0; i < View.Units.Count; i++)
             {
-                Mimas.Core.Match.UnitView other = _view.Units[i];
+                Mimas.Core.Match.UnitView other = View.Units[i];
                 if (other.Owner == of.Owner || !other.IsAlive) continue;
 
                 int distance = Hex.Distance(of.Position, other.Position);
@@ -1368,15 +1489,14 @@ namespace Mimas.Client.Presentation
         }
 
         /// <summary>
-        /// What this attack would do to this body, from what the local player knows. The same
-        /// <see cref="DamageCalculator"/> the rules resolve with (ADR-017), asked directly rather than through
-        /// <c>MatchState.PreviewAttack</c> so that a shot which is refused can still show its number.
+        /// What this attack would do to this body, from what the local player knows — including when the shot
+        /// is refused, which is the number behind a "No line of sight" line. On a mirror this keeps the "?"
+        /// row, so online the player is never told a guess is a certainty (ADR-026).
         /// </summary>
         private DamageBreakdown PreviewDamage(AttackDef attack, IBody target)
         {
-            Unit attacker;
-            if (_damage == null || target == null || !_state.Units.TryGet(_localUnitId, out attacker)) return null;
-            return _damage.Compute(_state.Map, attacker, target, attack, Knowledge.For(LocalPlayer, _state));
+            if (Rules == null || target == null || _localUnitId == None) return null;
+            return Rules.PreviewAgainst(LocalPlayer, _localUnitId, attack, target);
         }
 
         private bool ClearPreview()
@@ -1440,32 +1560,5 @@ namespace Mimas.Client.Presentation
             RefreshEmphasis();
         }
 
-        // ---- clock ----------------------------------------------------------------------------------
-
-        private void TickClock()
-        {
-            _turnRemaining -= Time.deltaTime;
-            if (_turnRemaining > 0f) return;
-            if (IsPlaying) { _turnRemaining = 0f; return; }   // let the animation finish; the turn passes right after
-
-            int active = _state.ActivePlayer;
-            _clockRunning = false;
-            Debug.Log("[LocalMatchSession] Turn of player " + active + " ended by the clock" + (_state.ActedThisTurn ? "." : " before any action."));
-            Submit(new EndTurnCommand(active, EndTurnReason.Timeout));
-        }
-
-        /// <summary>Acting during a penalty turn restores the full turn length (Hearthstone rule).</summary>
-        private void LiftPenalty()
-        {
-            if (!_penalised) return;
-            _penalised = false;
-            _turnTotal = _turnSeconds;
-            _turnRemaining = _turnSeconds;
-        }
-
-        private void LateUpdate()
-        {
-            if (_ready && _penalised && _state.ActedThisTurn) LiftPenalty();
-        }
     }
 }

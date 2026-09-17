@@ -36,10 +36,10 @@ namespace Mimas.Client.Presentation
         [Range(0, 1)] public int FirstPlayer = 0;
 
         [Header("Clock")]
-        [Tooltip("timecontrols.json preset; its turnCapMs is the turn length unless overridden below.")]
+        [Tooltip("Unused since M2; the turn length is rules.json clock.turnMs unless overridden below. Time controls with banks and increments are a later design (#time-controls).")]
         public string TimeControlId = "3+2";
 
-        [Tooltip("Seconds per turn. 0 = use the time control's turnCapMs.")]
+        [Tooltip("Seconds per turn in local practice. 0 = use rules.json clock.turnMs, which is what the server uses online.")]
         [Min(0f)] public float TurnSecondsOverride = 30f;
 
         [Tooltip("The rope appears when this many seconds remain in a turn (Hearthstone shows it for the last 20 of 75).")]
@@ -56,15 +56,16 @@ namespace Mimas.Client.Presentation
         [Tooltip("Pause after a hit lands so the number and the hp change can be read before the next event plays.")]
         [Min(0f)] public float HitPauseSeconds = 0.7f;
 
-        private const float FallbackTurnSeconds = 45f;
+        private const float FallbackTurnSeconds = 30f;
 
-        /// <summary>Seconds per turn: the override when set, else the time control's cap, else 45.</summary>
+        /// <summary>
+        /// Seconds per turn: the override when set, else <c>rules.json</c>'s <c>clock.turnMs</c> — the same
+        /// number the server times an online turn with, so practice and a real match feel the same length.
+        /// </summary>
         public float ResolveTurnSeconds(ContentCatalog catalog)
         {
             if (TurnSecondsOverride > 0f) return TurnSecondsOverride;
-            TimeControlDef timeControl;
-            if (catalog != null && catalog.TimeControls.TryGet(TimeControlId, out timeControl))
-                return timeControl.TurnCapMs / 1000f;
+            if (catalog != null && catalog.Rules != null && catalog.Rules.Clock != null) return catalog.Rules.Clock.TurnMs / 1000f;
             return FallbackTurnSeconds;
         }
     }

@@ -137,6 +137,16 @@ namespace Mimas.Client.Presentation
         /// </summary>
         public void Build()
         {
+            Build(null);
+        }
+
+        /// <summary>
+        /// The same, for a map chosen at run time. Online the map is not known until <c>match.start</c>
+        /// arrives, so the board cannot build itself in <c>Awake</c> from a serialized id; the session builds
+        /// it once it knows what it is playing on. A null or empty id keeps the old behaviour.
+        /// </summary>
+        public void Build(string mapIdOverride)
+        {
             if (IsBuilt) return;
 
             if (_content == null)
@@ -156,7 +166,9 @@ namespace Mimas.Client.Presentation
                 return;
             }
 
-            string mapId = _settings != null && !string.IsNullOrEmpty(_settings.MapId) ? _settings.MapId : _mapId;
+            string mapId = !string.IsNullOrEmpty(mapIdOverride)
+                ? mapIdOverride
+                : _settings != null && !string.IsNullOrEmpty(_settings.MapId) ? _settings.MapId : _mapId;
             MapData mapData;
             if (!catalog.Maps.TryGet(mapId, out mapData))
             {
@@ -173,7 +185,7 @@ namespace Mimas.Client.Presentation
             }
             catch (MapLoadException e)
             {
-                Debug.LogError("[BoardView] Failed to build map '" + _mapId + "': " + e.Message, this);
+                Debug.LogError("[BoardView] Failed to build map '" + mapId + "': " + e.Message, this);
                 return;
             }
 

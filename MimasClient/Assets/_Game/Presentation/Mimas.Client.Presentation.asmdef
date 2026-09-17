@@ -5,7 +5,8 @@
     "Mimas.Core",
     "Unity.Cinemachine",
     "Unity.InputSystem",
-    "Mimas.Client.Content"
+    "Mimas.Client.Content",
+    "Mimas.Client.Net"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],
