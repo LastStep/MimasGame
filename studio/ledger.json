@@ -1,0 +1,197 @@
+{
+  "project": "mimas",
+  "updated": "2026-09-17",
+  "note": "Seeded 17 Sep 2026 from the done-when in docs/roadmap.md, then realigned the same day to the decisions locked in docs/specs/2026-09-17-online-slice.md (ADR-026..028). M2-2 is worded neutrally because how two players meet -- queue or room codes -- is open as OPT-0001. Criteria are written once and then only `passes` moves, flipped by the verifier through `node tools/ledger.mjs pass` with evidence. M1 entries are marked passing from the 15 Sep milestone and the 16 Sep playtest; everything else starts false, including work that looks finished, because no verifier has been through it.",
+  "criteria": [
+    {
+      "id": "M0-1",
+      "milestone": "M0",
+      "text": "An empty Web build loads in a browser, dotnet test is green, the Unity CLI and Claude Code are connected, and the server /ws echoes a ping",
+      "passes": false,
+      "passed_by": null,
+      "passed_at": null,
+      "task": null,
+      "evidence": null
+    },
+    {
+      "id": "M1-1",
+      "milestone": "M1",
+      "text": "A hex map loads from JSON with one unit each, move and basic attack, turn order, and a win by kill",
+      "passes": true,
+      "passed_by": "rohan",
+      "passed_at": "2026-09-15",
+      "task": null,
+      "evidence": "M1 marked done 15 Sep 2026 in docs/roadmap.md; movement resolvers, AP turns, reveal events and win by elimination"
+    },
+    {
+      "id": "M1-2",
+      "milestone": "M1",
+      "text": "The game is playable against a random bot in the Editor",
+      "passes": true,
+      "passed_by": "rohan",
+      "passed_at": "2026-09-16",
+      "task": null,
+      "evidence": "Playtest 16 Sep 2026: warrior vs bot mage, won by elimination, clean console"
+    },
+    {
+      "id": "M1-3",
+      "milestone": "M1",
+      "text": "Core has at least 50 tests",
+      "passes": true,
+      "passed_by": "builder",
+      "passed_at": "2026-09-16",
+      "task": null,
+      "evidence": "287 tests, 0.24s (docs/roadmap.md baselines, 16 Sep 2026)"
+    },
+    {
+      "id": "M2-1",
+      "milestone": "M2",
+      "text": "Two browsers play a full match through Mimas.Server, start to win condition",
+      "passes": false,
+      "passed_by": null,
+      "passed_at": null,
+      "task": null,
+      "evidence": null
+    },
+    {
+      "id": "M2-2",
+      "milestone": "M2",
+      "text": "Two players who want to play each other end up in the same match (mechanism open: OPT-0001, queue vs room codes)",
+      "passes": false,
+      "passed_by": null,
+      "passed_at": null,
+      "task": null,
+      "evidence": null
+    },
+    {
+      "id": "M2-3",
+      "milestone": "M2",
+      "text": "Guest auth gives a player a resumable identity without signing up, and a page reload keeps it",
+      "passes": false,
+      "passed_by": null,
+      "passed_at": null,
+      "task": null,
+      "evidence": null
+    },
+    {
+      "id": "M2-4",
+      "milestone": "M2",
+      "text": "The turn clock is server-authoritative and a timeout arrives as EndTurnCommand(Timeout), resolved by the rules like any other command",
+      "passes": false,
+      "passed_by": null,
+      "passed_at": null,
+      "task": null,
+      "evidence": null
+    },
+    {
+      "id": "M2-5",
+      "milestone": "M2",
+      "text": "Reloading within the reconnect grace returns the player to the running match with a full resync",
+      "passes": false,
+      "passed_by": null,
+      "passed_at": null,
+      "task": null,
+      "evidence": null
+    },
+    {
+      "id": "M2-6",
+      "milestone": "M2",
+      "text": "Resign and disconnect-forfeit both end the match with the right result, through ResignCommand",
+      "passes": false,
+      "passed_by": null,
+      "passed_at": null,
+      "task": null,
+      "evidence": null
+    },
+    {
+      "id": "M2-7",
+      "milestone": "M2",
+      "text": "The game is deployed on the VPS over HTTPS and someone other than Rohan has connected to it",
+      "passes": false,
+      "passed_by": null,
+      "passed_at": null,
+      "task": null,
+      "evidence": null
+    },
+    {
+      "id": "M2-8",
+      "milestone": "M2",
+      "text": "Two players can rematch without leaving the room",
+      "passes": false,
+      "passed_by": null,
+      "passed_at": null,
+      "task": null,
+      "evidence": null
+    },
+    {
+      "id": "M3-1",
+      "milestone": "M3",
+      "text": "Gear replaces classes: a hero is base stats plus four items, and abilities come from the items",
+      "passes": false,
+      "passed_by": null,
+      "passed_at": null,
+      "task": null,
+      "evidence": "Built in the 16 Sep loadout slice (F-loadout-slice); not verified"
+    },
+    {
+      "id": "M3-2",
+      "milestone": "M3",
+      "text": "Two damage lanes with elements",
+      "passes": false,
+      "passed_by": null,
+      "passed_at": null,
+      "task": null,
+      "evidence": "Lanes shipped; elements and the element field deferred"
+    },
+    {
+      "id": "M3-3",
+      "milestone": "M3",
+      "text": "Three lineages with starting blessings",
+      "passes": false,
+      "passed_by": null,
+      "passed_at": null,
+      "task": null,
+      "evidence": null
+    },
+    {
+      "id": "M3-4",
+      "milestone": "M3",
+      "text": "Boons (blessing, enchant, sigil) with the between-round draft",
+      "passes": false,
+      "passed_by": null,
+      "passed_at": null,
+      "task": null,
+      "evidence": null
+    },
+    {
+      "id": "M3-5",
+      "milestone": "M3",
+      "text": "A session is best-of-three across three ladder maps, with session-long reveals",
+      "passes": false,
+      "passed_by": null,
+      "passed_at": null,
+      "task": null,
+      "evidence": null
+    },
+    {
+      "id": "M3-6",
+      "milestone": "M3",
+      "text": "Character select and draft screens",
+      "passes": false,
+      "passed_by": null,
+      "passed_at": null,
+      "task": null,
+      "evidence": null
+    },
+    {
+      "id": "M3-7",
+      "milestone": "M3",
+      "text": "Attacks aim at a point on a body and resolve against heights, with line of sight and trajectories",
+      "passes": false,
+      "passed_by": null,
+      "passed_at": null,
+      "task": null,
+      "evidence": "Built in the 16 Sep aiming slices (F-aiming-rules, F-aiming-client); not verified"
+    }
+  ]
+}

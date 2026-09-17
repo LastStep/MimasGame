@@ -1,0 +1,168 @@
+# Mimas — project configuration for the Trinetra studio.
+#
+# The ladder below is the whole intended picture from docs/PLAN.md §7, including the rungs that are
+# not built yet (`enabled: false`). They stay listed so the gaps are visible rather than forgotten;
+# the runner reports them as pending, and fails if a task asks for one by name.
+#
+#   node E:/Studios/Trinetra-Game-Studio/tools/ladder/ladder.mjs --project mimas --rungs 0,1,2
+version: 1
+
+id: mimas
+name: Mimas
+engine: unity
+base_branch: main
+
+paths:
+  studio: studio
+  design: docs/design/index.html
+  decisions: docs/decisions.md
+  artifacts: artifacts
+
+ladder:
+  - rung: 0
+    name: asset safety
+    kind: guard
+    check: protected-paths
+    required: true
+    means: the change touched a file Unity owns, or a protected path the task did not declare
+
+  - rung: 1
+    name: core build
+    kind: command
+    command: dotnet build Mimas.slnx
+    required: true
+    timeout_s: 300
+    means: the C# does not compile
+
+  - rung: 2
+    name: core tests
+    kind: command
+    command: dotnet test shared/Mimas.Core.Tests
+    required: true
+    timeout_s: 300
+    ratchet: test_count
+    capture:
+      test_count: 'Passed:\s+(\d+)'
+    means: a rule broke
+
+  - rung: 3
+    name: determinism and invariant sweep
+    kind: command
+    command: dotnet test shared/Mimas.Core.Tests --filter "Category=Sweep"
+    required: true
+    timeout_s: 600
+    enabled: false
+    pending_reason: >
+      To build. Same seed twice must produce the same state hash, no command may throw, and every game
+      must finish inside the turn cap — over many more seeds than the handful the existing
+      BotAndDeterminismTests cover. Determinism is the one property the whole client/server split
+      rests on, and it is currently checked at two seeds.
+
+  - rung: 4
+    name: unity compile clean
+    kind: command
+    command: unity command menu --path "Assets/Refresh"
+    required: false
+    timeout_s: 600
+    enabled: false
+    pending_reason: >
+      To build. Needs a refresh, a poll of recompile_status until completed, then a grep of
+      Logs/Editor.log for "error CS". Manual today. Requires a warm Editor, so it is not required for
+      server-only or Core-only tasks.
+
+  - rung: 5
+    name: server integration
+    kind: command
+    command: dotnet test server/Mimas.Server.Tests
+    required: true
+    timeout_s: 600
+    enabled: false
+    pending_reason: >
+      M2 week 1. Two fake clients join a room, play a full match over WebSocket, and receive identical
+      PlayerView sequences. This is the gate the whole online milestone hangs on.
+
+  - rung: 6
+    name: editmode tests
+    kind: command
+    command: unity test MimasClient --mode EditMode --report-format junit --output artifacts/editmode.xml --timeout 600
+    required: false
+    timeout_s: 900
+    enabled: false
+    pending_reason: >
+      The command works today, but wiring it into the ladder needs a warm Editor and an agreed
+      handling of exit code 8 (tests failed — never retry).
+
+  - rung: 7
+    name: bot-vs-bot batch
+    kind: command
+    command: dotnet run --project tools/sim/Mimas.Sim -c Release -- --games 1000 --out artifacts/sim
+    required: false
+    timeout_s: 1800
+    enabled: false
+    pending_reason: >
+      To build, nightly. 1000 seeded games over a loadout matrix; win rate, first-player advantage,
+      match length, NDJSON report. Also the balance pass docs/roadmap.md has wanted since 16 Sep —
+      the shipped ability numbers are hand-set placeholders that nothing has ever measured.
+
+  - rung: 8
+    name: live-editor assertions and screenshot
+    kind: command
+    command: unity command console
+    required: false
+    timeout_s: 600
+    enabled: false
+    pending_reason: >
+      Partially exists. Needs a [CliCommand] game-view capture the verifier can read, so a claim about
+      the client comes with a picture rather than the agent's opinion of it.
+
+  - rung: 9
+    name: web build and size gate
+    kind: command
+    command: unity build MimasClient --profile "Web Release" --output-path Build/Web
+    required: false
+    timeout_s: 3600
+    enabled: false
+    pending_reason: >
+      The build works; the gate does not. Fail above 25 MB. Baseline is 12.5 MB Brotli (14 Sep).
+
+  - rung: 10
+    name: browser smoke
+    kind: command
+    command: node tools/smoke/browser-smoke.mjs
+    required: false
+    timeout_s: 900
+    enabled: false
+    pending_reason: >
+      M2 week 3. Playwright against the built game: no pageerror, no console.error, a match starts.
+      The last thing between "it built" and "a friend can actually play it".
+
+# Paths no agent may edit unless its task frontmatter names them in `allows_assets`.
+# Unity owns the first group; the second is the gate, which cannot be changed by the work it judges.
+protected:
+  - '**/*.meta'
+  - '**/*.unity'
+  - '**/*.prefab'
+  - '**/*.asset'
+  - '**/ProjectSettings/**'
+  - '**/Packages/manifest.json'
+  - '**/packages-lock.json'
+  - '**/Library/**'
+  - '**/Temp/**'
+  - '**/UserSettings/**'
+  - '.claude/**'
+  - 'studio/game.yaml'
+  - 'studio/ledger.json'
+  - '**/Mimas.Core.Tests/**'
+  - 'docs/design/index.html'
+
+# Numbers that may not get worse without an explicit task. Raised by `ladder --bless`.
+ratchets:
+  test_count: 287
+  web_build_mb: 13
+
+commands:
+  build: dotnet build Mimas.slnx
+  test: dotnet test shared/Mimas.Core.Tests
+  run_server: dotnet run --project server/Mimas.Server
+  health: http://localhost:7777/health
+  play: unity command editor_play

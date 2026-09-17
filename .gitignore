@@ -73,3 +73,6 @@ MimasClient/.unity/
 # ---------- Editor tooling config (com.unity.pipeline bridge: port, telemetry, log verbosity; machine-local) ----------
 MimasClient/Assets/Settings/Pipeline/
 MimasClient/Assets/Settings/Pipeline.meta
+
+# Backup the Trinetra installer makes before merging settings
+*.before-trinetra
