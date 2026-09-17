@@ -1,13 +1,17 @@
-using System.Net.WebSockets;
-using System.Text;
 using Mimas.Core.Content;
 using Mimas.Core.Geometry;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
+using Mimas.Server.Net;
+using Mimas.Server.Options;
+using Mimas.Server.Players;
+using Mimas.Server.Rooms;
+using Microsoft.Extensions.Options;
 
-// Mimas game server — M0 scaffold.
-// Exposes /health and a /ws WebSocket that understands {"t":"ping"} → {"t":"pong"}.
-// Matchmaking, rooms, clocks and hidden-info filtering come in M2 (see docs/networking.md).
+// Mimas game server.
+//
+// Holds the truth for every online match: guest identities, rooms reached by a four-letter code, a
+// server-authoritative turn clock, a bot seat, and hidden information filtered per seat. A client only
+// ever receives its own PlayerView and the events filtered for it (golden rule 6, ADR-010); the wire
+// itself is docs/networking.md and Mimas.Core.Protocol.
 
 var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.ConfigureKestrel(o => o.ListenAnyIP(int.Parse(Environment.GetEnvironmentVariable("MIMAS_PORT") ?? "7777")));
@@ -25,17 +29,67 @@ catch (Exception e) when (e is ContentLoadException || e is DirectoryNotFoundExc
     Console.Error.WriteLine("Refusing to start: " + e.Message);
     return 1;
 }
+
 builder.Services.AddSingleton(catalog);
+builder.Services.Configure<ServerOptions>(builder.Configuration.GetSection(ServerOptions.Section));
+builder.Services.AddSingleton(sp => sp.GetRequiredService<IOptions<ServerOptions>>().Value);
+builder.Services.AddSingleton<PlayerRegistry>();
+builder.Services.AddSingleton<RoomRegistry>();
 
 var app = builder.Build();
+var options = app.Services.GetRequiredService<ServerOptions>();
+var players = app.Services.GetRequiredService<PlayerRegistry>();
+var rooms = app.Services.GetRequiredService<RoomRegistry>();
+
 app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.FromSeconds(20) });
 app.Logger.LogInformation("content loaded from {Path}: {Files} files, hash {Hash}", dataPath, catalog.Files.Count, catalog.Hash);
+app.Logger.LogInformation("clock: turn {Turn} ms, lag grace {Lag} ms, reconnect grace {Reconnect} ms",
+    options.TurnMs ?? catalog.Rules.Clock.TurnMs,
+    options.LagGraceMs ?? catalog.Rules.Clock.LagGraceMs,
+    options.ReconnectGraceMs ?? catalog.Rules.Clock.ReconnectGraceMs);
+
+// Optionally serve the Web build beside the socket, so one process gives a playable page (§7.11).
+// Inert unless MIMAS_WEB_PATH is set.
+var webPath = Environment.GetEnvironmentVariable("MIMAS_WEB_PATH");
+if (!string.IsNullOrWhiteSpace(webPath) && Directory.Exists(webPath))
+{
+    var fileOptions = new StaticFileOptions
+    {
+        FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(Path.GetFullPath(webPath)),
+        ServeUnknownFileTypes = true,
+        OnPrepareResponse = ctx =>
+        {
+            // Unity's Brotli output is "thing.wasm.br": the browser needs the encoding and the inner type.
+            string name = ctx.File.Name;
+            if (name.EndsWith(".br", StringComparison.OrdinalIgnoreCase))
+            {
+                ctx.Context.Response.Headers.ContentEncoding = "br";
+                string inner = Path.GetExtension(name[..^3]).ToLowerInvariant();
+                ctx.Context.Response.ContentType = inner switch
+                {
+                    ".wasm" => "application/wasm",
+                    ".js" => "application/javascript",
+                    ".data" => "application/octet-stream",
+                    ".symbols" => "application/octet-stream",
+                    _ => "application/octet-stream",
+                };
+            }
+            ctx.Context.Response.Headers.CacheControl = "no-store";
+        },
+    };
+    app.UseDefaultFiles(new DefaultFilesOptions { FileProvider = fileOptions.FileProvider });
+    app.UseStaticFiles(fileOptions);
+    app.Logger.LogInformation("serving the web build from {Path}", Path.GetFullPath(webPath));
+}
 
 app.MapGet("/health", () => Results.Ok(new
 {
     ok = true,
     service = "mimas-server",
     coreCheck = Hex.Distance(new Hex(-3, 0), new Hex(3, 0)),   // proves Core is linked (== 6)
+    rooms = rooms.Count,
+    waitingRooms = rooms.WaitingCount,
+    players = players.Count,
     content = new
     {
         hash = catalog.Hash,
@@ -61,42 +115,15 @@ app.Map("/ws", async context =>
     var log = context.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("ws");
     log.LogInformation("client connected {Remote}", context.Connection.RemoteIpAddress);
 
-    var buffer = new byte[16 * 1024];
-    while (socket.State == WebSocketState.Open)
-    {
-        var sb = new StringBuilder();
-        WebSocketReceiveResult result;
-        do
-        {
-            result = await socket.ReceiveAsync(new ArraySegment<byte>(buffer), context.RequestAborted);
-            if (result.MessageType == WebSocketMessageType.Close)
-            {
-                await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "bye", CancellationToken.None);
-                return;
-            }
-            sb.Append(Encoding.UTF8.GetString(buffer, 0, result.Count));
-        } while (!result.EndOfMessage);
-
-        string reply;
-        try
-        {
-            var msg = JObject.Parse(sb.ToString());
-            var type = msg.Value<string>("t") ?? "";
-            reply = type switch
-            {
-                "ping" => JsonConvert.SerializeObject(new { t = "pong", p = new { } }),
-                _ => JsonConvert.SerializeObject(new { t = "error", p = new { code = "unknown_type", message = $"Unknown message type '{type}'" } }),
-            };
-        }
-        catch (JsonException)
-        {
-            reply = JsonConvert.SerializeObject(new { t = "error", p = new { code = "bad_json", message = "Message must be a JSON object with fields t and p" } });
-        }
-
-        var bytes = Encoding.UTF8.GetBytes(reply);
-        await socket.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, context.RequestAborted);
-    }
+    var connection = new WsConnection(socket, log, players, rooms, options.PingIntervalMs, options.IdleCloseMs);
+    connection.Closed += rooms.OnConnectionClosed;
+    await connection.RunAsync(context.RequestAborted);
 });
 
 app.Run();
 return 0;
+
+/// <summary>Named so <c>WebApplicationFactory&lt;Program&gt;</c> can host this server in a test.</summary>
+public partial class Program
+{
+}

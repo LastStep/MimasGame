@@ -5,5 +5,6 @@
   </Folder>
   <Folder Name="/server/">
     <Project Path="server/Mimas.Server/Mimas.Server.csproj" />
+    <Project Path="server/Mimas.Server.Tests/Mimas.Server.Tests.csproj" />
   </Folder>
 </Solution>
