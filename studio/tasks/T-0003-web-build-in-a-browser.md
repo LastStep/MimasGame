@@ -1,0 +1,87 @@
+---
+id: T-0003
+title: The Web build, in a browser — served by MIMAS_WEB_PATH, played locally
+project: mimas
+feature: F-online-slice
+milestone: M2
+lane: light
+status: running
+owner: builder
+model: opus
+worktree: main
+depends_on: [T-0002]
+ladder: [0, 1, 2, 5]
+allows_assets:
+  # Both spellings: the repo-relative path git sees, and the Unity-relative one that appears inside a
+  # `unity command` argument. See the asset-guard note in the run report.
+  - '**/Settings/Build Profiles/Web Release.asset'
+  - '**/Settings/Build Profiles/Web Release.asset.meta'
+  - '**/Settings/Build Profiles/Web Debug.asset'
+  - '**/Settings/Build Profiles/Web Debug.asset.meta'
+  - 'ProjectSettings/ProjectSettings.asset'
+  - 'MimasClient/ProjectSettings/ProjectSettings.asset'
+done_when:
+  - "A Web build of the current game is produced by the Unity CLI and written to Build/Web"
+  - "MIMAS_WEB_PATH serves it: the page loads in Chromium with zero pageerror and zero console.error"
+  - "Play vs bot runs a full match to a result, in a browser"
+  - "Two seats play each other — a browser window and an incognito window, joined by room code"
+  - "A ?room=CODE link joins that room directly"
+  - "A mid-match refresh resyncs into the running match inside the 60 s grace (PlayerPrefs -> IndexedDB)"
+  - "Resign ends the match with the right banner, in a browser"
+  - "tools/smoke/browser-smoke.mjs exists and fails loudly on a console error"
+---
+
+# The Web build, in a browser
+
+**One sentence:** the game Rohan already plays in the Editor is played in a browser on this machine,
+served by `Mimas.Server` itself, with every WebGL-specific path exercised for the first time.
+
+This is task T-0003 from `studio/roadmap/M2-online.md`. It is the last thing between the online slice
+and `F-deploy`, and the roadmap calls it "the single largest unknown" in M2.
+
+## Why this is `light`
+
+No new rule, no wire-format change, no data-schema change. This is a build, a serving path and
+whatever bugs the browser turns up in code that is already written and already reviewed. The one
+shipped-behaviour change (exception support, below) was put to Rohan and answered before any work
+started.
+
+If a fix turns out to need a wire or server contract change, that is not this lane — stop, report it,
+and open a task.
+
+## The four decisions, answered by Rohan on 17 Sep 2026
+
+1. **Exception support goes from `None` to `Explicitly Thrown Exceptions Only`.** Both
+   `ProjectSettings.asset` and the `Web Release` profile carry `webGLExceptionSupport: 0`, which means
+   `try`/`catch` does not work at all in a Web build. The client has four catch sites that matter —
+   a malformed frame in `NetClient` (`JsonException`), `PlayerPrefs.Save` failing, `ContentBootstrap`
+   failing to load the catalogue, and `BoardView` failing to build a map. At `None` each of those
+   aborts the page instead of logging and carrying on. `Explicitly Thrown Only` is Unity's own default
+   and costs a little wasm size and speed.
+2. **This session builds a debug build only** — Development Build with Full With Stacktrace — because
+   a Release build gives no stack traces at all and this is the first time any of this code has run in
+   a browser. The Release build is proven in the deploy session.
+   **A Development Build embeds `com.unity.pipeline`'s runtime server and must never be hosted
+   publicly** (see the `unity-pipeline-package-build-safety` note).
+3. **Verification is a Playwright smoke script plus Rohan playing it.** The script is the first
+   instalment of ladder rung 10; Rohan's hands are the part no script substitutes for.
+4. **Two seats are a browser window and an incognito window.** Two ordinary tabs at one origin share
+   one IndexedDB store, so the second tab's `PlayerPrefs.Save()` silently clobbers the first tab's
+   guest token — they would be the same player, and worse, they would fight over the token.
+
+## The Unity constraint that shapes the session
+
+Changing exception support and adding a debug build profile are `.asset` edits, and golden rule 2 says
+only the live Editor may make them. `unity status` reports no Editor running. A batchmode
+`unity build` in turn requires the project to be **closed** in the Editor, because it takes the project
+lock.
+
+So the order is: everything that needs no Unity first, then Rohan opens the Editor once, then he closes
+it, then the build runs.
+
+## Not in this
+
+- Deploy, TLS, the VPS, a domain — that is `F-deploy` / T-0004, next session.
+- Rematch (M2-8), EditMode tests for the drivers, the determinism sweep.
+- Proving the **Release** build. Decision 2 defers it to the deploy session deliberately.
+- Safari. It is not on this machine; it stays a `F-deploy` done-when.
