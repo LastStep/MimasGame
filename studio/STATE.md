@@ -114,8 +114,6 @@ match started clean, but nobody has touched it. That is the next playtest, and i
 **16 Sep 2026, Rohan, the aiming slice, Editor on arena-4.** Console clean. Two bugs caught in play,
 both since fixed.
 
-Still unplayed: **anything in a browser.** That should be the next session and the next playtest.
-
 ## Next decision due
 
 None open. OPT-0001 (room codes) was decided and executed on 17 Sep. The one live question is the
