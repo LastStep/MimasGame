@@ -32,14 +32,14 @@ Scope is specified in full by **`docs/specs/2026-09-17-online-slice.md`** (17 Se
 locked decisions) with ADR-026 (client mirror), ADR-027 (wire and clock) and ADR-028 (lobby scene and
 the presenter/driver split). Read that before touching M2 — it is the work order.
 
-**One thing in it is unsettled.** The spec locks a FIFO matchmaking queue; `docs/PLAN.md`, approved the
-same day, records Rohan choosing room codes and moving the queue to M5. See
-`studio/decisions/OPT-0001-how-two-friends-meet.md`. Nothing else in M2 is open.
+**OPT-0001 is decided (17 Sep): room codes, not a queue**, with the loadout chosen after the room is
+joined. The spec carries it as Amendment A1 (§2a), which supersedes the queue in §5, §6 and §7.5. The
+queue moves to M5 with ratings. Nothing else in M2 is open.
 
 | Done-when | State |
 |---|---|
 | M2-1 Two browsers play a full match through `Mimas.Server` | not started |
-| M2-2 Two players who want to play each other end up in the same match | **blocked on OPT-0001** |
+| M2-2 Two players who want to play each other end up in the same match | in progress (room codes) |
 | M2-3 Guest auth with a resumable token; a reload keeps your identity | not started |
 | M2-4 Server-authoritative 30 s turn; timeout arrives as EndTurnCommand(Timeout) | not started |
 | M2-5 Reload within the 60 s grace resyncs into the running match | not started |
@@ -63,7 +63,6 @@ same day, records Rohan choosing room codes and moving the queue to M5. See
 
 | What | File | Since |
 |---|---|---|
-| **Decide OPT-0001** — queue or room codes. M2 waits on it | `studio/decisions/OPT-0001-how-two-friends-meet.md` | 17 Sep 2026 |
 | Edit `pillars.md` — it is a draft distilled from the design page, and the pillars are yours | `studio/pillars.md` | 17 Sep 2026 |
 
 ## Last playtest
@@ -78,10 +77,9 @@ and line of sight from the player's side, the DEFEAT banner, and a Web build of 
 
 ## Next decision due
 
-**OPT-0001, how two friends end up in the same match.** The online slice spec is otherwise ready to
-execute, so this is the only thing standing between today and the first real M2 session.
+None open. OPT-0001 was decided on 17 Sep (room codes); T-0002 is executing the spec.
 
-Then, from `docs/PLAN.md` §10: if two browsers cannot play a full match through the server by
+Then, from the studio plan (`E:\Studios\Trinetra-Game-Studio\docs\PLAN.md` §10): if two browsers cannot play a full match through the server by
 **Fri 2 Oct**, the 10 Oct playtest falls back to the local build (Rohan vs bot, shared over screen) and
 online moves to 17 Oct. The Producer raises this in the 2 Oct brief either way.
 

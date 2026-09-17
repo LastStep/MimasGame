@@ -32,8 +32,10 @@ connected to `Mimas.Server` in a real match.
 
 ## What the player sees
 
-The game opens on a **lobby**: your name, a loadout preset, and two buttons — **Play vs bot** and
-**Find match**. Both start a room on the server; the bot starts immediately.
+The game opens on a **lobby**: your name, and three ways in — **Play vs bot**, **Create room** and
+**Join room**. All three put you in a room with a four-letter code you can paste to a friend. In the
+room you see who you are playing, pick a loadout preset and press Ready; the match starts when both
+seats are ready.
 
 Then the same match you already play offline — the same board, the same range circles, the same blocked
 reasons, the same projectile arc — except the opponent is real. You get **30 seconds a turn**. A
@@ -65,14 +67,14 @@ information guarantee restated as an architecture.
 From the spec's §13.
 
 - [ ] Core and server tests green; a test asserts the server never serialises a `MatchState` (M2-1)
-- [ ] Two players who want to play each other end up in the same match (M2-2 — **see OPT-0001**)
+- [ ] Two players who want to play each other end up in the same match, by room code (M2-2)
 - [ ] Guest auth with a resumable token; a page reload keeps your identity (M2-3)
 - [ ] The 30 s turn is server-authoritative, with a lag grace of the measured round trip up to 1 s,
       and a timeout arrives as `EndTurnCommand(Timeout)` (M2-4)
 - [ ] Reloading within the 60 s grace returns you to the running match with a full resync (M2-5)
 - [ ] Resign and disconnect-forfeit both end the match with the right banner (M2-6)
 - [ ] From the Editor, a bot match plays start to finish online
-- [ ] A Web build in a browser and the Editor find each other and play a full match
+- [ ] A Web build in a browser joins a room the Editor created, by code, and they play a full match
 
 ## Not in this
 
@@ -83,15 +85,11 @@ Also out: rematch without leaving the room (still open, M2-8), ratings and accou
 increments and time-control choice, a database, character select and the draft (M3 — though the lobby
 scene is built as its future home).
 
-## Open — needs Rohan
+## Decided
 
-**OPT-0001: how do two friends end up in the same match?** The spec locks a FIFO **queue** with a "Find
-match" button. `docs/PLAN.md`, approved the same day, records the opposite decision — room codes, with
-the queue moved to M5. Both are dated 17 Sep and one of them is stale. This is the only thing in M2
-that is genuinely undecided, and it matters for 10 October, because a queue pairs four friends at
-random rather than into the two pairs they arranged.
-
-`studio/decisions/OPT-0001-how-two-friends-meet.md` lays out the options.
+**OPT-0001: room codes** (17 Sep, Rohan), with the loadout chosen after the room is joined. The spec
+carries it as Amendment A1 (§2a); the queue moves to M5 with ratings.
+`studio/decisions/OPT-0001-how-two-friends-meet.md` has the reasoning.
 
 ## Cost
 

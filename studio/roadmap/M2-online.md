@@ -24,22 +24,20 @@ checked against the code at commit `15e3be0`. Read it before touching M2.
 It deliberately stops at **local end-to-end** (D9: no deploy artefacts). Deployment, and therefore the
 10 October playtest, is `F-deploy` on top of it.
 
-## The one open question
+## The one question, now settled
 
-The spec locks a **FIFO queue** with a "Find match" button. `docs/PLAN.md`, approved the same day,
-records Rohan choosing **room codes** and moving the queue to M5. Both are dated 17 Sep; one is stale.
-
-This matters for 10 October: a queue pairs four friends in the order they click, not into the two pairs
-they arranged. Written up with options and a recommendation in
-`studio/decisions/OPT-0001-how-two-friends-meet.md`. Nothing else in M2 is undecided.
+The spec locked a **FIFO queue**; the studio plan (`E:\Studios\Trinetra-Game-Studio\docs\PLAN.md`),
+approved the same day, recorded Rohan choosing **room codes** and moving the queue to M5. Put to him on
+17 Sep as OPT-0001: **room codes**, with the loadout chosen after the room is joined. The spec carries
+it as Amendment A1 (§2a). Nothing else in M2 is undecided.
 
 ## Done when
 
 In `studio/ledger.json` as M2-1 … M2-8.
 
 1. **M2-1** Two browsers play a full match through `Mimas.Server` — the real thing, end to end.
-2. **M2-2** Two players who want to play each other end up in the same match. *(Mechanism open:
-   OPT-0001.)*
+2. **M2-2** Two players who want to play each other end up in the same match, by a four-letter room
+   code they can paste as a link.
 3. **M2-3** Guest auth with a resumable token; a page reload keeps your identity.
 4. **M2-4** The 30 s turn is server-authoritative, with a lag grace of the measured round trip up to
    1 s, and a timeout arrives as `EndTurnCommand(Timeout)`.

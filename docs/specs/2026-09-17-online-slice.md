@@ -98,6 +98,8 @@ projectiles as the local session. Concretely:
 
 ## 2. Decisions locked in the question round (17 Sep 2026)
 
+> **Amended.** §2a below replaces the FIFO queue with room codes (OPT-0001, decided 17 Sep).
+
 | # | Decision | Where it lives |
 |---|---|---|
 | D1 | One spec, server and client, one session. Server half first, client half only with an Editor. | this file |
@@ -112,6 +114,103 @@ projectiles as the local session. Concretely:
 | D10 | **Wire:** JSON envelope `{ "t": "...", "p": { ... } }`, one hand-written codec in Core (`Mimas.Core.Protocol.Wire`) for commands, events and views, no `TypeNameHandling`, enums as strings, `Hex` as `[q, r]`. | ADR-027 |
 | D11 | **Match setup online:** map `arena-4`; seed from the server; first player by seeded coin flip; the bot seat gets the two hidden passives the local bot has (`ward-of-feathers`, `stone-skin`) so the reveal path is exercised online. Humans get no modifiers. | §5.4 |
 | D12 | New Core command **`ResignCommand`** (legal at any time while the match runs, never enumerated for bots) and `MatchEndReason.Resign` / `Forfeit`. A disconnect forfeit is a `ResignCommand` with `ResignReason.Disconnect` submitted by the server, so a replay of the command list reproduces the match. | §4.2 |
+
+---
+
+## 2a. Amendment A1 — room codes instead of a queue (17 Sep 2026)
+
+**This section supersedes the FIFO queue wherever the rest of this file mentions it** (D-list row for
+"Find match", §5.1's `queue.*` rows, §5.2's `Matchmaking/Matchmaker.cs`, §6.2's `Queue_*` tests,
+§7.5's lobby, §8 step 7). Everything else in the spec stands unchanged.
+
+Decided by Rohan on 17 Sep 2026, resolving `studio/decisions/OPT-0001-how-two-friends-meet.md`
+(option **B**). The reason: on 10 October four friends in two arranged pairs press a button; a queue
+pairs them in click order and two of them end up playing the wrong person. A code and a link remove
+that. `E:\Studios\Trinetra-Game-Studio\docs\PLAN.md` records the same decision ("M2 uses room codes
+instead of a matchmaking queue"); the queue returns at M5 with ratings.
+
+Rohan added one thing of his own: **the loadout is chosen after the room is joined**, not in the lobby
+before it. The room is where you see who you are playing and pick your gear.
+
+### A1.1 Flow
+
+1. Lobby: a name and three ways in — **Play vs bot**, **Create room**, **Join room** (a code field).
+2. All three put you in a **room** with a 4-letter code. `Play vs bot` opens a room whose seat 1 is
+   `RandomBot`, already ready.
+3. The room screen shows the code (with a copyable link), both seat names, a loadout **preset**
+   dropdown and **Ready**. You may change the preset until you press Ready.
+4. When **both seats are ready** the server starts the match and sends `match.start` to each human.
+5. `Leave room` returns to the lobby; the other seat is told and the room stays open for a new joiner.
+
+### A1.2 Wire (replaces the `queue.*` rows in §5.1)
+
+Client → server:
+
+| `t` | Payload | Reply / effect |
+|---|---|---|
+| `room.create` | `{}` | `room.state` (you are seat 0, the other seat empty). `error { code: "in_room" }` if you are already in one, `error { code: "in_match" }` if you are seated in a live match |
+| `room.join` | `{ code }` (case-insensitive, trimmed) | `room.state` to both seats. `error { code: "no_such_room" }`, `error { code: "room_full" }`, `error { code: "in_room" }`, `error { code: "in_match" }` |
+| `bot.play` | `{}` | `room.state` with seat 1 = `Random Bot`, `ready: true`. Same errors as `room.create` |
+| `room.loadout` | `{ loadout: { weapon, crown, boots, armour }, ready }` | `room.state` to both; when both seats are ready, `match.start` to each human. `error { code: "bad_loadout" }` if an item id is unknown or in the wrong slot (nothing is stored), `error { code: "not_in_room" }` |
+| `room.leave` | `{}` | `room.left {}` to you, `room.state` to the other seat. `error { code: "not_in_room" }` |
+
+Server → client:
+
+| `t` | Payload |
+|---|---|
+| `room.state` | `{ code, youAre, seats: [ { name, ready, bot, present } … ] }`, always two entries; an empty seat is `{ name: null, ready: false, bot: false, present: false }` |
+| `room.left` | `{}` |
+
+A seat's chosen loadout is **not** sent to the other seat before the match starts. Items are public
+once the match begins (they are in every `PlayerView`), but revealing a preset during selection would
+invent a counter-pick rule the design page does not have. Smallest option, per §12; logged as an open
+question `q-online-room-loadout` on the design page.
+
+`room.loadout` with `ready: false` stores the loadout and clears readiness; with `ready: true` it
+stores it and marks the seat ready. A seat with no loadout can never be ready. The bot seat is created
+ready with `ServerOptions.BotLoadout`.
+
+### A1.3 Codes
+
+Four characters from `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` (no `I`, `O`, `0`, `1`), drawn with
+`RandomNumberGenerator`, retried on collision, upper-cased on join. A room is reachable by code only
+while it is waiting or in a match; `RoomRegistry.Close` frees the code.
+
+### A1.4 Files (replaces the `Matchmaking/Matchmaker.cs` row in §5.2)
+
+| File | Responsibility |
+|---|---|
+| `Rooms/RoomRegistry.cs` | `CreateWaiting(Player host)`, `CreateVsBot(Player host)`, `TryJoin(code, Player)`, `TryGetByCode`, `TryGet(matchId)`, `Close(matchId)`, `Count`, `WaitingCount`. Owns code generation and uniqueness |
+| `Rooms/Room.cs` | Gains a **lobby phase**: `Phase { Waiting, Playing, Over }`, `Code`, `SetLoadout(seat, loadout, ready)`, `Leave(seat)`, `BroadcastRoomState()`, and `StartMatch()` — which is everything §5.3 lists under "Construction", run when both seats are ready rather than at `Open` |
+| `Rooms/Seat.cs` | Gains `Ready` and `Loadout` (nullable until chosen); `Loadout` is no longer a constructor argument |
+
+There is no `Matchmaker`. `/health` reports `rooms`, `waitingRooms`, `players`.
+
+### A1.5 Tests (replaces the `Queue_*` names in §6.2)
+
+`Room_Create_ReturnsCodeAndSeat`, `Room_JoinByCode_BothSeatsSeeEachOther`,
+`Room_JoinUnknownCode_Error`, `Room_JoinFullRoom_Error`, `Room_CodeIsCaseInsensitive`,
+`Room_MatchStartsOnlyWhenBothReady`, `Room_BadLoadout_Error`, `Room_Leave_TellsTheOtherSeat`,
+`Room_JoinWhileInRoom_Error`, `Room_TwoPlayers_Paired_DifferentSeats`,
+`Room_LoadoutIsNotLeakedBeforeStart`.
+
+### A1.6 Client (replaces §7.5's lobby contents)
+
+`Lobby.uxml` holds **two panels in one document**, one visible at a time:
+
+- `lobby-panel`: title "MIMAS", `name` `TextField`, `play-bot` `Button`, `create-room` `Button`,
+  `join-code` `TextField` (4 chars, upper-cased as you type) + `join-room` `Button`, `status` `Label`,
+  `last-result` `Label`, `server` `Label`.
+- `room-panel`: `room-code` `Label` (large), `copy-link` `Button` (writes
+  `<page url>?room=<code>` to `GUIUtility.systemCopyBuffer`), `seat-0` / `seat-1` `Label`s showing
+  name and "Ready" / "Choosing…" / "Waiting for a player…", `preset` `DropdownField`,
+  `ready` `Button` ("Ready" ↔ "Not ready"), `leave-room` `Button`, `room-status` `Label`.
+
+On a WebGL build, `?room=<code>` in `Application.absoluteURL` auto-joins that code after auth — that
+is the link a friend pastes. `LoadoutPresets` and the four presets in §7.7 are unchanged; they now
+feed the room panel's dropdown, and `room.loadout` carries the chosen preset's four ids.
+
+§8 step 7 becomes: the Editor creates a room, the browser joins it by code, both play to the end.
 
 ---
 

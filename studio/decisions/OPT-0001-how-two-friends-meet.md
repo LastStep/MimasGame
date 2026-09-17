@@ -3,11 +3,11 @@ id: OPT-0001
 title: How do two friends end up in the same match?
 project: mimas
 lane: director
-status: open
+status: decided
 author: builder
 created: 2026-09-17
-decided:
-chosen:
+decided: 2026-09-17
+chosen: B
 ---
 
 # How do two friends end up in the same match?
@@ -19,7 +19,7 @@ Two documents, both dated 17 September 2026, both recording a decision with you,
 | Source | Says |
 |---|---|
 | `docs/specs/2026-09-17-online-slice.md` §2 D-list, ADR-027, ADR-028 | **A FIFO queue.** The lobby has a "Find match" button; the server holds one queue and pairs the first two waiting players. Written after a three-round question round, checked against the code at `15e3be0`, and already a 757-line work order |
-| `docs/PLAN.md` §8 and its decision log | **Room codes.** "M2 uses room codes instead of a matchmaking queue" and "the queue moves to M5", listed as a decision by you on 17 Sep |
+| `E:\Studios\Trinetra-Game-Studio\docs\PLAN.md` (the **studio** plan, not this repo — the original write-up gave the path as `docs/PLAN.md`, which does not exist here) | **Room codes.** "M2 uses room codes instead of a matchmaking queue" and "the queue moves to M5", listed as a decision by you on 17 Sep |
 
 One of them is stale and I cannot tell which from the files. Nothing else in M2 is unclear — this is
 the only open question in the milestone, and it is small in code and large in consequence.
@@ -107,3 +107,20 @@ queue stops being premature and A or C wins.
 Either way, `studio/ledger.json` M2-2 is currently worded neutrally — "two players who want to play
 each other end up in the same match" — so it does not have to be rewritten once you decide. It will be
 sharpened to the mechanism you pick.
+
+---
+
+## Decided — 17 Sep 2026, Rohan: **B, room codes**
+
+With one addition of his own: **the loadout is chosen after the room is joined**, not in the lobby
+before it. So the lobby is name plus three ways in (`Play vs bot`, `Create room`, `Join room`), and the
+room screen is where you pick a preset and press Ready. The match starts when both seats are ready.
+
+The written-up conflict was real but the path in it was wrong. `docs/PLAN.md` does not exist in the
+Mimas repo and never has; the file is `E:\Studios\Trinetra-Game-Studio\docs\PLAN.md`, the studio's
+own plan, which at line 3 records *"Approved by Rohan on 17 Sep 2026 with three changes: M2 uses room
+codes instead of a matchmaking queue …"* and logs it again at line 299. "Instead of a matchmaking
+queue" postdates and amends the spec.
+
+Executed as **Amendment A1** in `docs/specs/2026-09-17-online-slice.md` §2a, which supersedes the
+queue in §5.1, §5.2, §6.2 and §7.5. The queue moves to M5 with ratings, as the studio plan says.
