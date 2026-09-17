@@ -67,6 +67,13 @@ namespace Mimas.Core.Match
     /// generates candidates structurally and filters them through the same validation, so the bot, the HUD
     /// highlight and the server can never disagree. Never send this object to a client: project it with
     /// <see cref="ViewFor"/> and filter events with <see cref="EventFilter"/>.
+    /// <para>
+    /// A <b>mirror</b> (<see cref="FromView"/>, <see cref="IsMirror"/>, ADR-026) is the client's copy: the same
+    /// class built from one player's <see cref="PlayerView"/> and nothing else, so every preview question —
+    /// move options, range bands, <see cref="CheckTarget"/>, the damage preview and its "?" row — is answered
+    /// by the same code the server runs, instantly and without a round trip, and cannot see a thing the server
+    /// did not choose to send. A mirror only answers questions: it never starts or applies anything.
+    /// </para>
     /// </summary>
     public sealed class MatchState : IRevealedKnowledge
     {
@@ -92,6 +99,15 @@ namespace Mimas.Core.Match
 
         public Rng Rng { get; }
 
+        /// <summary>
+        /// True when this is a client-side mirror built by <see cref="FromView"/> rather than the truth: it
+        /// holds only what one player was told, and it refuses to be advanced (ADR-026).
+        /// </summary>
+        public bool IsMirror { get; }
+
+        /// <summary>The only player a mirror may answer for; -1 on the truth.</summary>
+        public int MirrorViewer { get; }
+
         /// <summary>Player whose turn it is.</summary>
         public int ActivePlayer { get; private set; }
 
@@ -106,9 +122,9 @@ namespace Mimas.Core.Match
         /// <summary>Winning player, or -1 while the match runs.</summary>
         public int Winner { get; private set; } = -1;
 
-        /// <summary>Builds the board, spawns one unit per player on its spawn, and starts the first turn (events are returned by <see cref="Start"/>).</summary>
-        public MatchState(ContentCatalog catalog, MatchSetup setup, uint seed,
-            MovementResolverRegistry resolvers = null, TrajectoryRegistry trajectories = null)
+        /// <summary>The board, the registries and the RNG: everything the truth and a mirror set up the same way.</summary>
+        private MatchState(ContentCatalog catalog, MatchSetup setup, uint seed,
+            MovementResolverRegistry resolvers, TrajectoryRegistry trajectories, int mirrorViewer)
         {
             Catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
             Setup = setup ?? throw new ArgumentNullException(nameof(setup));
@@ -122,6 +138,15 @@ namespace Mimas.Core.Match
             Units = new UnitSet();
             Bodies = new BodySet(Units);
 
+            IsMirror = mirrorViewer >= 0;
+            MirrorViewer = mirrorViewer;
+        }
+
+        /// <summary>Builds the board, spawns one unit per player on its spawn, and starts the first turn (events are returned by <see cref="Start"/>).</summary>
+        public MatchState(ContentCatalog catalog, MatchSetup setup, uint seed,
+            MovementResolverRegistry resolvers = null, TrajectoryRegistry trajectories = null)
+            : this(catalog, setup, seed, resolvers, trajectories, -1)
+        {
             for (int player = 0; player < MatchSetup.PlayerCount; player++)
             {
                 Loadout loadout = setup.LoadoutOf(player);
@@ -153,9 +178,86 @@ namespace Mimas.Core.Match
             TurnNumber = 0;
         }
 
+        /// <summary>
+        /// The client's mirror (ADR-026): a <see cref="MatchState"/> rebuilt from one player's
+        /// <see cref="PlayerView"/> and nothing else. Every number on it is one the server chose to send, so
+        /// asking it a question can never leak; and because it is the same class, every preview the local game
+        /// already answers is answered identically online, with no second implementation to drift.
+        /// <para>
+        /// Rebuilt per message rather than advanced by events: a view is two heroes and a handful of props, and
+        /// a state that is only ever replaced cannot fall out of step with the server.
+        /// </para>
+        /// <para>
+        /// <see cref="Setup"/>'s <c>FirstPlayer</c> is meaningless on a mirror (a view does not say who started)
+        /// and <see cref="Rng"/> is seeded 0 and never drawn from — a mirror decides nothing.
+        /// </para>
+        /// </summary>
+        public static MatchState FromView(ContentCatalog catalog, PlayerView view,
+            MovementResolverRegistry resolvers = null, TrajectoryRegistry trajectories = null)
+        {
+            if (catalog == null) throw new ArgumentNullException(nameof(catalog));
+            if (view == null) throw new ArgumentNullException(nameof(view));
+            if (view.Units.Count != MatchSetup.PlayerCount)
+                throw new ArgumentException($"A view of a 1v1 needs {MatchSetup.PlayerCount} units, had {view.Units.Count}.", nameof(view));
+
+            var loadouts = new Loadout[MatchSetup.PlayerCount];
+            for (int i = 0; i < view.Units.Count; i++)
+            {
+                UnitView u = view.Units[i];
+                if (u.Owner < 0 || u.Owner >= MatchSetup.PlayerCount)
+                    throw new ArgumentException($"Unit {u.Id} has owner {u.Owner}.", nameof(view));
+                if (u.ItemIds.Count != ItemSlots.All.Length)
+                    throw new ArgumentException($"Unit {u.Id} lists {u.ItemIds.Count} items.", nameof(view));
+                loadouts[u.Owner] = new Loadout(u.ItemIds[0], u.ItemIds[1], u.ItemIds[2], u.ItemIds[3]);
+            }
+            for (int player = 0; player < MatchSetup.PlayerCount; player++)
+                if (loadouts[player] == null) throw new ArgumentException($"The view has no unit for player {player}.", nameof(view));
+
+            var setup = new MatchSetup(view.MapId, loadouts[0], loadouts[1]);
+            var state = new MatchState(catalog, setup, 0, resolvers, trajectories, view.Viewer);
+
+            for (int i = 0; i < view.Units.Count; i++)
+                state.Units.Add(Unit.FromView(view.Units[i], catalog));
+
+            // Destroyed props are simply absent from a view, so the mirror's board has the holes the player
+            // can see and walk into.
+            for (int i = 0; i < view.Props.Count; i++)
+            {
+                PropView p = view.Props[i];
+                var prop = new Prop(p.Id, catalog.Props.Get(p.DefId), p.Position);
+                prop.Restore(p.Hp);
+                state.Bodies.AddProp(prop);
+            }
+
+            // Everything the viewer has been shown about the opponent is knowledge they keep: without this the
+            // mirror would re-hide a revealed ability the moment it rebuilt.
+            for (int i = 0; i < view.Units.Count; i++)
+            {
+                UnitView u = view.Units[i];
+                if (u.Owner == view.Viewer) continue;
+                for (int a = 0; a < u.Abilities.Count; a++)
+                    if (u.Abilities[a].Revealed) state._revealed.Add(view.Viewer, u.Id, u.Abilities[a].Id);
+                for (int m = 0; m < u.Modifiers.Count; m++)
+                    if (u.Modifiers[m].Revealed) state._revealed.Add(view.Viewer, u.Id, u.Modifiers[m].Id);
+            }
+
+            state.ActivePlayer = view.ActivePlayer;
+            state.TurnNumber = view.TurnNumber;
+            state.ActedThisTurn = view.ActedThisTurn;
+            state.IsOver = view.IsOver;
+            state.Winner = view.Winner;
+            return state;
+        }
+
+        private void RefuseOnMirror(string what)
+        {
+            if (IsMirror) throw new InvalidOperationException($"A mirror only answers questions ({what}).");
+        }
+
         /// <summary>Starts the first turn. Call exactly once after construction.</summary>
         public IReadOnlyList<MatchEvent> Start()
         {
+            RefuseOnMirror("Start");
             if (TurnNumber != 0) throw new InvalidOperationException("The match has already started.");
             var events = new List<MatchEvent>();
             BeginTurn(ActivePlayer, events);
@@ -234,6 +336,7 @@ namespace Mimas.Core.Match
         /// <summary>Applies a command. Throws <see cref="InvalidOperationException"/> when it does not validate; call <see cref="Validate"/> first.</summary>
         public IReadOnlyList<MatchEvent> Apply(Command command)
         {
+            RefuseOnMirror("Apply");
             CommandResult check = Validate(command);
             if (!check.Ok) throw new InvalidOperationException($"Command {command} rejected: {check}");
 
@@ -251,6 +354,7 @@ namespace Mimas.Core.Match
         /// <summary>Validates then applies; returns false (no events, no change) when the command is illegal.</summary>
         public bool TryApply(Command command, List<MatchEvent> into, out CommandResult result)
         {
+            RefuseOnMirror("TryApply");
             if (into == null) throw new ArgumentNullException(nameof(into));
             result = Validate(command);
             if (!result.Ok) return false;
@@ -483,16 +587,26 @@ namespace Mimas.Core.Match
         /// </summary>
         public DamageBreakdown PreviewAttack(int viewer, int unitId, string abilityId, Hex target)
         {
+            if (IsMirror && viewer != MirrorViewer)
+                throw new InvalidOperationException($"This mirror belongs to player {MirrorViewer} and cannot preview for player {viewer}.");
+
             Unit attacker; IBody victim; AttackDef def;
             var command = new AttackCommand(ActivePlayer, unitId, abilityId, target);
             if (IsOver || TurnNumber == 0) return null;
             if (!ValidateAttack(command, out attacker, out def, out victim).Ok) return null;
-            return _damage.Compute(Map, attacker, victim, def, Knowledge.For(viewer, this));
+            DamageBreakdown breakdown = _damage.Compute(Map, attacker, victim, def, Knowledge.For(viewer, this));
+            if (!IsMirror) return breakdown;
+
+            // On the truth the calculator counts a hidden modifier it may not show; on a mirror that modifier
+            // was never sent, so nothing would be counted and the "?" row would quietly disappear.
+            var victimUnit = victim as Unit;
+            return breakdown.WithUnknown(attacker.HiddenModifierCount + (victimUnit != null ? victimUnit.HiddenModifierCount : 0));
         }
 
-        /// <summary>The same arithmetic with full knowledge: for tests and the server only.</summary>
+        /// <summary>The same arithmetic with full knowledge: for tests and the server only. A mirror has no full knowledge to give.</summary>
         public DamageBreakdown ResolveAttackFully(int unitId, string abilityId, Hex target)
         {
+            RefuseOnMirror("ResolveAttackFully");
             Unit attacker; IBody victim; AttackDef def;
             var command = new AttackCommand(ActivePlayer, unitId, abilityId, target);
             if (IsOver || TurnNumber == 0) return null;
@@ -500,8 +614,17 @@ namespace Mimas.Core.Match
             return _damage.Compute(Map, attacker, victim, def, Knowledge.Full);
         }
 
-        /// <summary>What <paramref name="viewer"/> is allowed to see (ADR-010).</summary>
-        public PlayerView ViewFor(int viewer) => PlayerView.Build(this, viewer);
+        /// <summary>
+        /// What <paramref name="viewer"/> is allowed to see (ADR-010). On a mirror this reproduces the view it
+        /// was built from, "?" rows and all, and refuses any other viewer: a mirror holds one player's half of
+        /// the match and has nothing honest to say about the other's.
+        /// </summary>
+        public PlayerView ViewFor(int viewer)
+        {
+            if (IsMirror && viewer != MirrorViewer)
+                throw new InvalidOperationException($"This mirror belongs to player {MirrorViewer} and cannot produce a view for player {viewer}.");
+            return PlayerView.Build(this, viewer);
+        }
 
         /// <summary>Records what each player has learned. Small lists, linear scans, stable order.</summary>
         private sealed class RevealedSet

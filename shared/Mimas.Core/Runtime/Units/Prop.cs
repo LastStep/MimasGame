@@ -62,6 +62,17 @@ namespace Mimas.Core.Units
             return before - Hp;
         }
 
+        /// <summary>
+        /// Puts hit points back without replaying the damage: for a mirror rebuilt from a player view, and for
+        /// replays. A prop that was destroyed is simply absent from a view, so this never restores one to life.
+        /// </summary>
+        public void Restore(int hp)
+        {
+            if (hp < 0 || hp > MaxHp) throw new ArgumentOutOfRangeException(nameof(hp), $"Prop {Id} hp must be 0..{MaxHp}, was {hp}.");
+            Hp = hp;
+            IsDestroyed = false;
+        }
+
         public override string ToString() => $"Prop {Id} '{Def.Id}' at {Position}{(IsDestroyed ? " (destroyed)" : "")}";
     }
 }

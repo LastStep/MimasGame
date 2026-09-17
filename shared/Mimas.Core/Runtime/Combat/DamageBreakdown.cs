@@ -98,6 +98,17 @@ namespace Mimas.Core.Combat
             Total = sum < 0 ? 0 : sum;
         }
 
+        /// <summary>
+        /// The same lines with more unknowns counted. The mirror uses it: a hidden modifier it was never told
+        /// about is not on its copy of the unit at all, so the calculator cannot count it, and the "?" row
+        /// would vanish without this (ADR-026).
+        /// </summary>
+        public DamageBreakdown WithUnknown(int extra)
+        {
+            if (extra < 0) throw new ArgumentOutOfRangeException(nameof(extra));
+            return extra == 0 ? this : new DamageBreakdown(new List<DamageLine>(_lines), UnknownCount + extra);
+        }
+
         /// <summary>The line for a modifier id, or null.</summary>
         public DamageLine FindModifier(string modifierId)
         {

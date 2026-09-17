@@ -2,9 +2,31 @@ using System;
 using System.Collections.Generic;
 using Mimas.Core.Data;
 using Mimas.Core.Geometry;
+using Mimas.Core.Match;
 
 namespace Mimas.Core.Units
 {
+    /// <summary>
+    /// A slot in a unit's ability or modifier list that one player is not allowed to see the contents of:
+    /// its position in the list, and (for an ability) the item that granted it, which is public even when
+    /// what it grants is not. A mirror keeps these so it can reproduce the "?" rows of the view it was
+    /// built from, in the right places (ADR-026).
+    /// </summary>
+    public readonly struct HiddenSlot
+    {
+        /// <summary>Index in the full list, counting the hidden entries.</summary>
+        public readonly int Index;
+
+        /// <summary>The item that granted the hidden ability, or null for an innate ability or a modifier.</summary>
+        public readonly string SourceItemId;
+
+        public HiddenSlot(int index, string sourceItemId)
+        {
+            Index = index;
+            SourceItemId = sourceItemId;
+        }
+    }
+
     /// <summary>
     /// One unit on the board: identity, owner, gear, where it stands, its abilities, its modifiers, and
     /// its live numbers (hit points, action points). Abilities and modifiers are ids resolved against the
@@ -31,6 +53,8 @@ namespace Mimas.Core.Units
         private readonly List<string> _modifierIds = new List<string>();
         private readonly List<string> _itemIds;
         private readonly HeightsDef _heights;
+        private readonly List<HiddenSlot> _hiddenAbilitySlots = new List<HiddenSlot>();
+        private readonly List<HiddenSlot> _hiddenModifierSlots = new List<HiddenSlot>();
 
         public int Id { get; }
 
@@ -72,6 +96,21 @@ namespace Mimas.Core.Units
 
         /// <summary>Modifier ids this unit carries (boons, pickups), in the order they were granted.</summary>
         public IReadOnlyList<string> ModifierIds => _modifierIds;
+
+        /// <summary>
+        /// Abilities this unit has that the mirror's viewer may not see, by position and granting item.
+        /// Always empty on a unit that belongs to the truth (ADR-026).
+        /// </summary>
+        public IReadOnlyList<HiddenSlot> HiddenAbilitySlots => _hiddenAbilitySlots;
+
+        /// <summary>Modifiers this unit has that the mirror's viewer may not see, by position. Always empty on the truth.</summary>
+        public IReadOnlyList<HiddenSlot> HiddenModifierSlots => _hiddenModifierSlots;
+
+        /// <summary>How many of this unit's abilities the mirror's viewer cannot see. 0 on a truth unit.</summary>
+        public int HiddenAbilityCount => _hiddenAbilitySlots.Count;
+
+        /// <summary>How many of this unit's modifiers the mirror's viewer cannot see. 0 on a truth unit; what a "?" damage row counts.</summary>
+        public int HiddenModifierCount => _hiddenModifierSlots.Count;
 
         /// <summary>A unit with no gear and no abilities: for tests and scaffolding.</summary>
         public Unit(int id, int owner, Hex position, HeightsDef heights)
@@ -188,6 +227,61 @@ namespace Mimas.Core.Units
         }
 
         public bool CanAfford(int cost) => cost >= 0 && cost <= Ap;
+
+        /// <summary>
+        /// Puts live numbers back without replaying how they got there: for a mirror rebuilt from a
+        /// <see cref="PlayerView"/>, and for the replays that will read a command log. Not a rules operation —
+        /// nothing that plays a match should call it.
+        /// </summary>
+        public void Restore(int hp, int ap)
+        {
+            if (hp < 0 || hp > MaxHp) throw new ArgumentOutOfRangeException(nameof(hp), $"Unit {Id} hp must be 0..{MaxHp}, was {hp}.");
+            if (ap < 0) throw new ArgumentOutOfRangeException(nameof(ap), $"Unit {Id} ap must not be negative, was {ap}.");
+            Hp = hp;
+            Ap = ap;
+        }
+
+        /// <summary>
+        /// The mirror's unit (ADR-026): built from the public half of a <see cref="UnitView"/> — its gear, which
+        /// fixes every stat exactly as the truth computes it — and then stripped of everything the viewer was
+        /// not shown. What is left is what that player is entitled to reason with, and
+        /// <see cref="HiddenAbilitySlots"/> / <see cref="HiddenModifierSlots"/> remember where the gaps were so
+        /// the view can be reproduced with its "?" rows intact.
+        /// </summary>
+        public static Unit FromView(UnitView view, Content.ContentCatalog catalog)
+        {
+            if (view == null) throw new ArgumentNullException(nameof(view));
+            if (catalog == null) throw new ArgumentNullException(nameof(catalog));
+            if (view.ItemIds.Count != ItemSlots.All.Length)
+                throw new ArgumentException($"A hero view needs {ItemSlots.All.Length} items, had {view.ItemIds.Count}.", nameof(view));
+
+            var items = new List<ItemDef>(ItemSlots.All.Length);
+            for (int i = 0; i < ItemSlots.All.Length; i++) items.Add(catalog.GetItemForSlot(ItemSlots.All[i], view.ItemIds[i]));
+
+            var unit = new Unit(view.Id, view.Owner, view.Position, catalog.Rules, items);
+
+            // The view lists abilities in grant order, which is exactly the order the constructor just
+            // produced, so position i of the view is position i of this list.
+            if (view.Abilities.Count != unit._abilityIds.Count)
+                throw new ArgumentException($"Unit {view.Id}'s view lists {view.Abilities.Count} abilities; its gear grants {unit._abilityIds.Count}.", nameof(view));
+            for (int i = view.Abilities.Count - 1; i >= 0; i--)
+            {
+                if (view.Abilities[i].Revealed) continue;
+                unit._hiddenAbilitySlots.Insert(0, new HiddenSlot(i, view.Abilities[i].SourceItemId));
+                unit._abilityIds.RemoveAt(i);
+                unit._abilitySources.RemoveAt(i);
+            }
+
+            for (int i = 0; i < view.Modifiers.Count; i++)
+            {
+                KnownEntry entry = view.Modifiers[i];
+                if (entry.Revealed) unit._modifierIds.Add(entry.Id);
+                else unit._hiddenModifierSlots.Add(new HiddenSlot(i, null));
+            }
+
+            unit.Restore(view.Hp, view.Ap);
+            return unit;
+        }
 
         /// <summary>Spends action points. Callers check <see cref="CanAfford"/> first.</summary>
         public void SpendAp(int cost)

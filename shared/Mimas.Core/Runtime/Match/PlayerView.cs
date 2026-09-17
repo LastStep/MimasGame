@@ -205,18 +205,34 @@ namespace Mimas.Core.Match
                 Unit unit = state.Units.All[i];
                 bool mine = unit.Owner == viewer;
 
-                var abilities = new List<KnownEntry>(unit.AbilityIds.Count);
-                for (int a = 0; a < unit.AbilityIds.Count; a++)
+                // The hidden slots are empty on the truth, so this is the plain loop there; on a mirror they
+                // are the entries it was never told, put back where they were (ADR-026).
+                int abilityTotal = unit.AbilityIds.Count + unit.HiddenAbilityCount;
+                var abilities = new List<KnownEntry>(abilityTotal);
+                for (int a = 0, next = 0, gap = 0; a < abilityTotal; a++)
                 {
-                    string id = unit.AbilityIds[a];
+                    if (gap < unit.HiddenAbilitySlots.Count && unit.HiddenAbilitySlots[gap].Index == a)
+                    {
+                        abilities.Add(new KnownEntry(null, unit.HiddenAbilitySlots[gap].SourceItemId));
+                        gap++;
+                        continue;
+                    }
+                    string id = unit.AbilityIds[next++];
                     bool known = mine || state.Knows(viewer, unit.Id, id);
                     abilities.Add(new KnownEntry(known ? id : null, unit.AbilitySourceOf(id)));
                 }
 
-                var modifiers = new List<KnownEntry>(unit.ModifierIds.Count);
-                for (int m = 0; m < unit.ModifierIds.Count; m++)
+                int modifierTotal = unit.ModifierIds.Count + unit.HiddenModifierCount;
+                var modifiers = new List<KnownEntry>(modifierTotal);
+                for (int m = 0, next = 0, gap = 0; m < modifierTotal; m++)
                 {
-                    string id = unit.ModifierIds[m];
+                    if (gap < unit.HiddenModifierSlots.Count && unit.HiddenModifierSlots[gap].Index == m)
+                    {
+                        modifiers.Add(new KnownEntry(null));
+                        gap++;
+                        continue;
+                    }
+                    string id = unit.ModifierIds[next++];
                     ModifierDef def;
                     bool hidden = state.Catalog.Modifiers.TryGet(id, out def) && def.IsHidden;
                     bool known = mine || !hidden || state.Knows(viewer, unit.Id, id);
