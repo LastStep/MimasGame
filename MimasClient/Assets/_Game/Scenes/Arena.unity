@@ -888,7 +888,7 @@ MonoBehaviour:
   _tileSize: 1
   _tileMaterial: {fileID: 2100000, guid: 70a9afd3916572d47a9ac6c460c46654, type: 2}
   _tileLayer: -1
-  _buildOnAwake: 1
+  _buildOnAwake: 0
   _terrainVisuals:
   - TerrainId: grass
     Color: {r: 0.3294, g: 0.5765, b: 0.3059, a: 1}
@@ -1003,6 +1003,9 @@ MonoBehaviour:
   _input: {fileID: 974342029}
   _unit: {fileID: 971986041}
   _opponent: {fileID: 396881483}
+  _aimPreview: {fileID: 0}
+  _rangeCircles: {fileID: 0}
+  _projectiles: {fileID: 0}
   _playback:
     SecondsPerTile: 0.35
     LeapSeconds: 0.55

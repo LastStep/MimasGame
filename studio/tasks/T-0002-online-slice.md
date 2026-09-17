@@ -16,6 +16,13 @@ allows_assets:
   - 'ProjectSettings/EditorBuildSettings.asset'
   - 'shared/Mimas.Core.Tests/**'
   - 'studio/game.yaml'
+  # Both spellings: the repo-relative path git sees, and the Unity-relative one that appears inside a
+  # `unity command --path Assets/...` argument, which is how every one of these is actually written.
+  - '**/_Game/Scenes/Lobby.unity'
+  - '**/_Game/Scenes/Lobby.unity.meta'
+  - '**/_Game/Scenes/Arena.unity'
+  - '**/_Game/Settings/LoadoutPresets.asset'
+  - '**/_Game/Settings/LoadoutPresets.asset.meta'
 done_when:
   - "dotnet build Mimas.slnx, dotnet test shared/Mimas.Core.Tests (>= 320) and dotnet test server/Mimas.Server.Tests are green"
   - "Two fake clients join the same room by code and play a full match over WebSocket through Mimas.Server"
@@ -58,6 +65,21 @@ The other paths: `rules.json` gains the `clock` block (§3.1), `docs/design/inde
 and changelog updates §9.4 requires, and the build settings asset gains the Lobby scene via
 `add_scene_to_build` (§7.9) — the one `ProjectSettings` change the spec allows, made through the live
 Editor, never by hand.
+
+## Why `allows_assets` names two scenes and an asset
+
+Golden rule 2 says never hand-edit a `.unity` or `.asset`; drive the live Editor instead. That is what
+this task does — `create_scene`, `create_gameobject`, `attach_script`, `create_asset`,
+`set_serialized_field`, `save_scene` — but the asset guard matches the *path*, not how it is written,
+so driving the Editor from a shell trips it too. Declaring them is the documented way to say "yes, on
+purpose", and every one of these is written by Unity:
+
+- `Scenes/Lobby.unity` (+ meta) — new, §7.5. The lobby is its own scene (D6, ADR-028).
+- `Scenes/Arena.unity` — `_buildOnAwake` goes off on `/Board` (§7.3), because online the map is not
+  known until `match.start` arrives and the board can no longer build itself from a serialized id.
+- `Settings/LoadoutPresets.asset` (+ meta) — new, §7.7, with the four shipped kits.
+
+No `.unity`, `.asset` or `.meta` file is edited by hand at any point.
 
 `studio/game.yaml` is named for the rung this task builds: flipping rung 5 (`server integration`) from
 `enabled: false` to `true`, and seeding its `server_test_count` ratchet at 34, because `ladder --bless`
