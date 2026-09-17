@@ -78,4 +78,31 @@ namespace Mimas.Core.Match
 
         public override string ToString() => $"P{Player} end turn ({Reason})";
     }
+
+    public enum ResignReason
+    {
+        /// <summary>The player pressed Resign.</summary>
+        Player = 0,
+
+        /// <summary>The player did not come back inside the reconnect grace; the server submitted it for them.</summary>
+        Disconnect = 1,
+    }
+
+    /// <summary>
+    /// Concede the match. Legal for either player at any moment while the match runs, including off turn
+    /// (design: #win-conditions, #online). A disconnect forfeit is the same command with a different reason,
+    /// submitted by the server, so a replay of the command list reproduces the match without any sockets.
+    /// Never enumerated for a bot.
+    /// </summary>
+    public sealed class ResignCommand : Command
+    {
+        public ResignReason Reason { get; }
+
+        public ResignCommand(int player, ResignReason reason = ResignReason.Player) : base(player)
+        {
+            Reason = reason;
+        }
+
+        public override string ToString() => $"P{Player} resigns ({Reason})";
+    }
 }

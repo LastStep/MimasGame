@@ -173,6 +173,10 @@ namespace Mimas.Core.Match
             if (command == null) throw new ArgumentNullException(nameof(command));
             if (IsOver) return CommandResult.Reject(CommandRejectReason.MatchOver);
             if (TurnNumber == 0) return CommandResult.Reject(CommandRejectReason.NotYourTurn);
+
+            // Resigning is not a turn action: you may concede while the other player is thinking.
+            if (command is ResignCommand) return CommandResult.Accepted;
+
             if (command.Player != ActivePlayer) return CommandResult.Reject(CommandRejectReason.NotYourTurn);
 
             switch (command)
@@ -239,6 +243,7 @@ namespace Mimas.Core.Match
                 case MoveCommand move: ApplyMove(move, events); break;
                 case AttackCommand attack: ApplyAttack(attack, events); break;
                 case EndTurnCommand end: ApplyEndTurn(end, events); break;
+                case ResignCommand resign: ApplyResign(resign, events); break;
             }
             return events;
         }
@@ -307,6 +312,14 @@ namespace Mimas.Core.Match
             }
             events.Add(new UnitDiedEvent(victim.Id));
             CheckElimination(events);
+        }
+
+        /// <summary>A concession ends the match where it stands: no turn change, no action points spent.</summary>
+        private void ApplyResign(ResignCommand resign, List<MatchEvent> events)
+        {
+            IsOver = true;
+            Winner = 1 - resign.Player;
+            events.Add(new MatchEndedEvent(Winner, resign.Reason == ResignReason.Player ? MatchEndReason.Resign : MatchEndReason.Forfeit));
         }
 
         private void ApplyEndTurn(EndTurnCommand end, List<MatchEvent> events)
@@ -406,6 +419,7 @@ namespace Mimas.Core.Match
                 }
             }
 
+            // End Turn closes the list; a resign is never a candidate, because a bot does not concede.
             into.Add(new EndTurnCommand(player));
         }
 

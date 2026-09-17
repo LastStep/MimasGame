@@ -115,7 +115,7 @@ namespace Mimas.Core.Tests
     /// </summary>
     public class HeightsAndTrajectoryParsingTests
     {
-        private const string RulesHead = @"{ ""version"": 1, ""damageTypes"": [ ""weapon"" ], ""baseStats"": { ""hp"": 20, ""ap"": 3 }, ""innateAbilities"": [ ""move"" ]";
+        private const string RulesHead = @"{ ""version"": 1, ""damageTypes"": [ ""weapon"" ], ""baseStats"": { ""hp"": 20, ""ap"": 3 }, ""innateAbilities"": [ ""move"" ], ""clock"": { ""turnMs"": 30000, ""lagGraceMs"": 1000, ""reconnectGraceMs"": 60000 }";
 
         private static RulesDef Rules(string heights) => RulesDef.FromJson(RulesHead + @", ""heights"": " + heights + " }");
 
@@ -583,6 +583,52 @@ namespace Mimas.Core.Tests
             var start = new Hex(-4, 0);
             var goal = new Hex(4, 0);
             Assert.Equal(map.FindPath(start, goal), map.FindPath(start, goal));
+        }
+    }
+    /// <summary>
+    /// The one clock M2 ships (rules.json <c>clock</c>): required, all three numbers positive. Both the
+    /// server's deadline and the client's rope read it, so a missing or zero value must fail at load
+    /// rather than silently produce a turn that never ends.
+    /// </summary>
+    public class ClockParsingTests
+    {
+        private const string Head = @"{ ""version"": 1, ""damageTypes"": [ ""weapon"" ], ""heights"": { ""unitsPerLevel"": 3, ""body"": 6, ""aim"": 4 },
+            ""baseStats"": { ""hp"": 20, ""ap"": 3 }, ""innateAbilities"": [ ""move"" ]";
+
+        private static RulesDef WithClock(string clock) => RulesDef.FromJson(Head + @", ""clock"": " + clock + " }");
+
+        [Fact]
+        public void Rules_ClockBlock_Parsed()
+        {
+            var rules = WithClock(@"{ ""turnMs"": 30000, ""lagGraceMs"": 1000, ""reconnectGraceMs"": 60000 }");
+            Assert.Equal(30000, rules.Clock.TurnMs);
+            Assert.Equal(1000, rules.Clock.LagGraceMs);
+            Assert.Equal(60000, rules.Clock.ReconnectGraceMs);
+        }
+
+        [Fact]
+        public void Rules_MissingClock_Throws()
+        {
+            var e = Assert.Throws<MapLoadException>(() => RulesDef.FromJson(Head + " }"));
+            Assert.Contains("'clock'", e.Message);
+        }
+
+        [Fact]
+        public void Rules_ClockNonPositive_Throws()
+        {
+            Assert.Throws<MapLoadException>(() => WithClock(@"{ ""turnMs"": 0, ""lagGraceMs"": 1000, ""reconnectGraceMs"": 60000 }"));
+            Assert.Throws<MapLoadException>(() => WithClock(@"{ ""turnMs"": 30000, ""lagGraceMs"": 0, ""reconnectGraceMs"": 60000 }"));
+            Assert.Throws<MapLoadException>(() => WithClock(@"{ ""turnMs"": 30000, ""lagGraceMs"": 1000, ""reconnectGraceMs"": -1 }"));
+            Assert.Throws<ArgumentOutOfRangeException>(() => new ClockDef(30000, 1000, 0));
+        }
+
+        [Fact]
+        public void Rules_ShippedFile_HasTheClock()
+        {
+            var rules = RulesDef.FromJson(RepoData.Read("rules.json"));
+            Assert.Equal(30000, rules.Clock.TurnMs);
+            Assert.Equal(1000, rules.Clock.LagGraceMs);
+            Assert.Equal(60000, rules.Clock.ReconnectGraceMs);
         }
     }
 }

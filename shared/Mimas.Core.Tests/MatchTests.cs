@@ -587,4 +587,77 @@ namespace Mimas.Core.Tests
             Assert.Null(bot.Choose(state, 1));
         }
     }
+    /// <summary>
+    /// Resigning (design: #win-conditions, #online). A concession is a command like any other, so the
+    /// server can submit one for a player who never came back and a replay of the command list still
+    /// reproduces the match. It is the one command that is legal off turn, and the one a bot never sees.
+    /// </summary>
+    public class ResignTests
+    {
+        private static MatchState Started() =>
+            CombatFixtures.Started(CombatFixtures.Catalog(), CombatFixtures.Setup(), new Hex(-3, 0), new Hex(3, 0));
+
+        [Fact]
+        public void Resign_OnOwnTurn_EndsMatchOpponentWins()
+        {
+            var state = Started();
+            Assert.Equal(0, state.ActivePlayer);
+
+            var events = state.Apply(new ResignCommand(0));
+
+            var ended = Assert.IsType<MatchEndedEvent>(Assert.Single(events));
+            Assert.Equal(1, ended.Winner);
+            Assert.Equal(MatchEndReason.Resign, ended.Reason);
+            Assert.True(state.IsOver);
+            Assert.Equal(1, state.Winner);
+            Assert.Equal(3, state.Units.Get(0).Ap);      // no turn change, no points spent
+            Assert.Equal(1, state.TurnNumber);
+        }
+
+        [Fact]
+        public void Resign_OffTurn_IsLegal()
+        {
+            var state = Started();
+            Assert.Equal(0, state.ActivePlayer);
+
+            Assert.True(state.Validate(new ResignCommand(1)).Ok);
+            var ended = Assert.IsType<MatchEndedEvent>(Assert.Single(state.Apply(new ResignCommand(1))));
+            Assert.Equal(0, ended.Winner);
+            Assert.Equal(MatchEndReason.Resign, ended.Reason);
+        }
+
+        [Fact]
+        public void Resign_AfterMatchOver_Rejected()
+        {
+            var state = Started();
+            state.Apply(new ResignCommand(0));
+
+            Assert.Equal(CommandRejectReason.MatchOver, state.Validate(new ResignCommand(1)).Reason);
+            Assert.Equal(CommandRejectReason.MatchOver, state.Validate(new ResignCommand(0)).Reason);
+        }
+
+        [Fact]
+        public void Resign_Disconnect_EndsWithForfeit()
+        {
+            var state = Started();
+            var ended = Assert.IsType<MatchEndedEvent>(Assert.Single(state.Apply(new ResignCommand(1, ResignReason.Disconnect))));
+            Assert.Equal(MatchEndReason.Forfeit, ended.Reason);
+            Assert.Equal(0, ended.Winner);
+            Assert.Equal("P1 resigns (Disconnect)", new ResignCommand(1, ResignReason.Disconnect).ToString());
+        }
+
+        [Fact]
+        public void EnumerateLegal_NeverContainsResign()
+        {
+            var state = Started();
+            var commands = new List<Command>();
+            for (int turn = 0; turn < 8 && !state.IsOver; turn++)
+            {
+                state.EnumerateLegal(state.ActivePlayer, commands);
+                Assert.NotEmpty(commands);
+                Assert.DoesNotContain(commands, c => c is ResignCommand);
+                state.Apply(new EndTurnCommand(state.ActivePlayer));
+            }
+        }
+    }
 }

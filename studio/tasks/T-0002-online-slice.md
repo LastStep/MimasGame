@@ -14,6 +14,7 @@ allows_assets:
   - 'MimasClient/Assets/_Game/Data/rules.json'
   - 'docs/design/index.html'
   - 'ProjectSettings/EditorBuildSettings.asset'
+  - 'shared/Mimas.Core.Tests/**'
 done_when:
   - "dotnet build Mimas.slnx, dotnet test shared/Mimas.Core.Tests (>= 320) and dotnet test server/Mimas.Server.Tests are green"
   - "Two fake clients join the same room by code and play a full match over WebSocket through Mimas.Server"
@@ -41,3 +42,17 @@ room rather than in the lobby.
 
 Everything else in the spec stands as written, including its §12 defaults for forks and its §0 rules
 (autonomous, small commits to `main`, server half before client half, no Editor edits by hand).
+
+## Why `allows_assets` names the Core test project
+
+`shared/Mimas.Core.Tests/**` is protected because a task must not be able to weaken the gate that
+judges it. This task's whole point is new rules — `ResignCommand`, `MatchState.FromView`,
+`Mimas.Core.Protocol.Wire` — and §6.1 of the spec names the twenty-odd tests to add, file by file and
+test by test, as part of the approved work order. The `test_count` ratchet (287) is what keeps this
+honest: tests may only be added, and the ladder fails if the count drops. Existing tests are edited
+only where §12's first fork applies (a `MatchOver` reject reason), and any such edit is named in its
+commit.
+
+The other three paths: `rules.json` gains the `clock` block (§3.1), `docs/design/index.html` gains the
+status and changelog updates §9.4 requires, and `EditorBuildSettings.asset` gains the Lobby scene via
+`add_scene_to_build` (§7.9) — the one `ProjectSettings` change the spec allows.

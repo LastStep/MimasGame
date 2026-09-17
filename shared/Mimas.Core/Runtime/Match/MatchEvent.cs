@@ -163,6 +163,12 @@ namespace Mimas.Core.Match
     {
         /// <summary>Every unit of the loser is dead.</summary>
         Elimination = 0,
+
+        /// <summary>The loser pressed Resign.</summary>
+        Resign = 1,
+
+        /// <summary>The loser did not return inside the reconnect grace and the server resigned for them.</summary>
+        Forfeit = 2,
     }
 
     public sealed class MatchEndedEvent : MatchEvent

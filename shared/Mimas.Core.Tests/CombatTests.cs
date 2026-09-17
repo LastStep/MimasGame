@@ -53,7 +53,7 @@ namespace Mimas.Core.Tests
                     { ""id"": ""forest"", ""walkable"": true, ""moveCost"": 2, ""modifiers"": [ ""forest-cover"" ] },
                     { ""id"": ""stone"", ""walkable"": false } ] }"),
                 new ContentFile("rules.json", @"{ ""version"": 1, ""damageTypes"": [ ""melee"", ""ranged"", ""magic"" ], ""globalModifiers"": [ ""high-ground"" ],
-                    ""heights"": { ""unitsPerLevel"": 3, ""body"": 6, ""aim"": 4 }, ""baseStats"": { ""hp"": 2, ""ap"": 3 }, ""innateAbilities"": [ ""move"" ] }"),
+                    ""heights"": { ""unitsPerLevel"": 3, ""body"": 6, ""aim"": 4 }, ""baseStats"": { ""hp"": 2, ""ap"": 3 }, ""innateAbilities"": [ ""move"" ], ""clock"": { ""turnMs"": 30000, ""lagGraceMs"": 1000, ""reconnectGraceMs"": 60000 } }"),
                 new ContentFile("abilities/move.json", @"{ ""version"": 1, ""id"": ""move"", ""type"": ""movement"", ""movement"": { ""mode"": ""walk"", ""range"": 1 } }"),
                 new ContentFile("abilities/bow.json", @"{ ""version"": 1, ""id"": ""bow"", ""type"": ""attack"", ""category"": ""weapon"", ""cost"": 2,
                     ""attack"": { ""damage"": 5, ""damageType"": ""ranged"", ""range"": 3, ""trajectory"": ""direct"", ""lineOfSight"": true }, ""tags"": [ ""arrow"" ] }"),
@@ -128,7 +128,7 @@ namespace Mimas.Core.Tests
 
         /// <summary>A rules file whose only interesting part is its <c>baseStats</c> object.</summary>
         private static RulesDef Rules(string baseStats) => RulesDef.FromJson(
-            @"{ ""version"": 1, ""damageTypes"": [ ""melee"", ""magic"" ], ""heights"": { ""unitsPerLevel"": 3, ""body"": 6, ""aim"": 4 }, ""baseStats"": " + baseStats + @", ""innateAbilities"": [ ""move"" ] }");
+            @"{ ""version"": 1, ""damageTypes"": [ ""melee"", ""magic"" ], ""heights"": { ""unitsPerLevel"": 3, ""body"": 6, ""aim"": 4 }, ""baseStats"": " + baseStats + @", ""innateAbilities"": [ ""move"" ], ""clock"": { ""turnMs"": 30000, ""lagGraceMs"": 1000, ""reconnectGraceMs"": 60000 } }");
 
         [Fact]
         public void Catalogue_RejectsStatKeysAndAttacksWithUndeclaredDamageTypes()

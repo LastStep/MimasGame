@@ -7,9 +7,14 @@ namespace Mimas.Core.Data
 {
     /// <summary>
     /// Match-wide knobs from <c>rules.json</c>: the damage lanes every stat key and attack must use, the
-    /// stats and abilities every hero has before gear, and the modifiers that apply to every attack
-    /// (height advantage lives here as data, not as a special case in the calculator). One file, loaded
-    /// once, required.
+    /// stats and abilities every hero has before gear, the modifiers that apply to every attack (height
+    /// advantage lives here as data, not as a special case in the calculator), and the clock both sides
+    /// read. One file, loaded once, required.
+    /// <para>
+    /// The <c>clock</c> block is required in <c>rules.json</c>. The constructor defaults it to
+    /// <see cref="ClockDef.Default"/> so a test fixture can build a <see cref="RulesDef"/> by hand without
+    /// naming numbers it does not care about; loading never takes that path.
+    /// </para>
     /// </summary>
     public sealed class RulesDef
     {
@@ -32,7 +37,11 @@ namespace Mimas.Core.Data
         /// <summary>Ability ids every hero has regardless of gear (rules.json innateAbilities), authored order.</summary>
         public IReadOnlyList<string> InnateAbilityIds => _innateAbilityIds;
 
-        public RulesDef(List<string> damageTypes, List<string> globalModifierIds, StatBlock baseStats, HeightsDef heights, List<string> innateAbilityIds)
+        /// <summary>The turn deadline, lag grace and reconnect grace both the server and the client read (rules.json clock).</summary>
+        public ClockDef Clock { get; }
+
+        public RulesDef(List<string> damageTypes, List<string> globalModifierIds, StatBlock baseStats, HeightsDef heights, List<string> innateAbilityIds,
+            ClockDef clock = null)
         {
             if (damageTypes == null || damageTypes.Count == 0) throw new ArgumentException("At least one damage type is required.", nameof(damageTypes));
             if (innateAbilityIds == null || innateAbilityIds.Count == 0) throw new ArgumentException("At least one innate ability is required.", nameof(innateAbilityIds));
@@ -41,6 +50,7 @@ namespace Mimas.Core.Data
             BaseStats = baseStats ?? throw new ArgumentNullException(nameof(baseStats));
             Heights = heights ?? throw new ArgumentNullException(nameof(heights));
             _innateAbilityIds = new List<string>(innateAbilityIds);
+            Clock = clock ?? ClockDef.Default();
         }
 
         public bool IsDamageType(string type) => type != null && _damageTypes.Contains(type);
@@ -79,7 +89,11 @@ namespace Mimas.Core.Data
             var innate = MapJson.RequireStringList(root, "innateAbilities", "rules");
             if (innate.Count == 0) throw new MapLoadException("rules field 'innateAbilities' must list at least one ability id.");
 
-            return new RulesDef(damageTypes, globals, baseStats, heights, innate);
+            if (!(MapJson.Require(root, "clock", "rules") is JObject clockObj))
+                throw new MapLoadException("rules field 'clock' must be an object (rules.json).");
+            ClockDef clock = ClockDef.FromJsonAt(clockObj, "rules.clock");
+
+            return new RulesDef(damageTypes, globals, baseStats, heights, innate, clock);
         }
     }
 }

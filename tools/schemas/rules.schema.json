@@ -4,7 +4,7 @@
   "title": "Mimas rules",
   "description": "Match-wide rules (rules.json): the damage lanes, the stats and abilities every hero has before gear, and the modifiers that apply to every attack.",
   "type": "object",
-  "required": ["version", "damageTypes", "heights", "baseStats", "innateAbilities"],
+  "required": ["version", "damageTypes", "heights", "baseStats", "innateAbilities", "clock"],
   "additionalProperties": false,
   "properties": {
     "$schema": { "type": "string" },
@@ -52,6 +52,17 @@
       "uniqueItems": true,
       "description": "Ability ids every hero has whatever it wears. At least one must be a movement ability; no item may grant one of these.",
       "items": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" }
+    },
+    "clock": {
+      "type": "object",
+      "description": "The one clock M2 ships (design: #time-controls, #online). Rules, not balance: the server times the turn and the client draws its rope from the same numbers.",
+      "required": ["turnMs", "lagGraceMs", "reconnectGraceMs"],
+      "additionalProperties": false,
+      "properties": {
+        "turnMs": { "type": "integer", "minimum": 1, "description": "Turn deadline in milliseconds, for every turn of every player." },
+        "lagGraceMs": { "type": "integer", "minimum": 1, "description": "Cap on the measured round-trip allowance the server adds before it ends a turn, so a command sent before the deadline is never refused." },
+        "reconnectGraceMs": { "type": "integer", "minimum": 1, "description": "How long a disconnected seat is kept before the server forfeits it." }
+      }
     }
   }
 }
