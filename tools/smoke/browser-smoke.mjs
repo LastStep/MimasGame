@@ -8,7 +8,7 @@
 //
 //   node tools/smoke/browser-smoke.mjs --expect "\\[NetClient\\] connected"
 //   node tools/smoke/browser-smoke.mjs --url http://localhost:7777/?room=ABCD --shot artifacts/smoke
-//   node tools/smoke/browser-smoke.mjs --do "wait:2000,click:480,420,shot:after-click,wait:8000"
+//   node tools/smoke/browser-smoke.mjs --do "wait:2000,click:480,420,type:ABCD,shot:after-click,wait:8000"
 //
 // Exit 0 = the page loaded, Unity booted, `--expect` was seen, and nothing wrote to console.error.
 // Exit 1 = a real failure, with the browser's own words in the output. Never retry it away.
@@ -178,6 +178,16 @@ async function runSteps(page, spec, dir, say) {
     } else if (verb === 'key') {
       await page.keyboard.press(first);
       say(`key ${first}`);
+    } else if (verb === 'insert') {
+      // Text with no key events at all — how a paste and an IME commit arrive. If this lands where
+      // `type:` does not, the break is in key handling and an HTML/IME path would work.
+      await page.keyboard.insertText(first);
+      say(`insertText "${first}"`);
+    } else if (verb === 'type') {
+      // Typed one character at a time, like a player: a TextField that never sees keydown/keypress
+      // is the WebGL failure this step exists to catch.
+      await page.keyboard.type(first, { delay: 60 });
+      say(`type "${first}"`);
     } else {
       throw new Error(`unknown step "${parts[i]}"`);
     }
