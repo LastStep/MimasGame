@@ -87,11 +87,21 @@ namespace Mimas.Client.Editor
                     + $"scenes=[{string.Join(", ", scenePaths)}]; exceptions={exceptions}; "
                     + "compression=Brotli; fallback=off; stripping=High");
 
+                // `nameFilesAsHashes` means every build writes NEW filenames and Unity removes none of
+                // the old ones. Two consequences, both found the hard way on 18 Sep: the size below
+                // summed two builds and reported 24.71 MB against a 13 MB ratchet for a build that was
+                // really 12.31 MB, and a deploy would have shipped every stale wasm ever built.
+                string buildDir = Path.Combine(output, "Build");
+                if (Directory.Exists(buildDir))
+                {
+                    Directory.Delete(buildDir, recursive: true);
+                    Debug.Log($"[WebBuild] cleaned {buildDir} (hashed names never overwrite)");
+                }
+
                 BuildReport report = BuildPipeline.BuildPlayer(options);
                 BuildSummary summary = report.summary;
 
                 long bytes = 0;
-                string buildDir = Path.Combine(output, "Build");
                 if (Directory.Exists(buildDir))
                     foreach (var f in Directory.GetFiles(buildDir)) bytes += new FileInfo(f).Length;
 

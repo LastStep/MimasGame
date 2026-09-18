@@ -26,7 +26,7 @@ none of which any test or ladder rung would have caught.
 
 | What he said | What it was | State |
 |---|---|---|
-| "wasnt able to put the lobby code to join a room" | **Unity bug 4006** — UI Toolkit text fields lose focus instantly in a Web build. Affects 6000.4.0b11 onward; Unity fixed it in 6000.4.6f1. We are on 6000.4.4f1 | **open** — waits on the bump to 6000.4.12f1 |
+| "wasnt able to put the lobby code to join a room" | **Unity bug 4006** — UI Toolkit text fields lose focus instantly in a Web build. Affects 6000.4.0b11 onward; Unity fixed it in 6000.4.6f1 | **fixed and verified** 18 Sep by the bump to **6000.4.12f1** (ADR-030) |
 | "both units and props as pink color" | A **stale build**, made at 21:52 on 17 Sep; the fix was written at 21:54 | **fixed and verified** 18 Sep (`artifacts/verify-0918/arena.png`) |
 | "felt like it was dropping frames … bit janky" | **Not resolution** — measured, see below | **open**, now instrumented |
 
@@ -37,13 +37,13 @@ assumed (run report R-2026-09-18-T-0003, findings 7 and 9):
 
 | Path | State |
 |---|---|
-| Type the code | **dead** — no text reaches a `TextField` (Unity 4006) |
-| Paste the code | **dead** — the same, so the design's "joins by pasting either" (`#online` rule 2) is false today |
+| Type the code | **works** since the 6000.4.12f1 bump. `abcd` → `ABCD` → `no_such_room` from the server |
+| Paste the code | **works** — a real Ctrl+V from a seeded clipboard reaches the field, so `#online` rule 2 is honest again |
 | Press **Copy link**, send it | **fixed 18 Sep.** `GUIUtility.systemCopyBuffer` never reached the browser clipboard, so the lobby said "Link copied." over an empty one. Now goes through `navigator.clipboard` |
 | `?room=CODE` in the address bar | works, and was the only path before the clipboard fix |
 
-**So the invite link is the only way in until the engine upgrade lands, and it now genuinely works.**
-That is enough for 10 Oct if it has to be.
+**All four paths now work.** The address bar was the only one for most of 18 Sep; the clipboard fix and
+the engine bump restored the other three the same day.
 
 ## Current milestone: M2 — online
 
@@ -51,7 +51,7 @@ Target: **Sat 10 Oct 2026**, friends playing over the internet. **22 days.**
 
 | Done-when | State |
 |---|---|
-| M2-1 Two browsers play a full match | **one browser plays the server.** The second seat now has a working join path (the link) but has never been driven by a human |
+| M2-1 Two browsers play a full match | **one browser plays the server.** The second seat now has three working ways in (typed code, pasted code, invite link) and has still never been driven by a human. That is the whole remaining gap |
 | M2-2 Two players who want to play each other end up in the same match | **done** — room code (OPT-0001, ADR-029) |
 | M2-3 Guest auth with a resumable token | **done** (browser reload still untested by a human) |
 | M2-4 Server-authoritative 30 s turn | **done**, seen firing live |
@@ -79,8 +79,7 @@ Target: **Sat 10 Oct 2026**, friends playing over the internet. **22 days.**
 
 | What | Why | Since |
 |---|---|---|
-| **Install 6000.4.12f1 + Web Build Support from the Unity Hub GUI** | `unity install` cannot: it dies in the Hub's own database with `SQLite Error 1: 'table installs has no column named writer_kind'`. The 3.8 GB editor downloads fine and is cached; the install step is what breaks. Update the Hub first if it offers. Everything about the text-input fix waits on this | 18 Sep 2026 |
-| **Play one bot match at `?perf=1`** and say what the meter showed, or when it hitched | It is the only instrument that sees his 144 Hz vsync. Nothing outside the game can | 18 Sep 2026 |
+| **Play one bot match at `?perf=1`** and say what the meter showed, or when it hitched | It is the only instrument that sees his 144 Hz vsync. Nothing outside the game can. This is the last of the three findings still open | 18 Sep 2026 |
 | Edit `pillars.md` — it is a draft distilled from the design page, and the pillars are yours | | 17 Sep 2026 |
 | Optional: should a room show the other seat's chosen preset before the match starts? | design `#q-online-room-loadout` | 17 Sep 2026 |
 
@@ -127,8 +126,8 @@ That was under a software rasteriser, so the number is inflated; the attribution
 ## The two things that matter next
 
 1. **Deploy** (`F-deploy`, M2-7). Nothing about 10 October works without it.
-2. **The bump to 6000.4.12f1**, then prove in a browser that a room code can be typed. Small, and it is
-   what turns the invite link from the only join path into one of two.
+2. **Two browsers against each other** (M2-1) — a window and an incognito window, joined by code. Every
+   piece now works in isolation; nobody has put them together.
 
 From `E:\Studios\Trinetra-Game-Studio\docs\PLAN.md` §10: if two browsers cannot play a full match
 through the server by **Fri 2 Oct**, the 10 Oct playtest falls back to the local build and online moves

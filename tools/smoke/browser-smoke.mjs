@@ -46,7 +46,11 @@ function note(line) {
 // accessor is simply overwritten, because the loader declares it as a global `function`. What is left
 // is the template's own loading bar, which is honest as long as BOTH phases are checked.
 const browser = await chromium.launch({ headless: !headed });
-const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+const context = await browser.newContext({
+  viewport: { width: 1280, height: 800 },
+  // Needed by --clip, and harmless otherwise. Without it navigator.clipboard.writeText rejects.
+  permissions: ['clipboard-read', 'clipboard-write'],
+});
 const page = await context.newPage();
 
 // A line the game itself must print before this run counts as a pass.
@@ -178,6 +182,12 @@ async function runSteps(page, spec, dir, say) {
     } else if (verb === 'key') {
       await page.keyboard.press(first);
       say(`key ${first}`);
+    } else if (verb === 'clip') {
+      // Seeds the REAL browser clipboard, so a following `key:Control+v` is a genuine paste rather
+      // than a synthetic text insertion. The difference matters: CDP insertText targets a DOM text
+      // element and Unity's canvas is not one.
+      await page.evaluate((t) => navigator.clipboard.writeText(t), first);
+      say(`clipboard := "${first}"`);
     } else if (verb === 'insert') {
       // Text with no key events at all — how a paste and an IME commit arrive. If this lands where
       // `type:` does not, the break is in key handling and an HTML/IME path would work.
