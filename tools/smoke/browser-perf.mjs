@@ -62,17 +62,69 @@ const dims = await page.evaluate(() => {
 });
 note(`canvas css ${dims.cssW}x${dims.cssH}, drawing buffer ${dims.bufW}x${dims.bufH}, dpr ${dims.dpr}`);
 
-// A headed window that never got OS focus swallows CDP mouse events: the first run of this script
-// clicked "Play vs bot" twenty times and measured the idle lobby.
+// CDP mouse events go through the OS input path and a headed window that never took focus simply
+// drops them: the first two runs of this script clicked "Play vs bot", measured the idle lobby, and
+// reported a flawless zero dropped frames. `page.bringToFront()` did not fix it.
+//
+// Dispatching the DOM events straight at the canvas does, because that is the layer Unity's WebGL
+// input actually listens on. Both families are sent — Unity 6 handles pointer events and falls back
+// to mouse — and `buttons` matters: Unity ignores a pointerdown that claims no button is held.
+async function clickCanvas(x, y) {
+  await page.evaluate(({ x, y }) => {
+    const c = document.querySelector('#unity-canvas');
+    const r = c.getBoundingClientRect();
+    const base = {
+      clientX: r.left + x, clientY: r.top + y, bubbles: true, cancelable: true,
+      pointerId: 1, pointerType: 'mouse', isPrimary: true, button: 0, view: window,
+    };
+    c.dispatchEvent(new PointerEvent('pointermove', { ...base, buttons: 0 }));
+    c.dispatchEvent(new MouseEvent('mousemove', { ...base, buttons: 0 }));
+    c.dispatchEvent(new PointerEvent('pointerdown', { ...base, buttons: 1 }));
+    c.dispatchEvent(new MouseEvent('mousedown', { ...base, buttons: 1 }));
+    c.dispatchEvent(new PointerEvent('pointerup', { ...base, buttons: 0 }));
+    c.dispatchEvent(new MouseEvent('mouseup', { ...base, buttons: 0 }));
+    c.dispatchEvent(new MouseEvent('click', { ...base, buttons: 0 }));
+  }, { x, y });
+}
+
 await page.bringToFront();
+
+// "Booted" means createUnityInstance resolved. The Unity splash is still on the canvas for several
+// seconds after that, and a click into the splash goes nowhere. Two runs of this script clicked too
+// early, measured the idle lobby, and were read as "headed Chromium swallows clicks" — it does not.
+const warmup = Number(args.warmup ?? 6000);
+await page.waitForTimeout(warmup);
+note(`warmup ${warmup} ms (past the splash)`);
 
 for (const spec of [].concat(args.click ?? [])) {
   const [x, y] = String(spec).split(',').map(Number);
-  await page.mouse.move(box.x + x, box.y + y);
-  await page.waitForTimeout(150);
-  await page.mouse.click(box.x + x, box.y + y);
-  note(`click ${x},${y}`);
+  // Unity reads the pointer in its own Update, so the press needs to survive at least one frame.
+  await clickCanvas(x, y);
+  await page.waitForTimeout(80);
+  await clickCanvas(x, y);
+  note(`click ${x},${y} (dispatched at the canvas)`);
   await page.waitForTimeout(settle);
+}
+
+// Emulating a bigger screen without one: resize the canvas and let Unity resize its drawing buffer to
+// match. This is what the fullscreen button does, and it is how the resolution cap gets a number
+// instead of an opinion. `matchWebGLToCanvasSize` is on by default, so the buffer follows within a
+// frame or two.
+if (args.size) {
+  const [w, h] = String(args.size).split('x').map(Number);
+  await page.evaluate(({ w, h }) => {
+    const c = document.querySelector('#unity-canvas');
+    c.style.width = w + 'px';
+    c.style.height = h + 'px';
+  }, { w, h });
+  await page.waitForTimeout(2500);
+  const after = await page.evaluate(() => {
+    const c = document.querySelector('#unity-canvas');
+    return { cssW: c.clientWidth, cssH: c.clientHeight, bufW: c.width, bufH: c.height };
+  });
+  note(`resized: css ${after.cssW}x${after.cssH}, drawing buffer ${after.bufW}x${after.bufH} `
+    + `(${((after.bufW * after.bufH) / 1e6).toFixed(2)} Mpx)`);
+  dims.resized = after;
 }
 
 note(`sampling ${seconds}s of requestAnimationFrame…`);

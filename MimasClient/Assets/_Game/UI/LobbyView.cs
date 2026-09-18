@@ -352,9 +352,14 @@ namespace Mimas.Client.UI
             int q = page.IndexOf('?');
             if (q >= 0) page = page.Substring(0, q);
             string link = string.IsNullOrEmpty(page) ? _code : page + "?room=" + _code;
-            GUIUtility.systemCopyBuffer = link;
-            SetRoomStatus("Link copied.");
-            Debug.Log("[LobbyView] copied " + link);
+
+            // Not systemCopyBuffer: on Web that writes to a buffer of Unity's own and the browser
+            // clipboard never sees it, so this said "Link copied." over an empty clipboard in every
+            // build so far. WebClipboard goes through the browser. Say so honestly when it refuses —
+            // the room code is on screen in 52px type, which is the fallback.
+            bool copied = WebClipboard.Copy(link);
+            SetRoomStatus(copied ? "Link copied." : "Could not copy — read them the code instead.");
+            Debug.Log("[LobbyView] copy link " + link + " -> " + (copied ? "ok" : "refused"));
         }
 
         // ---- the server speaks --------------------------------------------------------------------------
