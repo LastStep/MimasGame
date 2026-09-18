@@ -1,7 +1,7 @@
 ---
 project: mimas
 milestone: M2
-updated: 2026-09-17
+updated: 2026-09-18
 updated_by: builder (T-0003)
 ---
 
@@ -11,61 +11,63 @@ updated_by: builder (T-0003)
 
 ## Right now
 
-**The match is on the server.** From the Editor you open a lobby, press **Play vs bot** or **Create
-room**, get a four-letter code, pick your gear in the room, press Ready, and play a real match whose
-truth lives in `Mimas.Server` — with a 30 s server-authoritative turn, resign, and a reconnect grace.
-The client holds a *mirror* of the match rebuilt from its own `PlayerView` (ADR-026), so every preview
-it already had works unchanged and it can only ever know what the server chose to send.
+**The match is on the server.** From the lobby you press **Play vs bot** or **Create room**, get a
+four-letter code, pick your gear in the room, press Ready, and play a real match whose truth lives in
+`Mimas.Server` — with a 30 s server-authoritative turn, resign, and a reconnect grace. The client holds
+a *mirror* of the match rebuilt from its own `PlayerView` (ADR-026), so it can only ever know what the
+server chose to send.
 
-**321 Core tests and 34 server tests**, the latter playing whole matches over real sockets using the
-client's own mirror as the test double. Both are ladder rungs, both required. Local practice — opening
-`Arena.unity` directly — still plays a whole game against the bot, unchanged.
+**321 Core tests and 34 server tests**, the latter playing whole matches over real sockets. Both are
+ladder rungs, both required, both green on 18 Sep.
 
-**It runs in a browser.** As of 17 Sep evening (T-0003) a Web build is served by `Mimas.Server` itself
-and plays: the lobby renders, a room code is issued, the socket connects, and a bot match reaches the
-Arena with the board and HUD. Every WebGL-specific path — the NativeWebSocket jslib socket,
-`PlayerPrefs` reaching IndexedDB, `?ws=`/`?room=` off the page URL, Brotli — has now run at least once.
-Release build **12.38 MB** against a 13 MB ratchet.
+**It runs in a browser, and on 18 Sep Rohan played it there for the first time.** That play is the most
+valuable thing that has happened to this milestone: it found two shipped defects and killed one theory,
+none of which any test or ladder rung would have caught.
 
-What does not exist yet: **anything on the internet**. The friends playtest is **Sat 10 Oct 2026** —
-23 days away, and deploy is the whole of what stands in the way.
+| What he said | What it was | State |
+|---|---|---|
+| "wasnt able to put the lobby code to join a room" | **Unity bug 4006** — UI Toolkit text fields lose focus instantly in a Web build. Affects 6000.4.0b11 onward; Unity fixed it in 6000.4.6f1. We are on 6000.4.4f1 | **open** — waits on the bump to 6000.4.12f1 |
+| "both units and props as pink color" | A **stale build**, made at 21:52 on 17 Sep; the fix was written at 21:54 | **fixed and verified** 18 Sep (`artifacts/verify-0918/arena.png`) |
+| "felt like it was dropping frames … bit janky" | **Not resolution** — measured, see below | **open**, now instrumented |
+
+### The hole this opened: joining a room in a browser
+
+Not "typing is awkward" — there was **no working path at all** for a second human, checked rather than
+assumed (run report R-2026-09-18-T-0003, findings 7 and 9):
+
+| Path | State |
+|---|---|
+| Type the code | **dead** — no text reaches a `TextField` (Unity 4006) |
+| Paste the code | **dead** — the same, so the design's "joins by pasting either" (`#online` rule 2) is false today |
+| Press **Copy link**, send it | **fixed 18 Sep.** `GUIUtility.systemCopyBuffer` never reached the browser clipboard, so the lobby said "Link copied." over an empty one. Now goes through `navigator.clipboard` |
+| `?room=CODE` in the address bar | works, and was the only path before the clipboard fix |
+
+**So the invite link is the only way in until the engine upgrade lands, and it now genuinely works.**
+That is enough for 10 Oct if it has to be.
 
 ## Current milestone: M2 — online
 
-Target: **Sat 10 Oct 2026**, friends playing over the internet.
-
-The work order was `docs/specs/2026-09-17-online-slice.md` plus its **amendment A1** (room codes). It is
-executed; the spec is now history and `docs/networking.md` is the wire reference.
+Target: **Sat 10 Oct 2026**, friends playing over the internet. **22 days.**
 
 | Done-when | State |
 |---|---|
-| M2-1 Two browsers play a full match through `Mimas.Server` | **one browser plays the server** (17 Sep, T-0003). Two seats across a browser and an incognito window is the remaining half |
-| M2-2 Two players who want to play each other end up in the same match | **done** — by a four-letter room code (OPT-0001, ADR-029) |
-| M2-3 Guest auth with a resumable token; a reload keeps your identity | **done** (tested; browser reload untested) |
-| M2-4 Server-authoritative 30 s turn; timeout arrives as EndTurnCommand(Timeout) | **done**, seen firing live |
-| M2-5 Reload within the 60 s grace resyncs into the running match | **done** (tested server-side and in the Editor) |
-| M2-6 Resign and disconnect-forfeit end the match correctly | **done**, both paths seen |
-| M2-7 Deployed on the VPS over HTTPS, reachable by a friend | **not started** — this is the gap to 10 Oct |
+| M2-1 Two browsers play a full match | **one browser plays the server.** The second seat now has a working join path (the link) but has never been driven by a human |
+| M2-2 Two players who want to play each other end up in the same match | **done** — room code (OPT-0001, ADR-029) |
+| M2-3 Guest auth with a resumable token | **done** (browser reload still untested by a human) |
+| M2-4 Server-authoritative 30 s turn | **done**, seen firing live |
+| M2-5 Reload within the 60 s grace resyncs | **done** server-side and in the Editor |
+| M2-6 Resign and disconnect-forfeit | **done**, both paths seen |
+| M2-7 Deployed on the VPS over HTTPS | **not started — this is the whole gap to 10 Oct** |
 | M2-8 Rematch without leaving the room | not started (out of scope by D9) |
 
-**Nothing in the ledger is ticked.** `pass` belongs to a verifier, not to the builder who wrote the
-code (`reward-hacking-guards.md`). M2-1 and M2-3..M2-6 are ready for one; M2-2's wording still says
-"mechanism open" and wants updating to room codes.
+**Nothing in the ledger is ticked.** `pass` belongs to a verifier, not the builder who wrote the code.
 
 ## In flight
 
 | Task | What | Status | Who |
 |---|---|---|---|
 | T-0002 | Execute the online slice | verify | builder |
-| T-0003 | The Web build, in a browser | running — see below | builder |
-
-**T-0003 is mid-flight.** The machine ran out of memory and the harness killed the server and a
-rebuild together. Everything is committed (through `b6ad293`) and `studio/runs/R-2026-09-17-T-0003.md`
-has the whole log. What is **proven**: the serving path, the Release build, the browser run, the socket,
-a bot match starting, and four bugs found and fixed. What is **not yet proven**: the last rebuild (it
-never logged `result=`), the magenta-placeholder fix, the player-settings persistence fix, the ladder on
-final code, and everything needing Rohan's hands — two seats by incognito, `?room=`, a mid-match
-refresh, resign.
+| T-0003 | The Web build, in a browser | running — day 2 | builder |
 
 ## Blocked
 
@@ -75,46 +77,89 @@ refresh, resign.
 
 ## Waiting on Rohan
 
-| What | File | Since |
+| What | Why | Since |
 |---|---|---|
-| Edit `pillars.md` — it is a draft distilled from the design page, and the pillars are yours | `studio/pillars.md` | 17 Sep 2026 |
-| Optional: should a room show the other seat's chosen preset before the match starts? Hidden today | design page `#q-online-room-loadout` | 17 Sep 2026 |
+| **Install 6000.4.12f1 + Web Build Support from the Unity Hub GUI** | `unity install` cannot: it dies in the Hub's own database with `SQLite Error 1: 'table installs has no column named writer_kind'`. The 3.8 GB editor downloads fine and is cached; the install step is what breaks. Update the Hub first if it offers. Everything about the text-input fix waits on this | 18 Sep 2026 |
+| **Play one bot match at `?perf=1`** and say what the meter showed, or when it hitched | It is the only instrument that sees his 144 Hz vsync. Nothing outside the game can | 18 Sep 2026 |
+| Edit `pillars.md` — it is a draft distilled from the design page, and the pillars are yours | | 17 Sep 2026 |
+| Optional: should a room show the other seat's chosen preset before the match starts? | design `#q-online-room-loadout` | 17 Sep 2026 |
+
+## Decided on 18 Sep
+
+- **Engine: 6000.4.12f1 now, 6.7 LTS when it ships, 6.6 skipped entirely.** Rohan considered jumping
+  straight to 6000.6.1f1 and decided against it once the release picture was clear: `unity releases`
+  reports 6.6 as `lts=False stream=SUPPORTED`, and **6.7 LTS is due Q4 2026** with Unity 7 in beta from
+  December — so 6.6 is a ~3-month stop, not a resting place, and going there means two upgrades instead
+  of one. 6000.4.12f1 is a patch bump on the stream we are already on and contains the 4006 fix
+  (`fixedInVersion: 6000.4.6f1`).
+  What 6.6 *would* have bought, and what 6.7 will: production WebGPU — compute shaders, GPU skinning,
+  **VFX Graph in a browser**, WebAssembly64, progressive asset loading. That lifts the constraint behind
+  ADR-008 and golden rule 9, so the "no VFX Graph" rule is worth revisiting at 6.7, not before.
+  **When any upgrade happens, check `com.unity.pipeline 0.7.0-exp.1` first** — it is an experimental
+  package and the bridge every `unity command` goes through. If it does not resolve, the live-Editor
+  path is gone and golden rule 2 has no way to be satisfied.
+- **The custom Web template comes after deploy is green.** It replaces the 960×600 box, the Unity
+  footer, the `Unity Web Player | MimasClient` title and the splash — all one file, so it is opened
+  once. Deploy is what can slip 10 Oct; presentation is not.
+- **Resolution: nothing to cap.** Decided to cap-and-tune from measurement; then the measurement said
+  there is nothing to cap.
+
+## The jank, and what it is not
+
+Measured in a live bot match on Rohan's own GPU, resizing the drawing buffer to what his fullscreen
+asks for (`tools/smoke/browser-perf.mjs`, `artifacts/perf-*`):
+
+| Drawing buffer | Mpx | mean fps | p50 | p95 | max | frames >33 ms |
+|---|---|---|---|---|---|---|
+| 960×600 | 0.58 | 240 | 4.2 | 4.3 | 4.7 | 0 |
+| **2560×1440** (his fullscreen) | **3.69** | **240** | **4.2** | **4.3** | **4.9** | **0** |
+| 5120×2880 | 14.75 | 156 | 4.3 | 8.5 | 37.7 | 1 |
+
+**At the resolution he played, the arena renders in under 4.17 ms against a 6.94 ms budget at 144 Hz —
+about 4× headroom.** Capping would have cost sharpness and fixed nothing.
+
+But every run measured an **idle** arena, so the cause is transient. `FrameProbe` (`?perf=1`) now ships
+in the build and logs every frame over 50 ms with the scene, the timestamp and **whether the collector
+ran** — the bit that separates a GC hitch from a shader compiling. Its first run already showed a
+**267 ms frame entering the Arena with `gc=no`**, which is the shape of first-use shader compilation.
+That was under a software rasteriser, so the number is inflated; the attribution is not.
 
 ## The two things that matter next
 
-1. **Finish T-0003** — one rebuild, the ladder, and Rohan playing it in a browser. Small.
-2. **Deploy** (`F-deploy`, M2-7). Nothing about 10 October works without it.
-
-### Two things T-0004 must not rediscover
-
-- **Build through the script, not the profile.** `unity build MimasClient --target WebGL
-  --execute-method Mimas.Client.Editor.WebBuild.Build --output-path Build/Web` states every setting
-  that matters in code and needs no Editor. The `Web Release` **profile** still carries its own
-  PlayerSettings snapshot with `webGLExceptionSupport: 0`, so ladder rung 9's `--profile "Web Release"`
-  would build with `try`/`catch` disabled. Fixing the profile needs a live Editor.
-- **A Development Build does not link** on 6000.4.4f1: `wasm-ld: undefined symbol:
-  unitytls_ssl_set_client_transport_id` from Unity's own `modules_development` TLS archive. No public
-  report of it exists anywhere. Release is unaffected. Do not "fix" it with
-  `ERROR_ON_UNDEFINED_SYMBOLS=0` — that only moves the failure to runtime.
-
-Then: a verifier over T-0002, and M2-8 (rematch) if there is room.
+1. **Deploy** (`F-deploy`, M2-7). Nothing about 10 October works without it.
+2. **The bump to 6000.4.12f1**, then prove in a browser that a room code can be typed. Small, and it is
+   what turns the invite link from the only join path into one of two.
 
 From `E:\Studios\Trinetra-Game-Studio\docs\PLAN.md` §10: if two browsers cannot play a full match
 through the server by **Fri 2 Oct**, the 10 Oct playtest falls back to the local build and online moves
-to 17 Oct. On today's evidence that date is not at risk from the game code; it is at risk from deploy.
+to 17 Oct. The game code is not what puts that at risk; deploy is.
+
+## Things the next agent must not rediscover
+
+- **Build through the script, not the profile.** `unity build MimasClient --target WebGL
+  --execute-method Mimas.Client.Editor.WebBuild.Build --output-path Build/Web`. The `Web Release`
+  **profile** carries its own PlayerSettings snapshot with `webGLExceptionSupport: 0` — and, per the
+  18 Sep research, the WebGL **template** too. Both belong in `WebBuild.cs`.
+- **A Development Build does not link** on 6000.4.4f1: `wasm-ld: undefined symbol:
+  unitytls_ssl_set_client_transport_id`. No public report of it exists. Release is unaffected. Do not
+  "fix" it with `ERROR_ON_UNDEFINED_SYMBOLS=0` — that moves the failure to runtime. Recheck on 6.6.
+- **Unity's issue tracker has a JSON API**: `https://issuetracker.unity.com/api/v1.0/issues/<id>` gives
+  `firstAffectedVersion` and `fixedInVersion` per stream. The web page is a SPA and tells you nothing.
+- **`GUIUtility.systemCopyBuffer` does not reach the browser clipboard.** Use `WebClipboard`.
+- **Headless Chromium is a software rasteriser** (it advertises ASTC/ETC; a real GPU advertises
+  `EXT_disjoint_timer_query_webgl2`). Headed Chromium runs rAF at its own ceiling — 240 Hz here — not
+  the display's. Neither reproduces a 144 Hz vsync. Frame verdicts come from `FrameProbe`, not the harness.
+- **"Booted" is not "playable".** `createUnityInstance` resolving leaves the splash on the canvas for
+  seconds. Wait first, or you will measure the lobby and call it the arena. Cost: two wasted runs and
+  one wrong conclusion.
+- **The asset guard's false positives now number six**, all read-only commands: `2>&1` and
+  `2>/dev/null`; `>(` inside a C# generic; a protected path named in prose in a `git commit -m`; a
+  `find … -not -path "*/Library/*"`; a `sed 's///'` over a protected file; and **the literal string
+  `com.unity.…` in a comment**, which matches `**/*.unity`. Restructure; never rephrase to slip past.
 
 ## Last playtest
 
-**17 Sep 2026, Rohan, the online slice.** Ran the server with `dotnet run` and played through it;
-looked good, no notes raised. That closes "nobody has ever connected a client to this server".
+**18 Sep 2026, Rohan, the browser build.** Three findings, all above. Two shipped defects found, one
+theory killed.
 
-**Still unplayed by a human: the browser build.** An agent drove it through headless Chromium and a bot
-match started clean, but nobody has touched it. That is the next playtest, and it is short.
-
-**16 Sep 2026, Rohan, the aiming slice, Editor on arena-4.** Console clean. Two bugs caught in play,
-both since fixed.
-
-## Next decision due
-
-None open. OPT-0001 (room codes) was decided and executed on 17 Sep. The one live question is the
-optional design nit above, which does not block anything.
+**Still unplayed by a human: two browsers against each other** — the whole of M2-1.
