@@ -12,7 +12,8 @@ Why not the alternatives (short): Photon can't be self-hosted at indie prices an
 
 ## Transport
 
-- `wss://<host>/ws` behind nginx (see `hosting.md`). Plain `ws://localhost:7777/ws` in development.
+- `wss://<host>/ws` behind nginx (see `hosting.md`) — in production `wss://mimas.laststep.cloud/ws`.
+  Plain `ws://localhost:7777/ws` in development.
   A Web build works its own out: `?ws=<url>` in the page query wins, then the page's own scheme
   (`https:` → `wss://<host>/ws`, `http:` → `ws://<host>:7777/ws`). In the Editor the serialized field on
   `NetClient` wins, so one build can be pointed anywhere without a rebuild.

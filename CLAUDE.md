@@ -49,6 +49,8 @@ dotnet test server/Mimas.Server.Tests            # the online game, end to end o
 dotnet run --project server/Mimas.Server         # http://localhost:7777/health, ws://localhost:7777/ws
 MIMAS_WEB_PATH=Build/Web dotnet run --project server/Mimas.Server   # also serves the Web build at /
 
+bash tools/deploy/deploy.sh --help               # Rohan runs deploys; agents only --dry-run
+
 # The ladder — what turns "it works" into a fact
 node E:/Studios/Trinetra-Game-Studio/tools/ladder/ladder.mjs --project mimas --task T-NNNN
 
@@ -56,7 +58,7 @@ node E:/Studios/Trinetra-Game-Studio/tools/ladder/ladder.mjs --project mimas --t
 unity status --format json                       # state must be "ready"
 unity command console                            # ALWAYS after touching Unity code
 unity test MimasClient --mode EditMode --report-format junit --output artifacts/editmode.xml --timeout 600
-unity build MimasClient --profile "Web Release" --output-path Build/Web
+unity build MimasClient --target WebGL --execute-method Mimas.Client.Editor.WebBuild.Build --output-path Build/Web   # NOT the "Web Release" profile: it carries its own PlayerSettings snapshot
 ```
 
 `unity test` exit **8** = tests failed. That is a result, not a flake — do not retry.
