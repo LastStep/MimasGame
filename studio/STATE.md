@@ -197,9 +197,13 @@ OQ-N03, N07 and N11 block a first slice. **Nothing in M2 depends on any of it**;
   `2>/dev/null`; `>(` inside a C# generic; a protected path named in prose in a `git commit -m`; a
   `find … -not -path "*/Library/*"`; a `sed 's///'` over a protected file; the literal string
   `com.unity.…` in a comment (matches `**/*.unity`); a Python `open('studio/ledger.json')` for
-  reading; and (22 Sep) **the session scratchpad**, which lives under `AppData\Local\Temp\claude\…`
-  and so matches `**/Temp/**` — writing a helper script there from Bash is blocked. Restructure;
-  never rephrase to slip past.
+  reading; and (22 Sep) **the session scratchpad**, which lives under Windows' per-user temp folder
+  and so matches the Unity temp pattern — writing a helper script there from Bash is blocked.
+  The general shape, which is the thing actually worth knowing: **the guard scans the whole command
+  text**, so a protected path is blocked wherever it appears — in a `git commit` message body, in an
+  `echo` label, in a grep pattern — even when the command writes nothing anywhere. Three of today's
+  four hits were that. Restructure the command, or word the prose differently; use the Write/Edit
+  tools for ordinary markdown. **Never** rephrase the part that actually touches files to slip past.
 - **The VPS is shared.** `sites-enabled/laststep.cloud` belongs to another product on the same box.
   Mimas has its own file, unit, user and two directories, and that is the whole footprint.
 - **nginx 1.24 syntax.** `listen 443 ssl http2;` is right on the VPS; `http2 on;` needs 1.25.
