@@ -21,6 +21,11 @@ allows_assets:
   - 'ProjectSettings/GraphicsSettings.asset'
   # The design page: rematch becomes rule 9 of #online, plus the lobby and targeting bullets (spec §10.1).
   - 'docs/design/index.html'
+  # Made by Unity itself when it imported the new Web template folder (spec §8.1, which says to commit
+  # them with the assets). Golden rule 1 requires an asset and its .meta to travel together, and the
+  # guard would otherwise refuse to let git see them. Same reason T-0003 declared its one .cs.meta.
+  - 'MimasClient/Assets/WebGLTemplates.meta'
+  - 'MimasClient/Assets/WebGLTemplates/**'
   # Two new Core tests that document arena-4's real refusals before the picture is changed to match
   # them: spec §7 step 1, plan P-T-0008 step 6, and done_when "Two arena-4 sight cases are Core tests".
   # Added by the builder on 21 Sep after the guard refused the write; nothing existing is softened or

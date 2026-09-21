@@ -66,6 +66,7 @@ namespace Mimas.Client.Editor
             try
             {
                 EnsureAlwaysIncludedShaders();
+                ApplyIdentity();
 
                 PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Brotli;
                 PlayerSettings.WebGL.decompressionFallback = false;
@@ -130,6 +131,28 @@ namespace Mimas.Client.Editor
             // After the finally, never inside it: EditorApplication.Exit terminates the process on the
             // spot, so exiting from the try skips the restore above entirely.
             if (failed && Application.isBatchMode) EditorApplication.Exit(1);
+        }
+
+        /// <summary>
+        /// Who made this and what it is called, as decided values (D2/D3, 21 Sep 2026) rather than
+        /// whatever the Editor was last poked into — the same reason <see cref="ShippedExceptionSupport"/>
+        /// is stated here. The tab said <c>Unity Web Player | MimasClient</c> until this ran.
+        ///
+        /// <para><c>PROJECT:</c> names a template under <c>Assets/WebGLTemplates</c>; <c>APPLICATION:</c>
+        /// would mean one of Unity's own. The splash is off because the HTML loading bar is the only
+        /// thing that should stand between a link and the lobby; Unity 6 allows that on every licence.
+        /// The log line below is the proof — if a licence ever forces it back on, the build says so.</para>
+        /// </summary>
+        private static void ApplyIdentity()
+        {
+            PlayerSettings.productName = "Mimas";
+            PlayerSettings.companyName = "Trinetra";
+            PlayerSettings.SplashScreen.show = false;
+            PlayerSettings.WebGL.template = "PROJECT:Mimas";
+
+            Debug.Log($"[WebBuild] identity: product={PlayerSettings.productName} company={PlayerSettings.companyName} "
+                + $"splash={PlayerSettings.SplashScreen.show} unityLogo={PlayerSettings.SplashScreen.showUnityLogo} "
+                + $"template={PlayerSettings.WebGL.template}");
         }
 
         /// <summary>

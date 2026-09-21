@@ -1,0 +1,82 @@
+/* The Mimas page. The game is the page: a dark full-window canvas, and before it a wordmark, a thin
+   bar and a percentage. The two colours are the lobby's own (Lobby.uss --lobby-bg and --accent), so
+   the page a friend opens and the first screen they see are one thing rather than two. */
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: #0a0c11;
+  overflow: hidden;
+}
+
+#unity-container {
+  position: fixed;
+  inset: 0;
+}
+
+#unity-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  background: #0a0c11;
+}
+
+/* Shown until createUnityInstance resolves, then hidden by index.html. */
+#unity-loading-bar {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* A text wordmark on purpose: there is no Mimas logo yet, and a placeholder one would be a decision
+   nobody has made. */
+#unity-wordmark {
+  color: #f0f2f6;
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: 14px;
+  text-indent: 14px;
+  margin-bottom: 22px;
+}
+
+#unity-progress-bar-empty {
+  width: 240px;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+#unity-progress-bar-full {
+  width: 0%;
+  height: 100%;
+  background: #78c8ff;
+  transition: width 0.1s linear;
+}
+
+#unity-progress-text {
+  margin-top: 12px;
+  color: rgba(240, 242, 246, 0.6);
+  font-size: 12px;
+  letter-spacing: 2px;
+}
+
+/* Unity's own warning/error banner, kept: the loader calls it, and an error on a black page with
+   nothing on it is the worst thing this template could do. */
+#unity-warning {
+  position: absolute;
+  left: 50%;
+  top: 5%;
+  transform: translate(-50%);
+  background: white;
+  padding: 10px;
+  display: none;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  max-width: 80vw;
+}
