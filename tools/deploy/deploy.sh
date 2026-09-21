@@ -97,6 +97,43 @@ verdict() {
 }
 
 
+# ---------------------------------------------------------------- 0. the tools this needs
+# Checked before anything slow or remote happens, so a missing tool costs a second rather than an
+# ssh round trip and a three-minute build.
+UNITY_BIN=unity
+have() { command -v "$1" >/dev/null 2>&1; }
+
+for t in tar curl ssh; do
+    have "$t" || die "'$t' is not on PATH. In Git Bash and in PowerShell it should be; if it is not, reopen the terminal."
+done
+have dotnet || die "'dotnet' is not on PATH (expected 10.0.203). Reopen the terminal, or see docs/deploy-runbook.md §0."
+
+if [ "$SKIP_BUILD" != yes ]; then
+    if ! have unity; then
+        # Unity Hub installs the CLI here and adds it to the USER PATH. A terminal opened before that
+        # happened carries a stale copy of the environment and cannot see it, which looks exactly like
+        # "Unity is not installed". Use it anyway and say so, rather than failing on a technicality.
+        #
+        # $HOME is used rather than $LOCALAPPDATA on purpose: under Git Bash, $HOME is already a unix
+        # path (/c/Users/name) while $LOCALAPPDATA is a Windows one (C:\Users\name\AppData\Local), and
+        # converting the latter means backslash-escaping that is easy to get subtly wrong.
+        unity_fallback="$HOME/AppData/Local/Unity/bin/unity.exe"
+        if [ -x "$unity_fallback" ]; then
+            UNITY_BIN="$unity_fallback"
+            echo "[deploy] note: 'unity' is not on this shell's PATH, but the CLI is installed."
+            echo "[deploy]       Using $UNITY_BIN"
+            echo "[deploy]       Open a new terminal and it will be found normally — the PATH entry"
+            echo "[deploy]       Unity Hub added is newer than this shell."
+        else
+            die "'unity' is not on PATH and the CLI is not at $unity_fallback. Open a new terminal (the PATH entry may be newer than this shell), or run with --skip-build to reuse $WEB_DIR."
+        fi
+    fi
+fi
+
+if [ "$SMOKE" = yes ]; then
+    have node || die "'node' is not on PATH, and --smoke needs it. Reopen the terminal, or drop --smoke."
+fi
+
 # ---------------------------------------------------------------- 1. where are we
 [ -f Mimas.slnx ] || die "run this from the repo root (Mimas.slnx is not here)"
 if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
@@ -137,7 +174,7 @@ else
     # PROFILE is not used: it carries its own PlayerSettings snapshot (exception support, the
     # template) that disagrees with WebBuild.cs. The relative output path is what worked; if a future
     # Unity CLI lands the build elsewhere, pass "$(pwd -W 2>/dev/null || pwd)/Build/Web" instead.
-    localcmd "unity build MimasClient --target WebGL --execute-method Mimas.Client.Editor.WebBuild.Build --output-path $WEB_DIR"
+    localcmd "\"$UNITY_BIN\" build MimasClient --target WebGL --execute-method Mimas.Client.Editor.WebBuild.Build --output-path $WEB_DIR"
 fi
 [ -f "$WEB_DIR/index.html" ] || die "$WEB_DIR/index.html is missing — the Web build did not land here"
 wasm_count=$(find "$WEB_DIR/Build" -maxdepth 1 -name '*.wasm.br' | wc -l)

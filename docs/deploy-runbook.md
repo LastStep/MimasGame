@@ -188,6 +188,8 @@ are not in the match yourself, wait.
 | `rung 9 gate: build is X MB, limit 25 MB` | The build grew past the limit | Nothing to do on the VPS. Tell the next session; it is a real regression |
 | Certificate warning in the browser | The address bar must say exactly `mimas.laststep.cloud` | The certificate covers that name only, not `www.` and not the bare domain |
 | `the ssh alias hostinger does not work` | §0 | Fix `~/.ssh/config` before anything else |
+| `unity: command not found`, or any tool "not on PATH" | A terminal opened **before** the tool was installed carries a stale copy of the environment | **Open a new terminal.** The script now finds Unity anyway and says so, but a fresh terminal is the real fix |
+| `git status` lists art files as modified that you never touched | Stale index data on Git LFS files, not real changes | Ignore it, or run `git status` once more to clear it. The deploy only warns; it does not care |
 
 ---
 
