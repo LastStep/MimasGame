@@ -9,6 +9,14 @@
 //   node tools/smoke/browser-smoke.mjs --expect "\\[NetClient\\] connected"
 //   node tools/smoke/browser-smoke.mjs --url http://localhost:7777/?room=ABCD --shot artifacts/smoke
 //   node tools/smoke/browser-smoke.mjs --do "wait:2000,click:480,420,type:ABCD,shot:after-click,wait:8000"
+//   node tools/smoke/browser-smoke.mjs --url https://mimas.laststep.cloud/ --timing
+//
+// --timing adds one line at the end — boot ms, ms to --expect, and the bytes the page pulled down:
+//
+//   [timing] boot 4213 ms, expect 6870 ms, transferred 12.4 MB
+//
+// That last number is what a cold load costs a friend, so it is the one written into the baselines
+// in docs/roadmap.md. The browser context is new for every run, so there is no cache to disable.
 //
 // Exit 0 = the page loaded, Unity booted, `--expect` was seen, and nothing wrote to console.error.
 // Exit 1 = a real failure, with the browser's own words in the output. Never retry it away.
@@ -29,11 +37,19 @@ const url = args.url ?? 'http://localhost:7777/';
 const bootTimeout = Number(args.timeout ?? 120_000);
 const shotDir = args.shot ?? 'artifacts/smoke';
 const headed = 'headed' in args;
+const timing = 'timing' in args;
 // Errors that are known-benign and must be justified in the run report, never added casually.
 const allow = args.allow ? new RegExp(args.allow) : null;
 
 const errors = [];
 const log = [];
+
+// --timing bookkeeping. `started` is hoisted out of the try block because the console handler needs
+// it to stamp the moment --expect matches.
+let started = 0;
+let expectMs = null;
+let transferred = 0;
+const bodySizes = [];
 
 function note(line) {
   log.push(line);
@@ -61,7 +77,10 @@ page.on('console', (msg) => {
   const text = msg.text();
   const line = `[console.${msg.type()}] ${text}`;
   log.push(line);
-  if (expect && expect.test(text)) expectSeen = true;
+  if (expect && expect.test(text) && !expectSeen) {
+    expectSeen = true;
+    expectMs = Date.now() - started;
+  }
   if (msg.type() === 'error') {
     if (allow && allow.test(text)) note(`[allowed] ${text}`);
     else errors.push(line);
@@ -90,12 +109,20 @@ page.on('response', (res) => {
     log.push(line);
     errors.push(line);
   }
+  if (timing) {
+    // Content-Length is what actually crossed the wire for Unity's Brotli files, which is the number
+    // that matters. Where a response has no header (chunked, or served from the loader's blob), fall
+    // back to reading the body — which can reject if the page moves on first, so it is best-effort.
+    const len = res.headers()['content-length'];
+    if (len !== undefined) transferred += Number(len) || 0;
+    else bodySizes.push(res.body().then((b) => { transferred += b.length; }).catch(() => {}));
+  }
 });
 
 let failure = null;
 try {
   note(`> ${url}`);
-  const started = Date.now();
+  started = Date.now();
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
 
   await page.waitForSelector('#unity-canvas', { timeout: 30_000 });
@@ -132,6 +159,11 @@ try {
   await page.screenshot({ path: path.join(shotDir, 'final.png') });
   note(`screenshot ${path.join(shotDir, 'final.png')}`);
   note(`cold boot to instance: ${bootMs} ms`);
+  if (timing) {
+    await Promise.all(bodySizes);
+    const mb = (transferred / 1048576).toFixed(1);
+    note(`[timing] boot ${bootMs} ms, expect ${expectMs === null ? 'n/a' : `${expectMs} ms`}, transferred ${mb} MB`);
+  }
 } catch (e) {
   failure = e;
 } finally {

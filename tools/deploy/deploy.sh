@@ -172,9 +172,13 @@ verdict
 # ---------------------------------------------------------------- 9. optional browser smoke
 if [ "$SMOKE" = yes ]; then
     note "9. browser smoke against the live site"
-    remote "node tools/smoke/browser-smoke.mjs --url \"https://$MIMAS_HOST/\" --expect \"\\[NetClient\\] connected\" --timing --shot artifacts/smoke-live"
+    # ?room=ZZZZ on purpose: the client opens no socket until the player does something, so a bare
+    # page load can never print "[NetClient] connected". An invite link auto-joins, which drives the
+    # whole round trip over the real origin — connect, authenticate, and the server's no_such_room
+    # answer for a code nobody owns. That last one is a console WARNING, so the smoke stays green.
+    remote "node tools/smoke/browser-smoke.mjs --url \"https://$MIMAS_HOST/?room=ZZZZ\" --expect \"\\[NetClient\\] connected\" --timing --shot artifacts/smoke-live"
 elif [ "$DRY" = yes ]; then
-    echo "[dry-run] (--smoke would run: node tools/smoke/browser-smoke.mjs --url \"https://$MIMAS_HOST/\" --expect \"\\[NetClient\\] connected\" --timing --shot artifacts/smoke-live)"
+    echo "[dry-run] (--smoke would run: node tools/smoke/browser-smoke.mjs --url \"https://$MIMAS_HOST/?room=ZZZZ\" --expect \"\\[NetClient\\] connected\" --timing --shot artifacts/smoke-live)"
 fi
 
 note "done. https://$MIMAS_HOST/"
