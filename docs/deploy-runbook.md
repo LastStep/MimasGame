@@ -9,17 +9,39 @@ You do §1 and §2 **once**. After that, deploying is §3: one command.
 
 ## 0. Before anything — is this PC ready?
 
-Four things. Each line should print something, not an error.
+**Which shell.** PowerShell **or** Git Bash both work for the deploy commands in §2, §3 and §5,
+because Git's `bash` and `ssh` are already on your Windows PATH. Two things to know:
 
-```bash
-ssh -o BatchMode=yes hostinger true && echo "ssh ok"   # the alias, added 22 Sep 2026
-dotnet --version                                       # 10.0.203
-unity --version                                        # 1.0.0-beta.9
-node --version                                         # v22.14.0
+- Your PowerShell is **5.1**, which does **not** understand `&&`. If you paste a line containing
+  `&&` into it you get `The token '&&' is not a valid statement separator in this version.` Nothing
+  runs — it fails while reading the line, before doing anything. Every command below is written one
+  per line so this cannot bite.
+- The **appendix in §8 is Git Bash only** — it pipes a tar archive into ssh, and PowerShell pipes
+  objects rather than bytes, which would corrupt the upload. The normal path (§3) is safe from either
+  shell, because the whole pipeline runs inside `bash`.
+
+Run these four, one line at a time. Each should print a version, not an error.
+
+```
+ssh -o BatchMode=yes hostinger true
+dotnet --version
+unity --version
+node --version
 ```
 
-If the `ssh` line asks for a password or says `Host hostinger not found`, the alias in
-`~/.ssh/config` is broken and nothing below will work. Everything else is already installed.
+Expected: `10.0.203`, `1.0.0-beta.9`, `v22.14.0` — and the `ssh` line prints **nothing at all**, which
+is what success looks like. If it asks for a password or says `Could not resolve hostname hostinger`,
+the alias in `C:\Users\droha\.ssh\config` is broken and nothing below will work.
+
+If you want the ssh line to say so out loud:
+
+```powershell
+ssh -o BatchMode=yes hostinger true; if ($LASTEXITCODE -eq 0) { "ssh ok" } else { "ssh FAILED" }
+```
+
+```bash
+ssh -o BatchMode=yes hostinger true && echo "ssh ok"    # Git Bash
+```
 
 ---
 
@@ -79,7 +101,9 @@ When it is done it prints the certificate's expiry date, says nginx is running, 
 
 ## 3. Deploy (every time)
 
-```bash
+From the repo root, in PowerShell or Git Bash — either is fine, the script runs itself in `bash`:
+
+```
 bash tools/deploy/deploy.sh
 ```
 
@@ -194,7 +218,9 @@ systemctl start mimas-server
 curl -fsS http://127.0.0.1:7777/health
 ```
 
-And from this PC, the two uploads the script does:
+And from this PC, the two uploads the script does — **in Git Bash, not PowerShell**: these pipe a tar
+archive into `ssh`, and PowerShell's pipeline carries objects rather than raw bytes, so it would
+arrive corrupted.
 
 ```bash
 tar -C Build/Web --format=ustar -czf - . | ssh hostinger 'rm -rf /var/www/mimas.next && mkdir -p /var/www/mimas.next && tar -C /var/www/mimas.next -xzf -'

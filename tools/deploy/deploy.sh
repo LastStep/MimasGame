@@ -8,8 +8,10 @@
 #   bash tools/deploy/deploy.sh --rollback      put the previous build and server back
 #   bash tools/deploy/deploy.sh --smoke         after release, run the browser smoke against the live URL
 #
-# Runs on this PC, from the repo root, in Git Bash or WSL (and on Linux). Rohan runs it; agents only
-# ever run it with --dry-run (studio decision D4, 22 Sep 2026).
+# Runs on this PC, from the repo root. Invoke it as `bash tools/deploy/deploy.sh` from PowerShell,
+# Git Bash or WSL — Git's bash is on the Windows PATH, and the script runs itself in bash, so the
+# caller's shell does not matter. (Windows PowerShell 5.1 has no `&&`, which is why nothing here asks
+# the caller to chain commands.) Rohan runs it; agents only ever run it with --dry-run (D4, 22 Sep).
 #
 # The VPS is reached only through the ssh alias below, which lives in ~/.ssh/config. No address, no
 # username and no key path appears anywhere in this repo — that is deliberate, do not "helpfully" add

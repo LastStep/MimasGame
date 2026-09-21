@@ -204,6 +204,12 @@ OQ-N03, N07 and N11 block a first slice. **Nothing in M2 depends on any of it**;
   `echo` label, in a grep pattern — even when the command writes nothing anywhere. Three of today's
   four hits were that. Restructure the command, or word the prose differently; use the Write/Edit
   tools for ordinary markdown. **Never** rephrase the part that actually touches files to slip past.
+- **Rohan's shell is Windows PowerShell 5.1, not Git Bash.** It has **no `&&`** — a chained command
+  fails at parse time with `The token '&&' is not a valid statement separator`, so *nothing* runs and
+  it looks like the first command failed. Write one command per line in anything he will paste. What
+  he can run: `bash`, `ssh`, `git`, `dotnet`, `node`, `unity`, `wsl` are all on his Windows PATH, so
+  `bash tools/deploy/deploy.sh` works from PowerShell unchanged (verified). What he cannot: any
+  `tar | ssh` pipeline, because PowerShell pipes objects, not bytes — that is Git Bash only.
 - **The VPS is shared.** `sites-enabled/laststep.cloud` belongs to another product on the same box.
   Mimas has its own file, unit, user and two directories, and that is the whole footprint.
 - **nginx 1.24 syntax.** `listen 443 ssl http2;` is right on the VPS; `http2 on;` needs 1.25.
