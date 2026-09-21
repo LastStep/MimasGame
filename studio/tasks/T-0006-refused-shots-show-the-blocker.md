@@ -5,7 +5,7 @@ project: mimas
 feature: F-aiming-client
 milestone: M2
 lane: light
-status: todo
+status: verify
 owner: builder
 model: sonnet
 worktree:
@@ -58,3 +58,13 @@ Changing the supercover rule, heights, aim points or prop data. Real prop art.
 
 Heroes are also whole-hex bodies of height 6. If a case turns out to be a hero body blocking a shot
 that looks open past its shoulder, the fix is the same highlight, not a thinner hero.
+
+**Done 21 Sep 2026 inside T-0008** (commits "core-tests: two arena-4 sight cases that name their
+blocker", "client: refused shots tint the blocking tile; props are hex prisms that fill their hex",
+and "client: the blocking body wears the mark too, not just the hex under it").
+
+The two documented cases, both of which say the rule is right and the picture was wrong:
+a grazing ray refused by the pillar at (-2,-2) that the board draws *beside* the line, and a shot at
+a pillar refused by the opponent standing in front of it. Pictures: `artifacts/blocker-highlight.png`
+(the wall in front of the hero is red, the X is on it, the HUD says No line of sight) and
+`artifacts/prop-prism.png`. Status `verify`; it is the T-0008 verifier who closes it.

@@ -5,7 +5,7 @@ project: mimas
 feature: F-online-slice
 milestone: M2
 lane: light
-status: todo
+status: verify
 owner: builder
 model: sonnet
 worktree:
@@ -50,3 +50,9 @@ unchanged in scope. Close this task when T-0008 verifies.
 
 The 18 Sep harness (`browser-smoke.mjs`) can seed and read the real clipboard (`clip:` step, the
 context requests clipboard permissions); reuse that for the check rather than trusting the status line.
+
+**Done 21 Sep 2026 inside T-0008** (commit "client: the lobby comes back to the room after a match,
+and Copy code beside Copy link"). Proved in headed Chromium against the local build: the button was
+clicked, the game logged `[LobbyView] copy code KJDH -> ok`, and the smoke read the real browser
+clipboard back as `KJDH` (new `clipmatch:` step). Picture: `artifacts/smoke-clip/copied.png`.
+Status `verify`; it is the T-0008 verifier who closes it.

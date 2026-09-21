@@ -5,7 +5,7 @@ project: mimas
 feature: F-m2-browser-finish
 milestone: M2
 lane: full
-status: running
+status: verify
 owner: builder
 model: opus
 worktree:
@@ -43,10 +43,16 @@ done_when:
   - "browser-smoke.mjs --browser chromium|webkit|firefox runs green against the local build with a [timing] line each"
   - "Design page #online has rule 9 (rematch, decided 21 Sep 2026); ADR-032 and ADR-033 in docs/decisions.md; networking.md, hosting.md, roadmap.md updated"
   - "Core tests +2, server tests +9, EditMode green, unity command console has no error CS and no Exception"
-ladder: [0, 1, 2, 5, 7, 10]
+# The spec's §12 numbers its own rungs (7 = the Editor proof, 10 = the build and the browser smoke).
+# This project's ladder numbers them differently and has neither built: in studio/game.yaml rung 7 is
+# the bot-vs-bot batch and rung 10 the browser smoke, both `enabled: false`, and the runner refuses a
+# task that asks for a rung that does not exist. So the list is the four that run, and the evidence for
+# the spec's 7 and 10 — EditMode, the Web build, three browser engines, the captures — is in the run
+# report where a verifier can check it by hand.
+ladder: [0, 1, 2, 5]
 created: 2026-09-21
 started: 2026-09-21
-finished:
+finished: 2026-09-21
 cost_usd: 0
 blocked_by:
 ---
