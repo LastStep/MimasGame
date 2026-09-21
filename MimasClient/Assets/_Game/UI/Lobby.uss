@@ -153,6 +153,17 @@
     width: 150px;
 }
 
+/* Copy link and Copy code side by side: the link is for a chat window, the code is for a phone call. */
+.room-actions {
+    flex-direction: row;
+    justify-content: center;
+}
+
+.room-actions > .button {
+    margin-left: 6px;
+    margin-right: 6px;
+}
+
 .status {
     margin-top: 18px;
     align-self: center;

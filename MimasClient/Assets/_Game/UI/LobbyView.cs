@@ -45,6 +45,7 @@ namespace Mimas.Client.UI
 
         private Label _roomCode;
         private Button _copyLink;
+        private Button _copyCode;
         private Label _seat0;
         private Label _seat1;
         private DropdownField _preset;
@@ -114,7 +115,27 @@ namespace Mimas.Client.UI
                 return;
             }
 
+            // TryBind's ShowLastResult consumes it, and the room's status line wants the same words.
+            MatchResult result = _net.LastResult;
+
             if (!TryBind()) return;
+
+            // Coming back from a result: the room outlives the match (ADR-032), so open on the room panel
+            // with the result on its status line. The front screen would be wrong — every one of its
+            // buttons is answered with in_room while we are still seated.
+            if (_net.CurrentMatchId == 0)
+            {
+                JObject room = _net.ConsumePendingRoom();
+                if (room != null)
+                {
+                    _isReady = false;
+                    _ready.text = "Ready";
+                    _preset.SetEnabled(true);
+                    ShowRoom(room);
+                    SetRoomStatus(ResultLine(result, OpponentPresent(room)));
+                    return;
+                }
+            }
 
             // A page reload mid-match lands here first: say so, and go straight back into the match when
             // the server confirms the seat is still ours.
@@ -146,6 +167,7 @@ namespace Mimas.Client.UI
 
             _roomCode = root.Q<Label>("room-code");
             _copyLink = root.Q<Button>("copy-link");
+            _copyCode = root.Q<Button>("copy-code");
             _seat0 = root.Q<Label>("seat-0");
             _seat1 = root.Q<Label>("seat-1");
             _preset = root.Q<DropdownField>("preset");
@@ -155,7 +177,7 @@ namespace Mimas.Client.UI
 
             if (_lobbyPanel == null || _roomPanel == null || _name == null || _joinCode == null || _playBot == null
                 || _createRoom == null || _joinRoom == null || _status == null || _server == null || _lastResult == null
-                || _roomCode == null || _copyLink == null || _seat0 == null || _seat1 == null || _preset == null
+                || _roomCode == null || _copyLink == null || _copyCode == null || _seat0 == null || _seat1 == null || _preset == null
                 || _ready == null || _leaveRoom == null || _roomStatus == null)
             {
                 Debug.LogError("[LobbyView] Lobby.uxml is missing one of the named elements.", this);
@@ -176,6 +198,7 @@ namespace Mimas.Client.UI
             _createRoom.clicked += HandleCreateRoom;
             _joinRoom.clicked += HandleJoinRoom;
             _copyLink.clicked += HandleCopyLink;
+            _copyCode.clicked += HandleCopyCode;
             _ready.clicked += HandleReady;
             _leaveRoom.clicked += HandleLeaveRoom;
             _preset.RegisterValueChangedCallback(HandlePresetChanged);
@@ -210,6 +233,7 @@ namespace Mimas.Client.UI
             _createRoom.clicked -= HandleCreateRoom;
             _joinRoom.clicked -= HandleJoinRoom;
             _copyLink.clicked -= HandleCopyLink;
+            _copyCode.clicked -= HandleCopyCode;
             _ready.clicked -= HandleReady;
             _leaveRoom.clicked -= HandleLeaveRoom;
             _preset.UnregisterValueChangedCallback(HandlePresetChanged);
@@ -362,6 +386,18 @@ namespace Mimas.Client.UI
             Debug.Log("[LobbyView] copy link " + link + " -> " + (copied ? "ok" : "refused"));
         }
 
+        /// <summary>
+        /// The code by itself, for the half of the time the link is no use: a phone call, a person in the
+        /// room, a chat that eats links. Four characters, nothing else on the clipboard (T-0005).
+        /// </summary>
+        private void HandleCopyCode()
+        {
+            if (string.IsNullOrEmpty(_code)) return;
+            bool copied = WebClipboard.Copy(_code);
+            SetRoomStatus(copied ? "Code copied." : "Could not copy — read them the code instead.");
+            Debug.Log("[LobbyView] copy code " + _code + " -> " + (copied ? "ok" : "refused"));
+        }
+
         // ---- the server speaks --------------------------------------------------------------------------
 
         private void HandleMessage(string type, JObject p)
@@ -371,6 +407,19 @@ namespace Mimas.Client.UI
             switch (type)
             {
                 case Messages.AuthOk:
+                    string seated = p.Value<string>("room");
+                    if (!string.IsNullOrEmpty(seated))
+                    {
+                        // We are still in a room that is between matches (ADR-032). The room.state that
+                        // follows opens the room panel; anything we had queued would only be told in_room.
+                        _pendingType = null;
+                        _pendingPayload = null;
+                        _busy = false;
+                        SetButtonsEnabled(true);
+                        SetStatus("Back in room " + seated + "…");
+                        break;
+                    }
+
                     // Nothing queued means we authenticated for our own reasons (a reconnection that came
                     // to nothing). Let go of the wait, or every button stays dead.
                     if (string.IsNullOrEmpty(_pendingType)) { _busy = false; SetButtonsEnabled(true); }
@@ -488,6 +537,29 @@ namespace Mimas.Client.UI
 
             bool waitingForSomeone = seats != null && seats.Count == 2 && !(seats[1 - _mySeat] as JObject).Value<bool>("present");
             SetRoomStatus(waitingForSomeone ? "Send the code to a friend." : _isReady ? "Waiting for your opponent…" : "Pick your gear.");
+        }
+
+        /// <summary>Is the other seat still filled? A room whose opponent left is still a room.</summary>
+        private bool OpponentPresent(JObject room)
+        {
+            var seats = room["seats"] as JArray;
+            if (seats == null || seats.Count != 2) return false;
+            var other = seats[1 - room.Value<int>("youAre")] as JObject;
+            return other != null && other.Value<bool>("present");
+        }
+
+        /// <summary>
+        /// The result, on the room's status line, in the same words the banner used — and then the only
+        /// question that matters, which is whether there is anybody there to play again.
+        /// </summary>
+        private static string ResultLine(MatchResult result, bool opponentPresent)
+        {
+            string tail = opponentPresent ? " — Ready for another?" : " — the seat is free; share the code";
+            if (result == null) return opponentPresent ? "Ready for another?" : "The seat is free; share the code.";
+
+            string line = result.Won ? "Victory" : "Defeat";
+            if (!string.IsNullOrEmpty(result.Reason)) line += " · " + result.Reason;
+            return line + tail;
         }
 
         private void DrawSeat(Label label, JObject seat, int index)

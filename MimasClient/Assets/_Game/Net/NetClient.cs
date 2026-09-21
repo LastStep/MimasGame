@@ -77,6 +77,15 @@ namespace Mimas.Client.Net
         /// <summary>The last <c>match.start</c> payload, waiting for the Arena scene to pick it up.</summary>
         public JObject PendingMatch { get; private set; }
 
+        /// <summary>
+        /// The last <c>room.state</c> received, in whatever scene was up. The room outlives the match
+        /// (ADR-032), so after a result this is both what sends the lobby straight back to the room panel
+        /// and what makes the result banner's button say "Back to room" rather than "Back to lobby".
+        /// Cleared when the room is left, when the socket is deliberately closed, and when the server turns
+        /// out never to have heard of us.
+        /// </summary>
+        public JObject PendingRoom { get; private set; }
+
         /// <summary>The match this client believes it is seated in, or 0. Survives a reload through PlayerPrefs.</summary>
         public int CurrentMatchId { get; private set; }
 
@@ -190,6 +199,7 @@ namespace Mimas.Client.Net
             _wantsConnection = false;
             _reconnecting = false;
             _retryIn = 0f;
+            PendingRoom = null;
             CloseSocket();
             _state = NetState.Disconnected;
         }
@@ -309,6 +319,12 @@ namespace Mimas.Client.Net
                 case Messages.MatchStart:
                     OnMatchStart(payload);
                     break;
+                case Messages.RoomState:
+                    PendingRoom = payload;
+                    break;
+                case Messages.RoomLeft:
+                    PendingRoom = null;
+                    break;
                 case Messages.Error:
                     OnError(payload);
                     break;
@@ -328,7 +344,9 @@ namespace Mimas.Client.Net
             SavePrefs();
             _retriedAsGuest = false;
             _reconnecting = false;
-            Debug.Log("[NetClient] authenticated as " + PlayerName + " (#" + PlayerId + ")");
+            string room = p.Value<string>("room");
+            Debug.Log("[NetClient] authenticated as " + PlayerName + " (#" + PlayerId + ")"
+                + (string.IsNullOrEmpty(room) ? "" : ", still seated in room " + room));
 
             // If we believed we were in a match, the server has this moment to say so.
             if (CurrentMatchId != 0 && PendingMatch == null) _rejoinWindow = RejoinWindowSeconds;
@@ -341,7 +359,10 @@ namespace Mimas.Client.Net
             CurrentMatchId = p.Value<int>("matchId");
             PlayerPrefs.SetInt(MatchPref, CurrentMatchId);
             SavePrefs();
-            Debug.Log("[NetClient] match " + CurrentMatchId + " starting, you are seat " + p.Value<int>("youAre"));
+            // matchId is the room's and is reused across rounds, so the round is what tells two matches in
+            // one room apart in a log (ADR-032). Nothing else on the client reads it.
+            Debug.Log("[NetClient] match " + CurrentMatchId + " round " + p.Value<int>("round")
+                + " starting, you are seat " + p.Value<int>("youAre"));
         }
 
         private void OnError(JObject p)
@@ -355,6 +376,7 @@ namespace Mimas.Client.Net
             _retriedAsGuest = true;
             bool wasInMatch = CurrentMatchId != 0;
             Token = "";
+            PendingRoom = null;      // whatever room we remembered went with the server that held it
             ForgetMatch();
             Send(Messages.AuthGuest, new JObject { ["name"] = PlayerName ?? "" });
 
@@ -378,6 +400,14 @@ namespace Mimas.Client.Net
             string code = PendingRoomCode;
             PendingRoomCode = null;
             return code;
+        }
+
+        /// <summary>The lobby takes the room it came back to and clears it, mirroring <see cref="ConsumePendingMatch"/>.</summary>
+        public JObject ConsumePendingRoom()
+        {
+            JObject pending = PendingRoom;
+            PendingRoom = null;
+            return pending;
         }
 
         /// <summary>Called when a match ends, or when the room turns out to be gone.</summary>

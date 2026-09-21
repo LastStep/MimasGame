@@ -27,7 +27,10 @@
         <ui:VisualElement name="room-panel" class="panel">
             <ui:Label class="field-label" text="ROOM CODE" />
             <ui:Label name="room-code" class="room-code" text="FROG" />
-            <ui:Button name="copy-link" class="button button--quiet" text="Copy link" />
+            <ui:VisualElement class="room-actions">
+                <ui:Button name="copy-link" class="button button--quiet" text="Copy link" />
+                <ui:Button name="copy-code" class="button button--quiet" text="Copy code" />
+            </ui:VisualElement>
 
             <ui:VisualElement class="seats">
                 <ui:Label name="seat-0" class="seat" text="" />

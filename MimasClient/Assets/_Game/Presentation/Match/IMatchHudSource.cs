@@ -218,6 +218,13 @@ namespace Mimas.Client.Presentation
         /// <summary>True once the way out of the result should appear, a beat after the banner.</summary>
         bool ShowBackToLobby { get; }
 
+        /// <summary>
+        /// What that way out is called. Online the room outlives the match (ADR-032), so it leads back to
+        /// the room the match was played in — "Back to room". In local practice there is no room and no
+        /// lobby to speak of: "Back to lobby".
+        /// </summary>
+        string BackLabel { get; }
+
         /// <summary>Who is on the other side, for the turn banner. Null before the match is ready.</summary>
         string OpponentName { get; }
 

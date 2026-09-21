@@ -149,6 +149,11 @@ namespace Mimas.Client.Presentation
         public string Banner => _banner;
         public string BannerDetail => _bannerDetail;
         public bool ShowBackToLobby => _backToLobbyAt >= 0f && Time.time >= _backToLobbyAt;
+
+        /// <summary>Read lazily, so it is right whenever the banner happens to ask (ADR-032).</summary>
+        public string BackLabel => NetClient.Instance != null && NetClient.Instance.PendingRoom != null
+            ? "Back to room"
+            : "Back to lobby";
         public string OpponentName => _driver != null ? _driver.OpponentName : null;
         public string OpponentStatus => _driver != null ? _driver.OpponentStatus : null;
         public bool CanResign => _driver != null && _driver.CanResign && !IsPlaying;

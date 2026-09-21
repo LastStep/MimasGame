@@ -482,6 +482,10 @@ namespace Mimas.Client.UI
             string detail = _source.BannerDetail;
             _bannerDetail.text = string.IsNullOrEmpty(detail) ? string.Empty : detail.ToUpperInvariant();
             _bannerButton.EnableInClassList("banner-button--visible", visible && _source.ShowBackToLobby);
+
+            // Where it leads is not always the lobby any more: online it goes back to the room this match
+            // was played in, with the same code and the same two seats (ADR-032).
+            if (visible) _bannerButton.text = _source.BackLabel;
         }
 
         /// <summary>The opponent's connection, when there is anything to say about it. Offline there never is.</summary>
