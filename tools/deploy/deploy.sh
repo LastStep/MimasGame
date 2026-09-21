@@ -110,6 +110,25 @@ have dotnet || die "'dotnet' is not on PATH (expected 10.0.203). Reopen the term
 
 if [ "$SKIP_BUILD" != yes ]; then
     if ! have unity; then
+        # WSL first, because its $HOME is a Linux path and the fallback below would point at a
+        # /home/<user>/AppData/... that can never exist, which is a confusing thing to be told.
+        if grep -qi microsoft /proc/version 2>/dev/null; then
+            echo "[deploy] FAILED: this is WSL, and the Unity CLI is a Windows program." >&2
+            echo "" >&2
+            echo "  Everything else here works from WSL — dotnet, node, tar, and the ssh alias — but" >&2
+            echo "  Unity is installed on the Windows side and cannot build from in here." >&2
+            echo "" >&2
+            echo "  If you did not mean to be in WSL: typing 'bash' in PowerShell runs" >&2
+            echo "  C:\\Windows\\System32\\bash.exe, which IS the WSL launcher. Git's bash is not on" >&2
+            echo "  the PATH, so that is almost certainly how you got here." >&2
+            echo "" >&2
+            echo "  Use Git Bash instead — open the Git Bash app, or from PowerShell:" >&2
+            echo "      & 'C:\\Program Files\\Git\\bin\\bash.exe' tools/deploy/deploy.sh" >&2
+            echo "" >&2
+            echo "  Or, if $WEB_DIR already holds the build you want, stay here and reuse it:" >&2
+            echo "      bash tools/deploy/deploy.sh --skip-build" >&2
+            exit 1
+        fi
         # Unity Hub installs the CLI here and adds it to the USER PATH. A terminal opened before that
         # happened carries a stale copy of the environment and cannot see it, which looks exactly like
         # "Unity is not installed". Use it anyway and say so, rather than failing on a technicality.

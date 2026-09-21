@@ -9,16 +9,36 @@ You do §1 and §2 **once**. After that, deploying is §3: one command.
 
 ## 0. Before anything — is this PC ready?
 
-**Which shell.** PowerShell **or** Git Bash both work for the deploy commands in §2, §3 and §5,
-because Git's `bash` and `ssh` are already on your Windows PATH. Two things to know:
+**Which shell — read this once, it has bitten twice.**
+
+**Run the deploy from Git Bash.** Open the **Git Bash** app from the Start menu, `cd` to the repo,
+and run the commands exactly as written.
+
+> **Do not type `bash …` in PowerShell.** On this PC `bash` resolves to
+> `C:\Windows\System32\bash.exe`, which is the **WSL launcher** — Git's `bash` is not on the PATH at
+> all. So `bash tools/deploy/deploy.sh` in PowerShell silently runs the script inside Ubuntu, where
+> Unity does not exist, and you get `'unity' is not on PATH`. The script now detects this and says so.
+
+If you would rather stay in PowerShell, call Git's bash by its full path:
+
+```powershell
+& 'C:\Program Files\Git\bin\bash.exe' tools/deploy/deploy.sh
+```
+
+Two more things about PowerShell, for the checks below:
 
 - Your PowerShell is **5.1**, which does **not** understand `&&`. If you paste a line containing
   `&&` into it you get `The token '&&' is not a valid statement separator in this version.` Nothing
   runs — it fails while reading the line, before doing anything. Every command below is written one
   per line so this cannot bite.
 - The **appendix in §8 is Git Bash only** — it pipes a tar archive into ssh, and PowerShell pipes
-  objects rather than bytes, which would corrupt the upload. The normal path (§3) is safe from either
-  shell, because the whole pipeline runs inside `bash`.
+  objects rather than bytes, which would corrupt the upload.
+
+Everything else Mimas needs — `ssh`, `tar`, `curl`, `dotnet`, `node`, `unity`, `git` — **is** on your
+Windows PATH, so the four checks below are fine to run in PowerShell.
+
+**WSL** has `dotnet`, `node`, `tar` and a working `hostinger` alias, so it can do every step **except
+the Unity build**. `--skip-build` works there; a full deploy does not.
 
 Run these four, one line at a time. Each should print a version, not an error.
 
@@ -188,7 +208,8 @@ are not in the match yourself, wait.
 | `rung 9 gate: build is X MB, limit 25 MB` | The build grew past the limit | Nothing to do on the VPS. Tell the next session; it is a real regression |
 | Certificate warning in the browser | The address bar must say exactly `mimas.laststep.cloud` | The certificate covers that name only, not `www.` and not the bare domain |
 | `the ssh alias hostinger does not work` | §0 | Fix `~/.ssh/config` before anything else |
-| `unity: command not found`, or any tool "not on PATH" | A terminal opened **before** the tool was installed carries a stale copy of the environment | **Open a new terminal.** The script now finds Unity anyway and says so, but a fresh terminal is the real fix |
+| `'unity' is not on PATH` and the path it names starts `/home/` | You are in **WSL** — typing `bash` in PowerShell launches it. See §0 | Use Git Bash, or `& 'C:\Program Files\Gitinash.exe' tools/deploy/deploy.sh` |
+| `unity: command not found` in a Windows shell | A terminal opened **before** Unity Hub added its bin folder to your PATH | **Open a new terminal.** The script falls back to the CLI's known location and says so, but a fresh terminal is the real fix |
 | `git status` lists art files as modified that you never touched | Stale index data on Git LFS files, not real changes | Ignore it, or run `git status` once more to clear it. The deploy only warns; it does not care |
 
 ---
