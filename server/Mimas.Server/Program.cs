@@ -14,7 +14,17 @@ using Microsoft.Extensions.Options;
 // itself is docs/networking.md and Mimas.Core.Protocol.
 
 var builder = WebApplication.CreateBuilder(args);
-builder.WebHost.ConfigureKestrel(o => o.ListenAnyIP(int.Parse(Environment.GetEnvironmentVariable("MIMAS_PORT") ?? "7777")));
+// Where Kestrel listens. MIMAS_BIND=loopback keeps the process off every interface but 127.0.0.1,
+// which is how it runs on the VPS: nginx terminates TLS and proxies to it, and the box has no
+// firewall (ADR-031). Anything else, including unset, is "any" — so development and the tests are
+// unchanged.
+var port = int.Parse(Environment.GetEnvironmentVariable("MIMAS_PORT") ?? "7777");
+var loopbackOnly = string.Equals(Environment.GetEnvironmentVariable("MIMAS_BIND"), "loopback", StringComparison.OrdinalIgnoreCase);
+builder.WebHost.ConfigureKestrel(o =>
+{
+    if (loopbackOnly) o.ListenLocalhost(port);
+    else o.ListenAnyIP(port);
+});
 
 // Content is loaded once, before anything can serve, from the same JSON folder the client ships.
 // MIMAS_DATA_PATH overrides the default (the Data/ folder copied next to the binary by the csproj).
@@ -43,6 +53,7 @@ var rooms = app.Services.GetRequiredService<RoomRegistry>();
 
 app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.FromSeconds(20) });
 app.Logger.LogInformation("content loaded from {Path}: {Files} files, hash {Hash}", dataPath, catalog.Files.Count, catalog.Hash);
+app.Logger.LogInformation("listening on {Bind}:{Port}", loopbackOnly ? "loopback" : "any", port);
 app.Logger.LogInformation("clock: turn {Turn} ms, lag grace {Lag} ms, reconnect grace {Reconnect} ms",
     options.TurnMs ?? catalog.Rules.Clock.TurnMs,
     options.LagGraceMs ?? catalog.Rules.Clock.LagGraceMs,
