@@ -5,11 +5,11 @@
 # reads no files beside itself and takes everything from these two directories, which deploy.sh has
 # just filled:
 #
-#   /var/www/mimas.next     the Unity Web build
-#   /opt/mimas/server.next  the self-contained linux-x64 publish
+#   /home/mimas/servers/mimas.laststep.cloud/web.next      the Unity Web build
+#   /home/mimas/servers/mimas.laststep.cloud/server.next   the self-contained linux-x64 publish
 #
-# It keeps exactly one generation back — /var/www/mimas.prev and /opt/mimas/server.prev — which is
-# what `deploy.sh --rollback` (this script with --rollback) puts back.
+# It keeps exactly one generation back — web.prev and server.prev beside them — which is what
+# `deploy.sh --rollback` (this script with --rollback) puts back.
 #
 # A release stops the server. Any match in flight is lost and both players see "Match lost", so the
 # runbook says to read `rooms` from /health first.
@@ -17,8 +17,9 @@
 set -euo pipefail
 
 HEALTH="http://127.0.0.1:7777/health"
-WEB=/var/www/mimas
-SRV=/opt/mimas/server
+BASE=/home/mimas/servers/mimas.laststep.cloud
+WEB="$BASE/web"
+SRV="$BASE/server"
 
 say() { echo "[release] $*"; }
 die() { echo "[release] FAILED: $*" >&2; exit 1; }

@@ -5,6 +5,9 @@
 #
 # The binary is a self-contained linux-x64 publish (ADR-031, decision D5), so nothing needs .NET
 # installed on the box. Logs go to journald: `ssh hostinger journalctl -u mimas-server -f`.
+#
+# Everything Mimas owns lives under /home/mimas/servers/mimas.laststep.cloud/, matching the
+# /home/<user>/servers/<subdomain>/ convention the other product on this box already uses.
 
 [Unit]
 Description=Mimas game server (ASP.NET Core WebSocket rooms)
@@ -15,8 +18,8 @@ Wants=network-online.target
 Type=simple
 User=mimas
 Group=mimas
-WorkingDirectory=/opt/mimas/server
-ExecStart=/opt/mimas/server/Mimas.Server
+WorkingDirectory=/home/mimas/servers/mimas.laststep.cloud/server
+ExecStart=/home/mimas/servers/mimas.laststep.cloud/server/Mimas.Server
 Environment=MIMAS_PORT=7777
 Environment=MIMAS_BIND=loopback
 Environment=ASPNETCORE_ENVIRONMENT=Production
@@ -25,14 +28,18 @@ Restart=always
 RestartSec=2
 LimitNOFILE=65536
 
-# The server writes nothing: no database, no files, logs to journald. So the publish folder can be
-# read-only and the rest of the filesystem invisible. If a future change makes it write, this is the
-# first place to look — the failure is an unhelpful "Read-only file system" in journalctl.
+# The server writes nothing: no database, no files, logs to journald. So the whole filesystem can be
+# read-only to it. If a future change makes it write, this is the first place to look — the failure
+# is an unhelpful "Read-only file system" in journalctl.
+#
+# ProtectHome is read-only rather than true: the binary now lives under /home, and `true` would hide
+# /home from the process entirely, so the service would fail to start with "No such file or
+# directory" on its own ExecStart.
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
-ProtectHome=true
-ReadOnlyPaths=/opt/mimas/server
+ProtectHome=read-only
+ReadOnlyPaths=/home/mimas/servers/mimas.laststep.cloud/server
 
 [Install]
 WantedBy=multi-user.target

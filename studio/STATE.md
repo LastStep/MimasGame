@@ -69,6 +69,14 @@ Target: **Sat 10 Oct 2026**, friends playing over the internet. **18 days.**
 | `browser-smoke.mjs --timing` | boot ms, ms to `--expect`, bytes transferred |
 | `docs/deploy-runbook.md` | what Rohan reads |
 
+**Layout on the VPS, changed 22 Sep during Part 2 at Rohan's request:** everything Mimas owns lives
+under **`/home/mimas/servers/mimas.laststep.cloud/`** (`web/`, `server/`, `deploy/`), following the
+`/home/<user>/servers/<subdomain>/` convention the box's other product already uses for
+`api.laststep.cloud`. Two consequences worth knowing: `/home/mimas` is **755**, not the usual 750,
+because Mimas is the first subdomain on that box whose files nginx serves **off disk** rather than
+proxying to a container — `www-data` has to traverse it; and the unit's `ProtectHome` is
+**`read-only`**, not `true`, which would have hidden the binary from its own service.
+
 **Proved locally, not on the VPS:** the full dry run exits 0 including a real Unity build (12.31 MB,
 same as 18 Sep, and it needs **no live Editor** — batch mode opens its own); the size gate exits 1 at
 a fake 1 MB limit; the `linux-x64` self-contained publish **actually runs inside WSL** and reports the

@@ -12,11 +12,12 @@ belong to another product and are never opened, edited or restarted by anything 
 
 | Piece | Where | How |
 |---|---|---|
-| Unity Web build | `/var/www/mimas/` | static files; nginx serves the pre-compressed Brotli ones with the right headers |
+| Everything Mimas owns | `/home/mimas/servers/mimas.laststep.cloud/` | one tree, matching the `/home/<user>/servers/<subdomain>/` convention the other product already uses for `api.laststep.cloud` |
+| Unity Web build | `/home/mimas/servers/mimas.laststep.cloud/web/` | static files; nginx serves the pre-compressed Brotli ones with the right headers |
 | Game server | `Mimas.Server` on `127.0.0.1:7777` | a **systemd** unit (`mimas-server`) running as the `mimas` system user; nginx reverse-proxies `/ws` and `/health` |
-| The binary | `/opt/mimas/server/` | a self-contained `linux-x64` publish — **there is no .NET on the VPS and nothing to install** |
-| Deploy scripts | `/opt/mimas/deploy/` | `vps-setup.sh` and the nginx/unit files, uploaded by `deploy.sh --setup` |
-| Previous release | `/var/www/mimas.prev`, `/opt/mimas/server.prev` | exactly one generation back; `deploy.sh --rollback` swaps them in |
+| The binary | `/home/mimas/servers/mimas.laststep.cloud/server/` | a self-contained `linux-x64` publish — **there is no .NET on the VPS and nothing to install** |
+| Deploy scripts | `/home/mimas/servers/mimas.laststep.cloud/deploy/` | `vps-setup.sh` and the nginx/unit files, uploaded by `deploy.sh --setup` |
+| Previous release | `/home/mimas/servers/mimas.laststep.cloud/web.prev`, `/home/mimas/servers/mimas.laststep.cloud/server.prev` | exactly one generation back; `deploy.sh --rollback` swaps them in |
 | TLS | Let's Encrypt, **its own certificate** for `mimas.laststep.cloud` | issued with `certbot certonly --nginx`, renewed by the `certbot.timer` already on the box. Brotli decoding needs HTTPS, and a WebSocket from an HTTPS page must be `wss://` |
 | Logs | journald | `ssh hostinger journalctl -u mimas-server -f` |
 
@@ -57,8 +58,8 @@ proxy. Installed by `vps-setup.sh` to `/etc/nginx/sites-available/mimas.laststep
 
 ## Deploying
 
-One command, run by **Rohan** from Git Bash on his PC. Agents only ever run it with `--dry-run`
-(ADR-031, decision D4).
+One command, run by **Rohan** from his PC — PowerShell or Git Bash, the script runs itself in
+`bash`. Agents only ever run it with `--dry-run` (ADR-031, decision D4).
 
 ```bash
 bash tools/deploy/deploy.sh --setup     # once: DNS must already point here

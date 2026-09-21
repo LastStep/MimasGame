@@ -49,9 +49,9 @@ ssh -o BatchMode=yes hostinger true && echo "ssh ok"    # Git Bash
 
 The name has to point at the VPS before a certificate can be issued for it.
 
-1. Find the VPS's address. In Git Bash:
+1. Find the VPS's address:
 
-   ```bash
+   ```
    nslookup laststep.cloud
    ```
 
@@ -65,11 +65,12 @@ The name has to point at the VPS before a certificate can be issued for it.
 
 3. Wait, then check it took:
 
-   ```bash
+   ```
    nslookup mimas.laststep.cloud
    ```
 
-   It must answer with the same address. This is usually minutes; it can be an hour. **Nothing else
+   It must answer with the same address. If your PC has cached the "does not exist" answer, ask a
+   public resolver instead: `nslookup mimas.laststep.cloud 1.1.1.1`. This is usually minutes; it can be an hour. **Nothing else
    works until it does** — the set-up script checks and refuses rather than half-doing it.
 
 ---
@@ -85,7 +86,7 @@ It uploads `tools/deploy/` to the VPS and runs the set-up script there. What it 
 | Thing | Where | Note |
 |---|---|---|
 | A user for the game | `mimas` | system user, cannot log in |
-| Two folders | `/var/www/mimas`, `/opt/mimas/server` | the web files, and the server program |
+| One folder tree | `/home/mimas/servers/mimas.laststep.cloud/` | `web/` the game files, `server/` the program, `deploy/` these scripts — the same `/home/<user>/servers/<subdomain>/` shape `api.laststep.cloud` uses |
 | An nginx site | `/etc/nginx/sites-available/mimas.laststep.cloud` | its own file |
 | A certificate | Let's Encrypt, for `mimas.laststep.cloud` only | renews itself, like your other one |
 | A service | `mimas-server` | starts on boot, restarts if it crashes |
@@ -197,23 +198,25 @@ For the day the script dies halfway. On the VPS, as root:
 ```bash
 # set-up, in order (this is vps-setup.sh)
 getent hosts mimas.laststep.cloud                     # must be this machine
-useradd --system --home-dir /opt/mimas --shell /usr/sbin/nologin mimas
-mkdir -p /opt/mimas/server /opt/mimas/deploy /var/www/mimas
-install -m 644 /opt/mimas/deploy/nginx-mimas-bootstrap.conf /etc/nginx/sites-available/mimas.laststep.cloud
+useradd --system --home-dir /home/mimas --shell /usr/sbin/nologin mimas
+mkdir -p /home/mimas/servers/mimas.laststep.cloud/{web,server,deploy}
+chown mimas:mimas /home/mimas /home/mimas/servers
+chmod 755 /home/mimas /home/mimas/servers   # so nginx (www-data) can traverse to web/
+install -m 644 /home/mimas/servers/mimas.laststep.cloud/deploy/nginx-mimas-bootstrap.conf /etc/nginx/sites-available/mimas.laststep.cloud
 ln -sfn /etc/nginx/sites-available/mimas.laststep.cloud /etc/nginx/sites-enabled/mimas.laststep.cloud
 nginx -t && systemctl reload nginx
 certbot certonly --nginx -d mimas.laststep.cloud --cert-name mimas.laststep.cloud \
         --non-interactive --agree-tos --keep-until-expiring
-install -m 644 /opt/mimas/deploy/nginx-mimas.conf /etc/nginx/sites-available/mimas.laststep.cloud
+install -m 644 /home/mimas/servers/mimas.laststep.cloud/deploy/nginx-mimas.conf /etc/nginx/sites-available/mimas.laststep.cloud
 nginx -t && systemctl reload nginx
-install -m 644 /opt/mimas/deploy/mimas-server.service /etc/systemd/system/
+install -m 644 /home/mimas/servers/mimas.laststep.cloud/deploy/mimas-server.service /etc/systemd/system/
 systemctl daemon-reload && systemctl enable mimas-server
 
 # a release, in order (this is vps-release.sh)
-chmod +x /opt/mimas/server.next/Mimas.Server
-rm -rf /var/www/mimas.prev && mv /var/www/mimas /var/www/mimas.prev && mv /var/www/mimas.next /var/www/mimas
+chmod +x /home/mimas/servers/mimas.laststep.cloud/server.next/Mimas.Server
+rm -rf /home/mimas/servers/mimas.laststep.cloud/web.prev && mv /home/mimas/servers/mimas.laststep.cloud/web /home/mimas/servers/mimas.laststep.cloud/web.prev && mv /home/mimas/servers/mimas.laststep.cloud/web.next /home/mimas/servers/mimas.laststep.cloud/web
 systemctl stop mimas-server
-rm -rf /opt/mimas/server.prev && mv /opt/mimas/server /opt/mimas/server.prev && mv /opt/mimas/server.next /opt/mimas/server
+rm -rf /home/mimas/servers/mimas.laststep.cloud/server.prev && mv /home/mimas/servers/mimas.laststep.cloud/server /home/mimas/servers/mimas.laststep.cloud/server.prev && mv /home/mimas/servers/mimas.laststep.cloud/server.next /home/mimas/servers/mimas.laststep.cloud/server
 systemctl start mimas-server
 curl -fsS http://127.0.0.1:7777/health
 ```
@@ -223,8 +226,8 @@ archive into `ssh`, and PowerShell's pipeline carries objects rather than raw by
 arrive corrupted.
 
 ```bash
-tar -C Build/Web --format=ustar -czf - . | ssh hostinger 'rm -rf /var/www/mimas.next && mkdir -p /var/www/mimas.next && tar -C /var/www/mimas.next -xzf -'
-tar -C Build/Server --format=ustar -czf - . | ssh hostinger 'rm -rf /opt/mimas/server.next && mkdir -p /opt/mimas/server.next && tar -C /opt/mimas/server.next -xzf -'
+tar -C Build/Web --format=ustar -czf - . | ssh hostinger 'rm -rf /home/mimas/servers/mimas.laststep.cloud/web.next && mkdir -p /home/mimas/servers/mimas.laststep.cloud/web.next && tar -C /home/mimas/servers/mimas.laststep.cloud/web.next -xzf -'
+tar -C Build/Server --format=ustar -czf - . | ssh hostinger 'rm -rf /home/mimas/servers/mimas.laststep.cloud/server.next && mkdir -p /home/mimas/servers/mimas.laststep.cloud/server.next && tar -C /home/mimas/servers/mimas.laststep.cloud/server.next -xzf -'
 ```
 
 ---

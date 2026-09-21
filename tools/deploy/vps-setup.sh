@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
 # One-time (and safely repeatable) setup of the Mimas half of the VPS.
 #
-# Runs ON THE VPS, as root, from /opt/mimas/deploy/ — `deploy.sh --setup` uploads this folder and
-# then runs this file. Do not run it from your PC.
+# Runs ON THE VPS, as root, from the deploy/ folder under the path below — `deploy.sh --setup`
+# uploads that folder and then runs this file. Do not run it from your PC.
+#
+# Everything Mimas owns lives under /home/mimas/servers/mimas.laststep.cloud/, matching the
+# /home/<user>/servers/<subdomain>/ convention the other product on this box already uses.
 #
 # What it touches, and nothing else:
-#   user       mimas (system user, no login shell)
-#   dirs       /opt/mimas/server, /opt/mimas/deploy, /var/www/mimas
+#   user       mimas (system user, no login shell, home /home/mimas)
+#   dirs       /home/mimas/servers/mimas.laststep.cloud/{web,server,deploy}
 #   nginx      /etc/nginx/sites-available/mimas.laststep.cloud  + symlink in sites-enabled
 #   cert       /etc/letsencrypt/live/mimas.laststep.cloud (certbot certonly --nginx)
 #   systemd    /etc/systemd/system/mimas-server.service (enabled, NOT started)
@@ -19,6 +22,7 @@
 set -euo pipefail
 
 HOST="${MIMAS_HOST:-mimas.laststep.cloud}"
+BASE="/home/mimas/servers/$HOST"
 SITE_AVAILABLE="/etc/nginx/sites-available/$HOST"
 SITE_ENABLED="/etc/nginx/sites-enabled/$HOST"
 UNIT="/etc/systemd/system/mimas-server.service"
@@ -57,16 +61,22 @@ say "2/7 the mimas system user"
 if id -u mimas >/dev/null 2>&1; then
     say "  already exists"
 else
-    useradd --system --home-dir /opt/mimas --shell /usr/sbin/nologin mimas
+    useradd --system --home-dir /home/mimas --shell /usr/sbin/nologin mimas
     say "  created"
 fi
 
 # ---------------------------------------------------------------- 3. the directories
 say "3/7 directories"
-mkdir -p /opt/mimas/server /opt/mimas/deploy /var/www/mimas
-chown root:root /opt/mimas /opt/mimas/server /opt/mimas/deploy /var/www/mimas
-chmod 755 /opt/mimas /opt/mimas/server /opt/mimas/deploy /var/www/mimas
-say "  /opt/mimas/server, /opt/mimas/deploy, /var/www/mimas — root:root 755"
+mkdir -p "$BASE/web" "$BASE/server" "$BASE/deploy"
+# /home/mimas is 755, not the 750 a home directory usually gets. nginx serves the Web build straight
+# off disk as www-data, and www-data must be able to traverse every directory on the way to it. The
+# other subdomains on this box are all reverse proxies, so this has never had to be true before.
+# Nothing under here is secret: it is a public web build and a game server binary.
+chown mimas:mimas /home/mimas /home/mimas/servers
+chmod 755 /home/mimas /home/mimas/servers
+chown root:root "$BASE" "$BASE/web" "$BASE/server" "$BASE/deploy"
+chmod 755 "$BASE" "$BASE/web" "$BASE/server" "$BASE/deploy"
+say "  $BASE/{web,server,deploy} — root:root 755, under mimas:mimas 755"
 
 # ---------------------------------------------------------------- 4. the certificate
 say "4/7 TLS certificate"

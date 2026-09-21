@@ -23,10 +23,13 @@ set -euo pipefail
 MIMAS_SSH="${MIMAS_SSH:-hostinger}"
 MIMAS_HOST="${MIMAS_HOST:-mimas.laststep.cloud}"
 MIMAS_SIZE_LIMIT_MB="${MIMAS_SIZE_LIMIT_MB:-25}"
+# Everything Mimas owns on the VPS lives under one folder, matching the
+# /home/<user>/servers/<subdomain>/ convention the other product on that box already uses.
+MIMAS_REMOTE_BASE="${MIMAS_REMOTE_BASE:-/home/mimas/servers/$MIMAS_HOST}"
 
-# Git Bash rewrites anything that looks like a unix path — /var/www/mimas becomes C:/Program
-# Files/Git/var/www/mimas — which would corrupt every remote command and the Unity build's output
-# path. Off for the whole script.
+# Git Bash rewrites anything that looks like a unix path — a remote /home/... path becomes
+# C:/Program Files/Git/home/... — which would corrupt every remote command and the Unity build's
+# output path. Off for the whole script.
 export MSYS_NO_PATHCONV=1
 
 WEB_DIR=Build/Web
@@ -110,9 +113,9 @@ echo "[deploy] ok"
 # ---------------------------------------------------------------- --setup
 if [ "$MODE" = setup ]; then
     note "one-time VPS setup"
-    remote "ssh \"$MIMAS_SSH\" 'mkdir -p /opt/mimas/deploy'"
-    remote "tar -C tools/deploy --format=ustar -czf - nginx-mimas.conf nginx-mimas-bootstrap.conf mimas-server.service vps-setup.sh | ssh \"$MIMAS_SSH\" 'tar -C /opt/mimas/deploy -xzf -'"
-    remote "ssh \"$MIMAS_SSH\" 'bash /opt/mimas/deploy/vps-setup.sh'"
+    remote "ssh \"$MIMAS_SSH\" 'mkdir -p $MIMAS_REMOTE_BASE/deploy'"
+    remote "tar -C tools/deploy --format=ustar -czf - nginx-mimas.conf nginx-mimas-bootstrap.conf mimas-server.service vps-setup.sh | ssh \"$MIMAS_SSH\" 'tar -C $MIMAS_REMOTE_BASE/deploy -xzf -'"
+    remote "ssh \"$MIMAS_SSH\" 'bash $MIMAS_REMOTE_BASE/deploy/vps-setup.sh'"
     note "setup finished. Next: bash tools/deploy/deploy.sh"
     exit 0
 fi
@@ -160,8 +163,8 @@ echo "[deploy] $SRV_DIR is ${srv_mb} MB (not gated; only the browser download is
 note "6. uploading"
 started=$(date +%s)
 # --format=ustar because Git Bash's tar otherwise writes pax headers Ubuntu's tar is noisy about.
-remote "tar -C $WEB_DIR --format=ustar -czf - . | ssh \"$MIMAS_SSH\" 'rm -rf /var/www/mimas.next && mkdir -p /var/www/mimas.next && tar -C /var/www/mimas.next -xzf -'"
-remote "tar -C $SRV_DIR --format=ustar -czf - . | ssh \"$MIMAS_SSH\" 'rm -rf /opt/mimas/server.next && mkdir -p /opt/mimas/server.next && tar -C /opt/mimas/server.next -xzf -'"
+remote "tar -C $WEB_DIR --format=ustar -czf - . | ssh \"$MIMAS_SSH\" 'rm -rf $MIMAS_REMOTE_BASE/web.next && mkdir -p $MIMAS_REMOTE_BASE/web.next && tar -C $MIMAS_REMOTE_BASE/web.next -xzf -'"
+remote "tar -C $SRV_DIR --format=ustar -czf - . | ssh \"$MIMAS_SSH\" 'rm -rf $MIMAS_REMOTE_BASE/server.next && mkdir -p $MIMAS_REMOTE_BASE/server.next && tar -C $MIMAS_REMOTE_BASE/server.next -xzf -'"
 [ "$DRY" = yes ] || echo "[deploy] uploaded $mb MB of build and ${srv_mb} MB of server in $(( $(date +%s) - started )) s"
 
 # ---------------------------------------------------------------- 7. release
