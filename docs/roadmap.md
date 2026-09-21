@@ -4,7 +4,7 @@
 |---|---|---|---|
 | M0 | Setup | Empty Web build loads in browser; `dotnet test` green; Unity CLI + Claude Code connected; server `/ws` echoes ping | in progress |
 | M1 | Core loop, offline | Hex map from JSON, 1 unit each, move + basic attack, turn order, win by kill; playable vs a random bot in the Editor; Core has ≥ 50 tests | **done 15 Sep 2026** |
-| M2 | Online | Same match over WebSocket via `Mimas.Server`; guest auth; rooms by code; server-authoritative turn clock; resign; reconnect | **local end to end done 17 Sep 2026**; deploy artefacts and runbook written 22 Sep (`docs/deploy-runbook.md`, `tools/deploy/`), live pending Rohan's first run (M2-7) |
+| M2 | Online | Same match over WebSocket via `Mimas.Server`; guest auth; rooms by code; server-authoritative turn clock; resign; reconnect | **local end to end done 17 Sep 2026**; **live at `https://mimas.laststep.cloud` since 21 Sep** (Rohan's first `deploy.sh` run; three green live smokes, headers as specified — M2-7 pending verifier) |
 | M3 | Depth | Gear replaces classes (`items/`), two damage lanes + elements, three lineages with starting blessings, boons (blessing / enchant / sigil) with the between-round draft, session best-of-3 across 3 ladder maps, session-long reveals, character select and draft screens. Spec: `docs/design/index.html` | |
 | M4 | Presentation | Cinemachine tilted/top-down toggle, UI Toolkit HUD + examine mode, Shuriken VFX, FMOD music/SFX, low-poly characters with animations | |
 | M5 | Ship | Ratings (Glicko-2), deploy on VPS, size/load optimisation (Addressables, stripping), mobile browser check | |
@@ -191,7 +191,7 @@ Small editor/authoring tools, in the order they are likely to be worth building.
 | Metric | Value | Date |
 |---|---|---|
 | Empty URP Web build (Brotli) | 12.5 MB (wasm 7.9 + data 4.5 + framework.js 0.08 + loader/template 0.04) | 14 Sep 2026 |
-| Load time (desktop Chrome, cold) | — s (pending the first live deploy; localhost for scale: boot 0.6 s, socket connected 3.1 s, 12.3 MB transferred) | 22 Sep 2026 |
+| Load time (desktop Chrome, cold) | **7.8 s to socket connected** on `https://mimas.laststep.cloud/?room=ZZZZ`, median of three headless runs (boot 3.7 / 5.3 / 9.5 s; connected 6.2 / 7.8 / 12.0 s), 12.3 MB transferred each time. Localhost for scale: boot 0.6 s, connected 3.1 s | 21 Sep 2026 |
 | Core test count / runtime | 24 / 0.07 s | 14 Sep 2026 |
 | Core test count / runtime | 110 / 0.05 s (movement: walk / jump / teleport resolvers, integer hex lines) | 15 Sep 2026 |
 | Core test count / runtime | 131 / 0.05 s (+ content catalogue, classes, hash parity) | 15 Sep 2026 |

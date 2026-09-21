@@ -1,39 +1,41 @@
 ---
 project: mimas
 milestone: M2
-updated: 2026-09-22
-updated_by: builder (opus) — T-0007 Part 1, the deploy artefacts
+updated: 2026-09-21
+updated_by: builder (fable) — T-0007 Part 3, the live confirmation
 ---
 
 # Where Mimas stands
 
 > **Rewritten, never appended.** One page, always current. History lives in `runs/` and in git.
+> Dates in this file are wall-clock. Earlier entries stamped "22 Sep" were written on 21 Sep; the
+> run report `R-2026-09-22-T-0007` explains the day-ahead label.
 
 ## Right now
 
-**The match is on the server, and the game is one command away from the internet.** From the lobby you
-press **Play vs bot** or **Create room**, get a four-letter code, pick your gear in the room, press
-Ready, and play a real match whose truth lives in `Mimas.Server` — with a 30 s server-authoritative
-turn, resign, and a reconnect grace. The client holds a *mirror* of the match rebuilt from its own
-`PlayerView` (ADR-026), so it can only ever know what the server chose to send.
+**Mimas is on the internet: `https://mimas.laststep.cloud`.** Rohan deployed it himself on 21 Sep
+with `bash tools/deploy/deploy.sh`, and the same session confirmed it from the outside: three green
+browser smokes on the live origin, every header as the spec lists them, `/ws` upgrading through nginx,
+the systemd unit up with zero restarts under `ProtectSystem=strict`. **Cold load is 7.8 s to socket
+connected (median of three), 12.3 MB.** The content hash on the box is the one Windows and WSL
+reported. The journal already shows two seats authenticated in one room on the live server.
+
+From the lobby you press **Play vs bot** or **Create room**, get a four-letter code, pick your gear in
+the room, press Ready, and play a real match whose truth lives in `Mimas.Server` — with a 30 s
+server-authoritative turn, resign, and a reconnect grace. The client holds a *mirror* of the match
+rebuilt from its own `PlayerView` (ADR-026), so it can only ever know what the server chose to send.
 
 **321 Core tests and 34 server tests**, the latter playing whole matches over real sockets. Both are
-ladder rungs, both required, both green on 22 Sep.
-
-**It runs in a browser.** Rohan played it there on 18 Sep — the most valuable thing that has happened
-to this milestone, and the only reason two shipped defects were found. All four ways into a room
-(type the code, paste it, invite link, `?room=` in the address bar) now work.
-
-**What is new today (22 Sep): everything needed to deploy, and nothing deployed.** T-0007 Part 1 is
-done and proved locally. Part 2 is Rohan's, and it is the only thing standing between here and a link
-a friend can open.
+ladder rungs, both required, both green on 21 Sep.
 
 ## The one thing to do next
 
-**Rohan: follow `docs/deploy-runbook.md`.** §1 is one DNS record in Hostinger hPanel (type A, name
-`mimas`, pointing where `laststep.cloud` points). §2 is `bash tools/deploy/deploy.sh --setup`, once.
-§3 is `bash tools/deploy/deploy.sh`, every time after. Nothing can be measured on the internet until
-the A record exists, and nothing else in M2 is blocked on anything.
+**Send the link to one person who is not Rohan, on another network, and play a match against them.**
+That single evening produces the last two facts M2 needs: M2-1 (two browsers, one full match through
+the server) and the step-4 evidence for M2-7. Record it as `studio/playtests/<date>-<name>.md`. It
+costs nothing now, and it is the thing the 2 Oct fallback date is measured against.
+
+Then: a verifier session on T-0007, and the next spec-writing session (see "Next plan" below).
 
 ## Current milestone: M2 — online
 
@@ -47,15 +49,18 @@ Target: **Sat 10 Oct 2026**, friends playing over the internet. **18 days.**
 | M2-4 Server-authoritative 30 s turn | **done**, seen firing live |
 | M2-5 Reload within the 60 s grace resyncs | **done** server-side and in the Editor |
 | M2-6 Resign and disconnect-forfeit | **done**, both paths seen |
-| M2-7 Deployed on the VPS over HTTPS | **artefacts written and rehearsed 22 Sep; live pending Rohan.** See below |
+| M2-7 Deployed on the VPS over HTTPS | **live since 21 Sep, confirmed from outside; pending verifier** and one playtest entry from someone who is not Rohan (spec §11 step 4) |
 | M2-8 Rematch without leaving the room | not started (out of scope by D9) |
 
 **Nothing in the ledger is ticked.** `pass` belongs to a verifier, not the builder who wrote the code.
 
 ## Deploy: what exists, what is proved, what is not
 
-`docs/specs/2026-09-22-deploy.md` in three parts. **Part 1 is done** (T-0007, run report
-`R-2026-09-22-T-0007`, six commits on `main`, nothing pushed).
+`docs/specs/2026-09-22-deploy.md` in three parts. **All three are done** (T-0007, run report
+`R-2026-09-22-T-0007`, status `verify`). Part 2 was Rohan's own run on 21 Sep; Part 3 read the result
+from outside and over read-only ssh, and found nothing to fix — the `ProtectSystem=strict` fork, the
+`tar` fork and the nginx-parse fork all turned out unneeded. Redeploy is `bash tools/deploy/deploy.sh`
+from Git Bash; `--rollback` swaps back to `.prev`.
 
 | Artefact | What it does |
 |---|---|
@@ -77,45 +82,52 @@ because Mimas is the first subdomain on that box whose files nginx serves **off 
 proxying to a container — `www-data` has to traverse it; and the unit's `ProtectHome` is
 **`read-only`**, not `true`, which would have hidden the binary from its own service.
 
-**Proved locally, not on the VPS:** the full dry run exits 0 including a real Unity build (12.31 MB,
-same as 18 Sep, and it needs **no live Editor** — batch mode opens its own); the size gate exits 1 at
-a fake 1 MB limit; the `linux-x64` self-contained publish **actually runs inside WSL** and reports the
-same content hash as the Windows server (`ea75e2db…`); loopback answers and the LAN address is
-refused; the browser smoke is green at `boot 616 ms, expect 3040 ms, transferred 12.3 MB` on
-localhost. Only two read-only `ssh hostinger` commands were run all session — agents never deploy
-(decision D4).
+**Proved on the VPS, 21 Sep:** `/health` answers with content hash `ea75e2db…` (the same one Windows
+and WSL reported); the four hashed `/Build/` files come back `Content-Encoding: br` with the right inner
+type and `immutable`; `/` is `no-cache`; `/ws` returns `101` and a ping; the live smoke is green three
+times at `boot 3.7–9.5 s, connected 6.2–12.0 s, 12.3 MB` (localhost was `0.6 s / 3.1 s`); the unit is
+active with `NRestarts=0` under `ProtectSystem=strict` and `ProtectHome=read-only`; `nginx -t` passes;
+the cert for `mimas.laststep.cloud` exists. Footprint on disk: 107 MB server, 13 MB web.
 
-**Not proved:** anything that needs the VPS. The nginx file has never been parsed by nginx (Docker
-Desktop was not running, so the optional local parse was skipped); `tar` from Git Bash has never met
-Ubuntu's `tar` (mitigated with `--format=ustar`); `ProtectSystem=strict` has never started the
-process. Spec §13 has a fork for each.
+**Not proved:** the WebKit smoke (spec §11 step 3 — `--browser` is not in `browser-smoke.mjs` yet);
+a real Safari; and anyone other than Rohan loading it. Also still open and out of M2 scope: `/ws`
+accepts any origin.
 
 ## In flight
 
 | Task | What | Status | Who |
 |---|---|---|---|
-| **T-0007** | **Deploy** | **Part 1 done; waiting on Rohan's deploy, then Part 3 measures and hands to a verifier** | builder (opus) |
-| T-0002 | Execute the online slice | verify | builder |
+| **T-0007** | **Deploy** | **verify** — all three parts done, live confirmed 21 Sep | verifier needed |
+| T-0002 | Execute the online slice | verify | verifier needed |
 | T-0003 | The Web build, in a browser | running — day 2 | builder |
 | T-0005 | Copy code button beside Copy link | todo (from 21 Sep playtest) | builder |
 | T-0006 | Refused shots show the blocking hex; prop art fills its hex | todo (from 21 Sep playtest) | builder |
 
 ## Blocked
 
-| Task | Blocked by | Since |
+Nothing.
+
+## Next plan
+
+The next spec-writing session picks the slice. `studio/plans/2026-09-22-spec-session-prep.md` framed
+the choice as deploy (done) versus board mechanics; with deploy live the field is different. The
+candidates, in the order the deadline cares about:
+
+| Slice | Why | Lane |
 |---|---|---|
-| T-0007 Part 3 | Rohan's first deploy (Part 2) | 22 Sep 2026 |
+| **Finish M2 in the browser**: T-0005, T-0006, the custom Web template (960×600 box, Unity footer, title, splash), M2-8 rematch in the room | Everything a friend will hit on 10 Oct. Small, known, no design questions | light |
+| **Board mechanics, first slice** (aura + fog in `PlayerView`, `needsVision` + blind shots) | The first thing that changes how the game plays. Blocked on OQ-N03/N07/N11 and on the design page having `proposed` sections | full |
+| **WebSocket origin check + WebKit smoke** | Hardening that Part 3 left open. Half a day | light |
 
 ## Waiting on Rohan
 
 | What | Why | Since |
 |---|---|---|
-| **Add the `mimas` A record, then follow `docs/deploy-runbook.md`** | You chose to run deploys yourself (spec D4). It is the only thing blocking M2-7, and M2-7 is the only thing that can slip 10 Oct | 22 Sep 2026 |
-| **Play one bot match at `?perf=1`** and say what the meter showed, or when it hitched | It is the only instrument that sees your 144 Hz vsync. Nothing outside the game can | 18 Sep 2026 |
+| **One match against a friend on another network**, recorded as a playtest file | It is M2-1 and the last evidence M2-7 needs. Nothing blocks it any more | 21 Sep 2026 |
+| **Play one bot match at `?perf=1`** and say what the meter showed, or when it hitched | It is the only instrument that sees your 144 Hz vsync. Nothing outside the game can. The live site is the right place to do it now | 18 Sep 2026 |
 | Edit `pillars.md` — it is a draft distilled from the design page, and the pillars are yours | | 17 Sep 2026 |
 | Optional: should a room show the other seat's chosen preset before the match starts? | design `#q-online-room-loadout` | 17 Sep 2026 |
 | Answer OQ-N03, N07, N11 on `docs/design/mechanics.xlsx` before anyone builds the board mechanics | jump/teleport crossing a beam; trap consumed on fire; lane and power for structure damage | 21 Sep 2026 |
-| Commit the 21 Sep design files, or say who should | Still uncommitted: `docs/design/mechanics.xlsx`, the board-mechanics brief and research, the playtest, T-0005/T-0006, the prep plan. Today's deploy work **is** committed | 22 Sep 2026 |
 
 ## Decided on 22 Sep: deploy, and how (ADR-031)
 
@@ -231,12 +243,13 @@ code button is missing (**T-0005**); shots refused where the picture looks open,
 placeholder prop box being narrower than the hex column the rules block (**T-0006**); and whether a
 turn should end itself at 0 AP, parked as **OQ-N16**. No frame-meter reading was reported.
 
-**Still unplayed by a human: two browsers against each other** — the whole of M2-1 — and, from today,
-**anything at all over the internet**.
+**Still unplayed by a human: two browsers against each other** — the whole of M2-1. The live server's
+journal shows two seats authenticated in one room on 21 Sep, so someone has at least reached a room
+from two clients; a match played through and written up is what counts.
 
 ## The deadline
 
 From `E:\Studios\Trinetra-Game-Studio\docs\PLAN.md` §10: if two browsers cannot play a full match
 through the server by **Fri 2 Oct**, the 10 Oct playtest falls back to the local build and online
-moves to 17 Oct. The game code is not what puts that at risk; deploy is — and deploy is now one DNS
-record and two commands away.
+moves to 17 Oct. Deploy no longer puts that at risk. What is left is one evening with a second human,
+and it can happen any day from now.
