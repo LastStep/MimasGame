@@ -45,5 +45,8 @@ Any change to how codes are generated or validated. Any change to the join field
 
 ## Notes
 
+**Executed as part of T-0008** (`docs/specs/2026-09-21-m2-browser-finish.md` §6, commit 6 of §11),
+unchanged in scope. Close this task when T-0008 verifies.
+
 The 18 Sep harness (`browser-smoke.mjs`) can seed and read the real clipboard (`clip:` step, the
 context requests clipboard permissions); reuse that for the check rather than trusting the status line.

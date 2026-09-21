@@ -53,5 +53,8 @@ Changing the supercover rule, heights, aim points or prop data. Real prop art.
 
 ## Notes
 
+**Executed as part of T-0008** (`docs/specs/2026-09-21-m2-browser-finish.md` §7, commits 7–8 of
+§11), unchanged in scope. Close this task when T-0008 verifies.
+
 Heroes are also whole-hex bodies of height 6. If a case turns out to be a hero body blocking a shot
 that looks open past its shoulder, the fix is the same highlight, not a thinner hero.

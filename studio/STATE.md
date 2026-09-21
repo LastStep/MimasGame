@@ -35,7 +35,7 @@ That single evening produces the last two facts M2 needs: M2-1 (two browsers, on
 the server) and the step-4 evidence for M2-7. Record it as `studio/playtests/<date>-<name>.md`. It
 costs nothing now, and it is the thing the 2 Oct fallback date is measured against.
 
-Then: a verifier session on T-0007, and the next spec-writing session (see "Next plan" below).
+Then: a verifier session on T-0007, and an Opus builder on **T-0008** (see "Next plan" below).
 
 ## Current milestone: M2 — online
 
@@ -97,27 +97,30 @@ accepts any origin.
 
 | Task | What | Status | Who |
 |---|---|---|---|
+| **T-0008** | **Finish M2 in the browser** — rematch in the room, Mimas Web template, Copy code, blocker shown, origin check, multi-browser smoke | **approved, not started.** Spec `docs/specs/2026-09-21-m2-browser-finish.md`, plan `P-T-0008` | builder (opus) |
 | **T-0007** | **Deploy** | **verify** — all three parts done, live confirmed 21 Sep | verifier needed |
 | T-0002 | Execute the online slice | verify | verifier needed |
 | T-0003 | The Web build, in a browser | running — day 2 | builder |
-| T-0005 | Copy code button beside Copy link | todo (from 21 Sep playtest) | builder |
-| T-0006 | Refused shots show the blocking hex; prop art fills its hex | todo (from 21 Sep playtest) | builder |
+| T-0005 | Copy code button beside Copy link | folded into T-0008 (spec §6) | — |
+| T-0006 | Refused shots show the blocking hex; prop art fills its hex | folded into T-0008 (spec §7) | — |
 
 ## Blocked
 
 Nothing.
 
-## Next plan
+## Next plan: T-0008, decided 21 Sep
 
-The next spec-writing session picks the slice. `studio/plans/2026-09-22-spec-session-prep.md` framed
-the choice as deploy (done) versus board mechanics; with deploy live the field is different. The
-candidates, in the order the deadline cares about:
+Rohan chose "finish M2 in the browser" over board mechanics, and answered the four questions in one
+round: **rematch = the room outlives the match** (same code, Ready reset, no offer, no score);
+**full-window canvas** template titled Mimas with its own favicon and a percentage bar; **Unity splash
+off** and the product renamed through `WebBuild.cs`; **both hardening items folded in** (WebSocket
+origin allow-list in `appsettings.Production.json`, `--browser webkit|firefox` in the smoke). T-0005
+and T-0006 execute inside it unchanged. The spec is written to be run unattended by Opus, server half
+first (no Editor), then client. It ends the way the deploy spec did: Rohan redeploys with the one
+command (no `--setup`), plays a bot match and a rematch on the live site, then a friend by code — that
+evening is M2-1, M2-7 and M2-8 in one sitting — and a short session measures and hands to a verifier.
 
-| Slice | Why | Lane |
-|---|---|---|
-| **Finish M2 in the browser**: T-0005, T-0006, the custom Web template (960×600 box, Unity footer, title, splash), M2-8 rematch in the room | Everything a friend will hit on 10 Oct. Small, known, no design questions | light |
-| **Board mechanics, first slice** (aura + fog in `PlayerView`, `needsVision` + blind shots) | The first thing that changes how the game plays. Blocked on OQ-N03/N07/N11 and on the design page having `proposed` sections | full |
-| **WebSocket origin check + WebKit smoke** | Hardening that Part 3 left open. Half a day | light |
+**Board mechanics** stays M3-or-later, still waiting on OQ-N03/N07/N11.
 
 ## Waiting on Rohan
 
