@@ -166,6 +166,17 @@ public sealed class RoomRegistry
         RoomOf(player)?.Reattach(player, connection);
     }
 
+    /// <summary>
+    /// The code of the room this player is seated in while it is choosing gear, or null. It is what
+    /// <c>auth.ok</c> carries after a reload, so a client that comes back between matches opens on its
+    /// room instead of a lobby whose buttons would all answer <c>in_room</c> (ADR-032).
+    /// </summary>
+    public string? WaitingRoomCodeOf(Player player)
+    {
+        Room? room = RoomOf(player);
+        return room != null && room.Phase == RoomPhase.Waiting ? room.Code : null;
+    }
+
     /// <summary>A socket ended. Whichever room was holding it needs to know; nothing else does.</summary>
     public void OnConnectionClosed(WsConnection connection)
     {

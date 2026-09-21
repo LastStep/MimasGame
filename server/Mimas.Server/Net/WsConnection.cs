@@ -277,7 +277,16 @@ public sealed class WsConnection
         Player = player;
         player.Connection = this;
         _log.LogInformation("authenticated {Player}", player);
-        Send(Messages.AuthOk, new JObject { ["playerId"] = player.Id, ["token"] = player.Token, ["name"] = player.Name });
+
+        var p = new JObject { ["playerId"] = player.Id, ["token"] = player.Token, ["name"] = player.Name };
+
+        // A player who reloads between matches is still seated in a room. Saying so here, before the
+        // room.state that Reattach broadcasts, is what lets the lobby open on the room rather than on
+        // buttons that would all answer in_room (ADR-032). Absent for anyone who is not in one.
+        string? room = _rooms.WaitingRoomCodeOf(player);
+        if (room != null) p["room"] = room;
+
+        Send(Messages.AuthOk, p);
     }
 
     private void OnPong()

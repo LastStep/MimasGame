@@ -45,7 +45,8 @@ namespace Mimas.Core.Protocol
 
         // ---- server -> client --------------------------------------------------------------------
 
-        /// <summary><c>{ playerId, token, name }</c></summary>
+        /// <summary><c>{ playerId, token, name, room? }</c> — <c>room</c> is the four-letter code when the
+        /// resumed player is still seated in a room that is waiting (ADR-032).</summary>
         public const string AuthOk = "auth.ok";
 
         /// <summary><c>{ code, youAre, seats: [ { name, ready, bot, present } … ] }</c> — sent to every occupant on every change.</summary>
