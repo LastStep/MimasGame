@@ -96,6 +96,52 @@ public class MatchTests
         }
     }
 
+    [Fact]
+    public async Task Match_TwoRoundsInOneRoom_BothComplete()
+    {
+        await using var factory = new MimasServerFactory(UnhurriedClock());
+        (FakeClient host, FakeClient guest, JObject hostStart, JObject guestStart) = await Rooms.PlayAsync(factory);
+        await using (host)
+        await using (guest)
+        {
+            Assert.Equal(1, hostStart.Value<int>("round"));
+
+            var a = new MirrorPlayer(factory.Catalog, host, hostStart, 5);
+            var b = new MirrorPlayer(factory.Catalog, guest, guestStart, 9);
+            await Task.WhenAll(
+                PlayToTheEndAsync(a, host, TimeSpan.FromSeconds(90)),
+                PlayToTheEndAsync(b, guest, TimeSpan.FromSeconds(90)));
+
+            // Nobody left the room to get here, and nobody typed the code again (ADR-032).
+            JObject hostRoom = await host.ExpectAsync(Messages.RoomState);
+            JObject guestRoom = await guest.ExpectAsync(Messages.RoomState);
+            Assert.Equal(hostRoom.Value<string>("code"), guestRoom.Value<string>("code"));
+
+            await host.SendAsync(Messages.RoomLoadout, Loadouts.Ready(Loadouts.Bow));
+            await guest.SendAsync(Messages.RoomLoadout, Loadouts.Ready(Loadouts.Gun));
+
+            JObject hostSecond = await host.ExpectAsync(Messages.MatchStart);
+            JObject guestSecond = await guest.ExpectAsync(Messages.MatchStart);
+            Assert.Equal(2, hostSecond.Value<int>("round"));
+            Assert.Equal(2, guestSecond.Value<int>("round"));
+
+            var c = new MirrorPlayer(factory.Catalog, host, hostSecond, 11);
+            var d = new MirrorPlayer(factory.Catalog, guest, guestSecond, 13);
+            await Task.WhenAll(
+                PlayToTheEndAsync(c, host, TimeSpan.FromSeconds(90)),
+                PlayToTheEndAsync(d, guest, TimeSpan.FromSeconds(90)));
+
+            Assert.True(c.Mirror.IsOver);
+            Assert.True(d.Mirror.IsOver);
+            Assert.Equal(c.View.Winner, d.View.Winner);
+
+            // Still one room, still the same seats: the second match was played in it, not beside it.
+            Assert.Equal(1, (await factory.HealthAsync()).Value<int>("rooms"));
+            AssertEveryViewBelongsTo(host, c.Seat);
+            AssertEveryViewBelongsTo(guest, d.Seat);
+        }
+    }
+
     // ---- commands --------------------------------------------------------------------------------
 
     [Fact]

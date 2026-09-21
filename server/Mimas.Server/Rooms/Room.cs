@@ -18,7 +18,7 @@ public enum RoomPhase
     /// <summary>Both seats were ready; there is a match.</summary>
     Playing = 1,
 
-    /// <summary>The match ended. The room is closing.</summary>
+    /// <summary>Nobody human is left. The room is closing and its code is about to be forgotten.</summary>
     Over = 2,
 }
 
@@ -54,7 +54,18 @@ public sealed class Room
     public RoomPhase Phase { get; private set; } = RoomPhase.Waiting;
     public RoomClock Clock { get; }
 
-    /// <summary>The truth, once the match has started. Never serialised, never handed out (golden rule 6).</summary>
+    /// <summary>
+    /// Which match this is in the room's life: 1 for the first, 2 for the rematch, and so on. The room's
+    /// <see cref="MatchId"/> is the room's own id and is reused across rounds, so this is what tells two
+    /// matches apart in a log line (ADR-032).
+    /// </summary>
+    public int Round { get; private set; }
+
+    /// <summary>
+    /// The truth, while the match is being played. Never serialised, never handed out (golden rule 6).
+    /// Non-null exactly while <see cref="Phase"/> is <see cref="RoomPhase.Playing"/>: the result is sent
+    /// before the room goes back to waiting, and nothing may answer from a finished match afterwards.
+    /// </summary>
     public MatchState? State { get; private set; }
 
     public IReadOnlyList<Seat> Seats => _seats;
@@ -187,14 +198,15 @@ public sealed class Room
         State = new MatchState(_catalog, setup, seed);
         Phase = RoomPhase.Playing;
         _seq = 0;
+        Round++;
 
         IReadOnlyList<MatchEvent> started = State.Start();
         long now = Environment.TickCount64;
         Clock.Arm(now);
         _botDueAt = now + _options.BotThinkMs;
 
-        _log.LogInformation("room {Code}: match {MatchId} started on {Map}, seed {Seed}, first player {First}",
-            Code, MatchId, _options.MapId, seed, firstPlayer);
+        _log.LogInformation("room {Code}: match {MatchId} round {Round} started on {Map}, seed {Seed}, first player {First}",
+            Code, MatchId, Round, _options.MapId, seed, firstPlayer);
 
         foreach (Seat seat in _seats) SendMatchStart(seat, started);
         StartTicking();
@@ -210,6 +222,7 @@ public sealed class Room
         var p = new JObject
         {
             ["matchId"] = MatchId,
+            ["round"] = Round,
             ["seq"] = _seq,
             ["mapId"] = State.MapData.Id,
             ["youAre"] = seat.Index,
@@ -321,9 +334,59 @@ public sealed class Room
         if (!State.IsOver) return;
 
         var ended = events.OfType<MatchEndedEvent>().LastOrDefault();
-        _log.LogInformation("room {Code}: match {MatchId} over, winner {Winner} ({Reason})", Code, MatchId, State.Winner, ended?.Reason);
-        Phase = RoomPhase.Over;
-        Close();
+        _log.LogInformation("room {Code}: match {MatchId} round {Round} over, winner {Winner} ({Reason})",
+            Code, MatchId, Round, State.Winner, ended?.Reason);
+        ReturnToWaiting();
+    }
+
+    /// <summary>
+    /// The match is over; the room is not (ADR-032). The code two friends already agreed on stays open,
+    /// both seats keep their place and their gear, Ready goes back off, and pressing it again is the
+    /// whole of the rematch. Only a room with nobody human left in it closes.
+    /// <para>
+    /// A seat whose socket is gone at the result is freed rather than held: the reconnect grace is a
+    /// thing a *match* owes a player, and there is no match. That is what lets a friend who dropped
+    /// come back by code, and a different friend take the seat.
+    /// </para>
+    /// </summary>
+    private void ReturnToWaiting()
+    {
+        _ticker?.Cancel();
+        _ticker = null;
+        _bot = null;
+        State = null;
+
+        foreach (Seat seat in _seats)
+        {
+            if (seat.IsBot)
+            {
+                seat.Ready = true;            // the bot has nothing to choose and never un-readies
+                continue;
+            }
+            if (!seat.IsHuman) continue;
+
+            if (seat.Connection == null)
+            {
+                if (seat.Player != null) seat.Player.RoomId = 0;
+                seat.Clear();
+                _log.LogInformation("room {Code}: seat {Seat} was gone at the result; the seat is free", Code, seat.Index);
+                continue;
+            }
+
+            // Loadout is deliberately kept: Ready is one click, and the preset dropdown still shows what
+            // they played. It is still never broadcast (q-online-room-loadout).
+            seat.Ready = false;
+            seat.DisconnectedAt = null;
+        }
+
+        if (!_seats.Any(s => s.IsHuman))
+        {
+            Close();
+            return;
+        }
+
+        Phase = RoomPhase.Waiting;
+        BroadcastRoomState();
     }
 
     private JObject ClockPayload() => new()

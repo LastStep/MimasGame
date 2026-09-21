@@ -54,7 +54,9 @@ namespace Mimas.Core.Protocol
         /// <summary><c>{}</c> — you are out of the room; the lobby is yours again.</summary>
         public const string RoomLeft = "room.left";
 
-        /// <summary><c>{ matchId, seq, mapId, youAre, opponentName, view, clock, events }</c></summary>
+        /// <summary><c>{ matchId, round, seq, mapId, youAre, opponentName, view, clock, events }</c> —
+        /// <c>matchId</c> is the room's id and is reused across rounds; <c>round</c> counts the matches
+        /// played in it, 1 for the first.</summary>
         public const string MatchStart = "match.start";
 
         /// <summary><c>{ matchId, seq, events, view, clock }</c> — events already filtered for this seat.</summary>
