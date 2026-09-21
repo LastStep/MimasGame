@@ -1,0 +1,38 @@
+# systemd unit for the Mimas game server on the VPS.
+#
+# Installed to /etc/systemd/system/mimas-server.service by tools/deploy/vps-setup.sh, which enables
+# it but does not start it: there is no binary until the first `deploy.sh` run.
+#
+# The binary is a self-contained linux-x64 publish (ADR-031, decision D5), so nothing needs .NET
+# installed on the box. Logs go to journald: `ssh hostinger journalctl -u mimas-server -f`.
+
+[Unit]
+Description=Mimas game server (ASP.NET Core WebSocket rooms)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=mimas
+Group=mimas
+WorkingDirectory=/opt/mimas/server
+ExecStart=/opt/mimas/server/Mimas.Server
+Environment=MIMAS_PORT=7777
+Environment=MIMAS_BIND=loopback
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=DOTNET_EnableDiagnostics=0
+Restart=always
+RestartSec=2
+LimitNOFILE=65536
+
+# The server writes nothing: no database, no files, logs to journald. So the publish folder can be
+# read-only and the rest of the filesystem invisible. If a future change makes it write, this is the
+# first place to look — the failure is an unhelpful "Read-only file system" in journalctl.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadOnlyPaths=/opt/mimas/server
+
+[Install]
+WantedBy=multi-user.target
