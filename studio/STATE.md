@@ -2,7 +2,7 @@
 project: mimas
 milestone: M2
 updated: 2026-09-21
-updated_by: builder (opus) — T-0008, finishing M2 in the browser
+updated_by: builder (fable) — T-0008 deployed and measured live; session wrap-up
 ---
 
 # Where Mimas stands
@@ -15,10 +15,11 @@ updated_by: builder (opus) — T-0008, finishing M2 in the browser
 
 **Mimas is on the internet: `https://mimas.laststep.cloud`** — deployed by Rohan on 21 Sep and
 confirmed from outside the same day (three green browser smokes, every header as specified, `/ws`
-upgrading through nginx, the unit up with zero restarts). **The live site is one deploy behind the
-repo**: everything below is built, green and captured, and has not been shipped yet.
+upgrading through nginx, the unit up with zero restarts). **The live site is the repo**: Rohan
+redeployed the same evening with everything below on it, played a bot match and a rematch there, and
+the measuring pass confirmed it from outside (details under "Deploy").
 
-Since that deploy, T-0008 closed what a friend meets in the first five minutes:
+T-0008 closed what a friend meets in the first five minutes:
 
 - **A match no longer throws you out of the room.** After the result both seats are back in the room
   they started in — same code, Ready reset, gear editable — and pressing Ready again starts the next
@@ -38,20 +39,13 @@ Ladder for T-0008: green, 4/4 (`studio/runs/.ladder/T-0008.json`).
 
 ## The one thing to do next
 
-**Rohan: deploy, then play.**
+**Send the link to one person who is not Rohan, on another network, and play them — with a
+rematch.** That one evening is M2-1, the step-4 evidence for M2-7, and M2-8 with a human on the other
+seat. Record it as `studio/playtests/<date>-<name>.md`. Nothing blocks it; the site is live with
+everything on it.
 
-```
-bash tools/deploy/deploy.sh          # no --setup: nothing on the VPS changes
-bash tools/deploy/deploy.sh --smoke
-```
-
-Then one bot match on the live site — resign, **Back to room**, Ready, a second match — and then
-**send the link to one person who is not Rohan, on another network, and play them**. That single
-evening produces the last three facts M2 needs: M2-1, the step-4 evidence for M2-7, and M2-8 in the
-wild. Record it as `studio/playtests/<date>-<name>.md`.
-
-Then: a short measuring session against the live site (`R-2026-09-21-T-0008` § "Left for next time"
-lists the five commands), and a verifier on T-0008 — which closes T-0005 and T-0006 with it.
+Then a **verifier** on T-0008 (closes T-0005 and T-0006 with it), T-0007 and T-0002 — three tasks sit
+at `verify` and nothing in the ledger is ticked until someone in a fresh context agrees.
 
 ## Current milestone: M2 — online
 
@@ -66,7 +60,7 @@ Target: **Sat 10 Oct 2026**, friends playing over the internet. **18 days.**
 | M2-5 Reload within the 60 s grace resyncs | **done** server-side and in the Editor |
 | M2-6 Resign and disconnect-forfeit | **done**, both paths seen |
 | M2-7 Deployed on the VPS over HTTPS | **live since 21 Sep, confirmed from outside; pending verifier** and one playtest entry from someone who is not Rohan |
-| M2-8 Rematch without leaving the room | **built 21 Sep (T-0008), pending verifier.** Nine server tests, the Editor sequence captured; not yet played on the live site |
+| M2-8 Rematch without leaving the room | **built and played live 21 Sep (T-0008), pending verifier.** The server journal shows room `55QY` play round 1 to elimination and round 2 to a resign; nine server tests; the Editor sequence captured |
 
 **Nothing in the ledger is ticked.** `pass` belongs to a verifier, not the builder who wrote the code.
 
@@ -74,7 +68,7 @@ Target: **Sat 10 Oct 2026**, friends playing over the internet. **18 days.**
 
 | Task | What | Status | Who |
 |---|---|---|---|
-| **T-0008** | **Finish M2 in the browser** — rematch, the Mimas template, Copy code, the blocker shown, origin check, three-engine smoke | **verify.** Twelve commits, ladder green, run report `R-2026-09-21-T-0008`. Rohan deploys next | verifier needed |
+| **T-0008** | **Finish M2 in the browser** — rematch, the Mimas template, Copy code, the blocker shown, origin check, three-engine smoke | **verify.** Twelve commits, ladder green, deployed and measured live 21 Sep; run report `R-2026-09-21-T-0008` | verifier needed |
 | T-0007 | Deploy | verify — all three parts done, live confirmed 21 Sep | verifier needed |
 | T-0002 | Execute the online slice | verify | verifier needed |
 | T-0005 | Copy code button | **verify** — executed inside T-0008, clipboard read back in a real browser | closes with T-0008 |
@@ -89,9 +83,9 @@ Nothing, except what waits on Rohan below.
 
 `docs/specs/2026-09-22-deploy.md` in three parts. **All three are done** (T-0007, run report
 `R-2026-09-22-T-0007`, status `verify`). Redeploy is `bash tools/deploy/deploy.sh` from Git Bash;
-`--rollback` swaps back to `.prev`. **The next deploy carries one new file** —
-`server/Mimas.Server/appsettings.Production.json` — which turns on the origin allow-list. It lands in
-the publish output by itself; no unit, nginx or `--setup` change.
+`--rollback` swaps back to `.prev`. The second deploy (21 Sep, 15:07 UTC) carried
+`appsettings.Production.json` in the publish output by itself; no unit, nginx or `--setup` change was
+needed, and the unit logs `ws origins allowed: https://mimas.laststep.cloud` at start.
 
 | Artefact | What it does |
 |---|---|
@@ -108,11 +102,13 @@ the publish output by itself; no unit, nginx or `--setup` change.
 not 750, because nginx serves these files off disk; the unit's `ProtectHome` is **`read-only`**, not
 `true`, which would have hidden the binary from its own service.
 
-**Proved on the VPS, 21 Sep:** `/health` content hash `ea75e2db…`; the four hashed `/Build/` files
-come back `Content-Encoding: br` with the right inner type and `immutable`; `/` is `no-cache`; `/ws`
-returns `101`; three green live smokes at `boot 3.7–9.5 s, connected 6.2–12.0 s, 12.3 MB`; the unit
-active with `NRestarts=0`; the cert exists. **Not proved:** a real Safari, anyone other than Rohan
-loading it, and everything in this session's changes *on the box* — none of it has been deployed yet.
+**Proved on the VPS, 21 Sep (after the second deploy):** `/` is titled `Mimas` with the new template;
+`/health` content hash `ea75e2db…`; the four hashed `/Build/` files come back `Content-Encoding: br`
+with the right inner type and `immutable`; `/ws` returns `101` with the site's `Origin` and `403`
+without one (the journal logs the refusal); a two-round match was played in room `55QY`; three green
+live smokes at **`boot 2.8 s, connected 3.2 s, 12.3 MB`** (the morning's 7.8 s had the splash in
+it); the unit active with `NRestarts=0`. **Not proved:** a real Safari, and anyone other than Rohan
+loading it.
 
 ## Numbers, 21 Sep (local build)
 
@@ -123,15 +119,15 @@ loading it, and everything in this session's changes *on the box* — none of it
 | Firefox | 1315 ms | 1584 ms | 12.3 MB |
 
 The 18 Sep local baseline was `boot 0.6 s / connected 3.1 s` **with** the Unity splash. Boot is
-unchanged; connected fell to 1.16 s. The live baseline (`7.8 s to connected, 12.3 MB`) is re-measured
-after the next deploy — the splash removal should show in *connected*, not in *boot*. Build size
+unchanged; connected fell to 1.16 s. **Live, after the deploy (Chromium, headless, three runs):
+`boot 2.8 s, connected 3.2 s, 12.3 MB`**, down from `7.8 s` connected the same morning. Build size
 **12.31 MB** against the 13 MB ratchet.
 
 ## Waiting on Rohan
 
 | What | Why | Since |
 |---|---|---|
-| **Deploy, then one match against a friend on another network**, recorded as a playtest file | It is M2-1, the last evidence M2-7 needs, and the first live run of everything T-0008 built | 21 Sep 2026 |
+| **One match against a friend on another network, with a rematch**, recorded as a playtest file | It is M2-1, the last evidence M2-7 needs, and M2-8 with a human opponent. The site is live with everything on it | 21 Sep 2026 |
 | **Play one bot match at `?perf=1`** and say what the meter showed, or when it hitched | It is the only instrument that sees your 144 Hz vsync. It also unblocks T-0003 | 18 Sep 2026 |
 | Edit `pillars.md` — it is a draft distilled from the design page, and the pillars are yours | | 17 Sep 2026 |
 | Optional: should a room show the other seat's chosen preset before the match starts? | design `#q-online-room-loadout` | 17 Sep 2026 |

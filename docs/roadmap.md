@@ -220,7 +220,7 @@ Small editor/authoring tools, in the order they are likely to be worth building.
 | Metric | Value | Date |
 |---|---|---|
 | Empty URP Web build (Brotli) | 12.5 MB (wasm 7.9 + data 4.5 + framework.js 0.08 + loader/template 0.04) | 14 Sep 2026 |
-| Load time (desktop Chrome, cold) | **7.8 s to socket connected** on `https://mimas.laststep.cloud/?room=ZZZZ`, median of three headless runs (boot 3.7 / 5.3 / 9.5 s; connected 6.2 / 7.8 / 12.0 s), 12.3 MB transferred each time. Localhost for scale: boot 0.6 s, connected 3.1 s | 21 Sep 2026 |
+| Load time (desktop Chrome, cold) | **3.2 s to socket connected** on `https://mimas.laststep.cloud/?room=ZZZZ`, median of three headless runs after the T-0008 deploy (boot 2.8 / 2.8 / 2.9 s; connected 3.2 / 3.2 / 3.3 s), 12.3 MB each time. Before the splash was removed, same day and same page: boot 3.7 / 5.3 / 9.5 s, connected 6.2 / 7.8 / 12.0 s (median 7.8 s). Localhost for scale: boot 0.7 s, connected 1.2 s | 21 Sep 2026 |
 | Core test count / runtime | 24 / 0.07 s | 14 Sep 2026 |
 | Core test count / runtime | 110 / 0.05 s (movement: walk / jump / teleport resolvers, integer hex lines) | 15 Sep 2026 |
 | Core test count / runtime | 131 / 0.05 s (+ content catalogue, classes, hash parity) | 15 Sep 2026 |
