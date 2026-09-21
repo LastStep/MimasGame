@@ -24,10 +24,15 @@ namespace Mimas.Client.Presentation
         [Tooltip("Seconds the shrink-to-nothing takes when the prop is destroyed.")]
         [SerializeField] private float _destroySeconds = 0.25f;
 
+        private static readonly Color BlockedColor = new Color(1f, 0.353f, 0.290f, 1f);
+
         private Transform _visual;
         private MaterialPropertyBlock _block;
         private Mesh _bodyMesh;
         private Mesh _hitMarkMesh;
+        private GameObject _body;
+        private Color _baseColor;
+        private bool _blocking;
 
         /// <summary>Body id from Core — unique across every unit and prop in the match.</summary>
         public int Id { get; private set; }
@@ -75,6 +80,18 @@ namespace Mimas.Client.Presentation
             transform.rotation = Quaternion.identity;
 
             BuildPlaceholder(board.TileSize, BodyWorldHeight, view.AimHeight * worldPerUnit, color);
+        }
+
+        /// <summary>
+        /// Marks this prop as the thing that stopped the shot currently being aimed, in the aim line's own
+        /// blocked colour (T-0006). The tile underneath carries the same mark, but a prop now fills its hex
+        /// exactly, so from above the tile is not visible at all: the body has to say it itself.
+        /// </summary>
+        public void SetBlocking(bool blocking)
+        {
+            if (_blocking == blocking || _body == null) return;
+            _blocking = blocking;
+            Tint(_body, blocking ? Color.Lerp(_baseColor, BlockedColor, 0.75f) : _baseColor);
         }
 
         /// <summary>Shrinks the prop away and destroys it, then calls back. The tile is walkable again the moment Core says so, not when this finishes.</summary>
@@ -127,13 +144,14 @@ namespace Mimas.Client.Presentation
             // The prism's base sits at y = 0 and its top at y = height, so it needs no offset at all.
             _bodyMesh = HexMeshFactory.CreatePrism(radius, bodyHeight, "PropPrism");
 
-            var body = new GameObject("Body");
-            body.layer = gameObject.layer;
-            body.transform.SetParent(root.transform, false);
-            body.AddComponent<MeshFilter>().sharedMesh = _bodyMesh;
-            body.AddComponent<MeshRenderer>();
-            body.AddComponent<MeshCollider>().sharedMesh = _bodyMesh;   // the cursor picks the prop by this
-            Tint(body, color);
+            _body = new GameObject("Body");
+            _body.layer = gameObject.layer;
+            _body.transform.SetParent(root.transform, false);
+            _body.AddComponent<MeshFilter>().sharedMesh = _bodyMesh;
+            _body.AddComponent<MeshRenderer>();
+            _body.AddComponent<MeshCollider>().sharedMesh = _bodyMesh;   // the cursor picks the prop by this
+            _baseColor = color;
+            Tint(_body, color);
 
             AimPoint = new GameObject("AimPoint").transform;
             AimPoint.SetParent(transform, false);

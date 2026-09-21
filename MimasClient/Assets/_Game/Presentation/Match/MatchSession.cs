@@ -95,6 +95,9 @@ namespace Mimas.Client.Presentation
         // Views.
         private readonly Dictionary<int, UnitView> _unitViews = new Dictionary<int, UnitView>();
         private readonly Dictionary<int, PropView> _propViews = new Dictionary<int, PropView>();
+
+        /// <summary>The prop currently wearing the blocked tint, or <see cref="None"/>.</summary>
+        private int _blockingPropId = None;
         private readonly List<HudUnit> _hudUnits = new List<HudUnit>();
         private readonly Dictionary<int, HudUnit> _hudUnitsById = new Dictionary<int, HudUnit>();
         private Transform _propRoot;
@@ -1309,7 +1312,7 @@ namespace Mimas.Client.Presentation
                 // The band stays lit while the cursor is off the board — it belongs to the armed ability, not the
                 // cursor — but there is nothing left to aim at, so the line, the blocker and the tag go.
                 if (_aimPreview != null) _aimPreview.Hide();
-                _board.ClearBlocker();
+                ClearBlocker();
                 bool changed = _cursorTag != null;
                 _cursorTag = null;
                 if (ClearPreview() || changed) RaiseStateChanged();
@@ -1344,7 +1347,7 @@ namespace Mimas.Client.Presentation
             int samples = FlightCurve.Samples(attack.Trajectory);
 
             ClearPreview();
-            _board.ClearBlocker();     // this hover answers for itself; only a refusal puts it back
+            ClearBlocker();            // this hover answers for itself; only a refusal puts it back
             _cursorTag = null;
 
             switch (check.Reason)
@@ -1363,7 +1366,11 @@ namespace Mimas.Client.Presentation
                     // The X marks where the shot stops; the tint marks the hex the rules blamed. They are
                     // often not the same picture: a grazing line is blocked by a pillar beside it, not on
                     // it (design #line-of-sight rule 5), which is what "refused where it looks open" was.
-                    if (check.HasBlockedAt) _board.SetBlocker(check.BlockedAt);
+                    if (check.HasBlockedAt)
+                    {
+                        _board.SetBlocker(check.BlockedAt);
+                        MarkBlockingProp(check.BlockedAt);
+                    }
 
                     ShowPreview(attack, check.Victim,
                         check.Reason == TargetRejectReason.NoLineOfSight ? "No line of sight" : "Trajectory blocked");
@@ -1540,8 +1547,33 @@ namespace Mimas.Client.Presentation
         {
             if (_aimPreview != null) _aimPreview.Hide();
             if (_rangeCircles != null) _rangeCircles.Hide();
-            if (_board != null) _board.ClearBlocker();
+            ClearBlocker();
             _cursorTag = null;
+        }
+
+        /// <summary>
+        /// Says which hex stopped the shot, in both places it can be seen: the tile, and — when something
+        /// is standing on it — the body itself, because a prop fills its hex and hides the tile under it.
+        /// </summary>
+        private void MarkBlockingProp(Hex hex)
+        {
+            foreach (KeyValuePair<int, PropView> pair in _propViews)
+            {
+                if (pair.Value == null || pair.Value.CurrentHex != hex) continue;
+                pair.Value.SetBlocking(true);
+                _blockingPropId = pair.Key;
+                return;
+            }
+        }
+
+        private void ClearBlocker()
+        {
+            if (_board != null) _board.ClearBlocker();
+            if (_blockingPropId == None) return;
+
+            PropView prop;
+            if (_propViews.TryGetValue(_blockingPropId, out prop) && prop != null) prop.SetBlocking(false);
+            _blockingPropId = None;
         }
 
         private string DescribeLine(DamageLine line)
