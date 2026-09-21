@@ -122,10 +122,16 @@ When it is done it prints the certificate's expiry date, says nginx is running, 
 
 ## 3. Deploy (every time)
 
-From the repo root, in PowerShell or Git Bash — either is fine, the script runs itself in `bash`:
+From the repo root, **in Git Bash** (see §0 — `bash` in PowerShell is the WSL launcher):
 
-```
+```bash
 bash tools/deploy/deploy.sh
+```
+
+or, staying in PowerShell:
+
+```powershell
+& 'C:\Program Files\Git\bin\bash.exe' tools/deploy/deploy.sh
 ```
 
 Nine steps, printed as it goes. Roughly:
