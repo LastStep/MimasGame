@@ -7,6 +7,8 @@
 #   bash tools/deploy/deploy.sh --setup         one-time: upload tools/deploy to the VPS and run vps-setup.sh
 #   bash tools/deploy/deploy.sh --rollback      put the previous build and server back
 #   bash tools/deploy/deploy.sh --smoke         after release, run the browser smoke against the live URL
+#                                               (Chromium; for the others run browser-smoke.mjs yourself
+#                                                with --browser webkit|firefox)
 #
 # Runs on this PC, from the repo root. Invoke it as `bash tools/deploy/deploy.sh` from PowerShell,
 # Git Bash or WSL — Git's bash is on the Windows PATH, and the script runs itself in bash, so the

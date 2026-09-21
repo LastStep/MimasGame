@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Ladder rung 10 — browser smoke.
 //
-// Loads a served Mimas Web build in headless Chromium, waits for Unity to boot, and fails loudly on
+// Loads a served Mimas Web build in a headless browser, waits for Unity to boot, and fails loudly on
 // anything the browser complains about. This is the gate between "it built" and "a friend can play
 // it": nothing else in the ladder ever executes the WebGL-specific paths — the NativeWebSocket jslib
 // socket, PlayerPrefs reaching IndexedDB, `?room=` off the page URL, Brotli.
@@ -10,6 +10,19 @@
 //   node tools/smoke/browser-smoke.mjs --url http://localhost:7777/?room=ABCD --shot artifacts/smoke
 //   node tools/smoke/browser-smoke.mjs --do "wait:2000,click:480,420,type:ABCD,shot:after-click,wait:8000"
 //   node tools/smoke/browser-smoke.mjs --url https://mimas.laststep.cloud/ --timing
+//   node tools/smoke/browser-smoke.mjs --browser webkit --timing
+//   node tools/smoke/browser-smoke.mjs --headed --do "wait:3000,click:640,520,wait:2000,clipmatch:^[A-HJ-NP-Z2-9]{4}$"
+//
+// --browser chromium|webkit|firefox (default chromium). WebKit and Firefox have to be fetched once:
+//
+//   npx playwright install webkit firefox
+//
+// WebKit on Windows is not Safari — it is the same engine without Apple's own quirks — so it catches
+// WebGL2 and Brotli-decoding differences and nothing about iOS. The clipboard steps (`clip:`,
+// `clipmatch:`) are Chromium-only and are skipped with a printed [skip] line elsewhere, because only
+// Chromium can be granted clipboard permission without a user gesture.
+//
+// --viewport 1920x1080 sizes the window; the default is 1280x800.
 //
 // --timing adds one line at the end — boot ms, ms to --expect, and the bytes the page pulled down:
 //
@@ -28,11 +41,19 @@
 // hidden; that is `display: none` in the stylesheet until the loader shows it, so it passed in 906 ms
 // against a page that had not started loading. Do not reintroduce that check.
 
-import { chromium } from 'playwright';
+import { chromium, webkit, firefox } from 'playwright';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
+const engines = { chromium, webkit, firefox };
+
 const args = parseArgs(process.argv.slice(2));
+const browserName = args.browser ?? 'chromium';
+const engine = engines[browserName];
+if (!engine) {
+  console.error(`unknown --browser "${browserName}". One of: ${Object.keys(engines).join(', ')}`);
+  process.exit(2);
+}
 const url = args.url ?? 'http://localhost:7777/';
 const bootTimeout = Number(args.timeout ?? 120_000);
 const shotDir = args.shot ?? 'artifacts/smoke';
@@ -61,12 +82,12 @@ function note(line) {
 // script evaluation and calls it from that same script's onload), and an Object.defineProperty
 // accessor is simply overwritten, because the loader declares it as a global `function`. What is left
 // is the template's own loading bar, which is honest as long as BOTH phases are checked.
-const browser = await chromium.launch({ headless: !headed });
-const context = await browser.newContext({
-  viewport: { width: 1280, height: 800 },
-  // Needed by --clip, and harmless otherwise. Without it navigator.clipboard.writeText rejects.
-  permissions: ['clipboard-read', 'clipboard-write'],
-});
+const browser = await engine.launch({ headless: !headed });
+const contextOptions = { viewport: parseViewport(args.viewport) };
+// Clipboard permission can only be granted without a gesture in Chromium; Firefox and WebKit reject
+// the permission name itself, so asking for it there fails the whole run before the page loads.
+if (browserName === 'chromium') contextOptions.permissions = ['clipboard-read', 'clipboard-write'];
+const context = await browser.newContext(contextOptions);
 const page = await context.newPage();
 
 // A line the game itself must print before this run counts as a pass.
@@ -121,7 +142,7 @@ page.on('response', (res) => {
 
 let failure = null;
 try {
-  note(`> ${url}`);
+  note(`> ${url}  (${browserName}${headed ? ', headed' : ''})`);
   started = Date.now();
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
 
@@ -148,7 +169,7 @@ try {
 
   // Steps first, then the assertion. The client connects lazily — nothing reaches the socket until
   // something is clicked — so checking --expect before the steps can only ever time out.
-  await runSteps(page, args.do ?? '', shotDir, note);
+  await runSteps(page, args.do ?? '', shotDir, note, browserName);
 
   if (expect) {
     const deadline = Date.now() + Number(args['expect-timeout'] ?? 60_000);
@@ -189,7 +210,7 @@ if (errors.length) {
 note('\nOK — no pageerror, no console.error, no failed request.');
 
 /** `wait:2000,click:480,420,shot:lobby` — ordered steps, so a scenario needs no second file. */
-async function runSteps(page, spec, dir, say) {
+async function runSteps(page, spec, dir, say, browserName = 'chromium') {
   if (!spec) return;
   const parts = spec.split(',').map((s) => s.trim()).filter(Boolean);
   for (let i = 0; i < parts.length; i++) {
@@ -218,8 +239,16 @@ async function runSteps(page, spec, dir, say) {
       // Seeds the REAL browser clipboard, so a following `key:Control+v` is a genuine paste rather
       // than a synthetic text insertion. The difference matters: CDP insertText targets a DOM text
       // element and Unity's canvas is not one.
+      if (browserName !== 'chromium') { say(`[skip] clipboard step: ${browserName}`); continue; }
       await page.evaluate((t) => navigator.clipboard.writeText(t), first);
       say(`clipboard := "${first}"`);
+    } else if (verb === 'clipmatch') {
+      // Reads the REAL clipboard back and fails unless it matches. This is how Copy code is proved:
+      // the game wrote it through WebClipboard, and nothing but the browser's own clipboard is asked.
+      if (browserName !== 'chromium') { say(`[skip] clipboard step: ${browserName}`); continue; }
+      const text = await page.evaluate(() => navigator.clipboard.readText());
+      if (!new RegExp(first).test(text)) throw new Error(`clipboard is "${text}", which does not match /${first}/`);
+      say(`clipboard is "${text}" — matches /${first}/`);
     } else if (verb === 'insert') {
       // Text with no key events at all — how a paste and an IME commit arrive. If this lands where
       // `type:` does not, the break is in key handling and an HTML/IME path would work.
@@ -234,6 +263,14 @@ async function runSteps(page, spec, dir, say) {
       throw new Error(`unknown step "${parts[i]}"`);
     }
   }
+}
+
+/** `--viewport 1920x1080`; the default is the 1280x800 every earlier run used. */
+function parseViewport(spec) {
+  if (!spec || spec === true) return { width: 1280, height: 800 };
+  const [w, h] = String(spec).toLowerCase().split('x').map(Number);
+  if (!w || !h) throw new Error(`--viewport wants WIDTHxHEIGHT, got "${spec}"`);
+  return { width: w, height: h };
 }
 
 function parseArgs(argv) {
