@@ -42,4 +42,13 @@ public sealed class ServerOptions
 
     /// <summary>How often each room's clock, bot and reconnect graces are checked.</summary>
     public int TickMs { get; set; } = 100;
+
+    /// <summary>
+    /// The origins allowed to open a game socket, exactly as a browser writes them (scheme, host, and a
+    /// port if it is not the default; no trailing slash). <b>Null or empty means any origin</b>, which is
+    /// what development, the tests and a plain <c>dotnet run</c> rely on; production names its one origin
+    /// in <c>appsettings.Production.json</c> so that changing it is a redeploy and not a VPS setup
+    /// (ADR-033).
+    /// </summary>
+    public string[]? AllowedOrigins { get; set; }
 }

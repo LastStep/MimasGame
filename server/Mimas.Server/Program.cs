@@ -114,16 +114,39 @@ app.MapGet("/health", () => Results.Ok(new
     utc = DateTime.UtcNow,
 }));
 
+// Who may open a game socket. Empty — the default, and what every test and a plain `dotnet run` rely
+// on — means anyone. Production names its one origin in appsettings.Production.json, so moving the
+// site is a redeploy and not a VPS setup (ADR-033).
+var allowedOrigins = options.AllowedOrigins ?? Array.Empty<string>();
+if (allowedOrigins.Length > 0) app.Logger.LogInformation("ws origins allowed: {Origins}", string.Join(", ", allowedOrigins));
+else app.Logger.LogInformation("ws origins allowed: any");
+
 app.Map("/ws", async context =>
 {
+    var log = context.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("ws");
+
     if (!context.WebSockets.IsWebSocketRequest)
     {
         context.Response.StatusCode = StatusCodes.Status400BadRequest;
         return;
     }
 
+    // A browser always sends Origin on a WebSocket handshake, so a missing one is refused with the
+    // rest. The header is compared as a string: an origin has no trailing slash and no path, and
+    // parsing it would only invent ways for two spellings of the same site to disagree.
+    if (allowedOrigins.Length > 0)
+    {
+        string origin = context.Request.Headers.Origin.ToString();
+        if (!allowedOrigins.Any(o => string.Equals(o, origin, StringComparison.OrdinalIgnoreCase)))
+        {
+            log.LogWarning("ws: origin {Origin} refused", string.IsNullOrEmpty(origin) ? "(none)" : origin);
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            await context.Response.WriteAsync("This server does not accept game sockets from that origin.");
+            return;
+        }
+    }
+
     using var socket = await context.WebSockets.AcceptWebSocketAsync();
-    var log = context.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("ws");
     log.LogInformation("client connected {Remote}", context.Connection.RemoteIpAddress);
 
     var connection = new WsConnection(socket, log, players, rooms, options.PingIntervalMs, options.IdleCloseMs);
