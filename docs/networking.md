@@ -24,6 +24,16 @@ Why not the alternatives (short): Photon can't be self-hosted at indie prices an
 - Reconnect: the client keeps its `token` and `matchId` in `PlayerPrefs`; `auth.resume` puts it back in its
   seat and replays the current `PlayerView` as a fresh `match.start`.
 
+### Origins
+
+`Mimas:AllowedOrigins` (configuration, not code) is the list of origins that may open `/ws`, written the
+way a browser writes them — scheme, host, and a port if it is not the default, no trailing slash. **Empty
+or unset means any origin**, which is development, the tests and a plain `dotnet run`. Production names
+its one origin in `appsettings.Production.json`, so moving the site is a redeploy and not a VPS setup
+(ADR-033). A handshake from anywhere else — or with no `Origin` header at all, which no browser does — is
+`403` with a warning line naming the origin. The refusal is deliberately the server's and not nginx's: it
+is in the log, and it is in the tests.
+
 ## Message envelope
 
 ```json
@@ -48,12 +58,22 @@ case-insensitive on the way in. A matchmaking queue returns at M5 with ratings.
 Gear is chosen **in the room**, once you can see who you are playing, and the match starts when both
 seats are ready.
 
+**The room outlives the match** (ADR-032, design `#online` rule 9, 21 Sep 2026). A room's life is
+`Waiting → Playing → Waiting → Playing → …`; it reaches `Over` only when nobody human is left in it, and
+that is the only thing that forgets its code. After a result both seats keep their place and their gear,
+`ready` goes back to `false` for the humans (the bot seat stays ready), and both pressing Ready again
+starts the next match — there is no rematch offer and no session score, because the room *is* the offer.
+A seat whose socket is gone at the result is **freed** rather than held: the reconnect grace is something
+a match owes a player, and there is no match. So a friend who dropped can rejoin by code, and a different
+friend can take the seat. `matchId` is the room's id and is reused across rounds; `round` in `match.start`
+counts them, 1 for the first. Closing the tab in a waiting room frees the seat as it always did.
+
 ### Client → Server
 
 | `t` | Payload | Reply / effect |
 |---|---|---|
 | `auth.guest` | `{ name }` (1..24 chars, trimmed; empty → `Guest-<4 digits>`) | `auth.ok` |
-| `auth.resume` | `{ token }` | `auth.ok`, and a fresh `match.start` if the seat is still live; unknown token → `error { code: "bad_token" }` |
+| `auth.resume` | `{ token }` | `auth.ok` (with `room` when the seat is in a room that is waiting), and a fresh `match.start` if the seat is still live, or `room.state` if the room is between matches; unknown token → `error { code: "bad_token" }` |
 | `room.create` | `{}` | `room.state`; you are seat 0 |
 | `room.join` | `{ code }` | `room.state` to both seats |
 | `bot.play` | `{}` | `room.state` with seat 1 = `Random Bot`, already ready |
@@ -67,10 +87,10 @@ seats are ready.
 
 | `t` | Payload |
 |---|---|
-| `auth.ok` | `{ playerId, token, name }` |
+| `auth.ok` | `{ playerId, token, name, room? }` — `room` is the four-letter code, present only when the resumed player is seated in a room that is waiting |
 | `room.state` | `{ code, youAre, seats: [ { name, ready, bot, present } … ] }`, always two entries |
 | `room.left` | `{}` |
-| `match.start` | `{ matchId, seq, mapId, youAre, opponentName, view, clock, events }` (`events` = the filtered start events, normally one `turnStarted`; empty on a reconnect) |
+| `match.start` | `{ matchId, round, seq, mapId, youAre, opponentName, view, clock, events }` (`events` = the filtered start events, normally one `turnStarted`; empty on a reconnect. `round` is 1 for the first match in a room, 2 for the rematch, …) |
 | `match.events` | `{ matchId, seq, events, view, clock }` |
 | `match.rejected` | `{ matchId, reason, view, clock }` |
 | `match.view` | `{ matchId, seq, view, clock }` |
@@ -146,4 +166,11 @@ move, so replaying a match's command list reproduces it exactly, with no clock a
 
 Time controls with banks and increments (`timecontrols.json` stays loaded and unused; design:
 `#time-controls`), a matchmaking queue and ratings (M5), accounts and any database (M5), spectating,
-chat, move buffering across a reconnect, and rematch without leaving the room (M2-8).
+chat, move buffering across a reconnect, and a best-of-three wrapper or any session score around the
+rematch (the room's rounds are counted, nothing else is).
+
+One gap worth naming: `auth.ok.room` covers a resume that arrives while the seat is still held — a
+second tab, or a reconnect the server has not yet seen the close for. A **full page reload** after a
+result closes the socket first, and closing a socket in a waiting room frees the seat, so that player
+comes back as a stranger and needs the code again. Holding a seat for a grace between matches is a
+design question (how long does a room wait for you?) and is Rohan's.

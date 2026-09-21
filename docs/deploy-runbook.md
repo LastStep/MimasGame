@@ -209,6 +209,8 @@ are not in the match yourself, wait.
 | certbot fails to issue | Same cause, nearly always | As above |
 | `nginx -t` failed, previous file restored | Our nginx file is bad | Your other site is fine — the script put the old file back. Send the output to the next Claude session |
 | `502 Bad Gateway` on the page | The page is served, the game server is not running | `ssh hostinger systemctl status mimas-server`, then `journalctl -u mimas-server -n 40` |
+| `curl` on `/ws` answers **403**, but the game works in the browser | Nothing is wrong. Since 21 Sep the live server only accepts sockets from `https://mimas.laststep.cloud`, and `curl` sends no `Origin` | Add `-H "Origin: https://mimas.laststep.cloud"` to the `curl` and expect `101`. The journal line is `ws: origin (none) refused` |
+| The **page** loads but every match says "Server unreachable", after moving the site to a new name | The allow-list still names the old origin | It is one line in `server/Mimas.Server/appsettings.Production.json`; change it and deploy again. No `--setup`, no nginx change |
 | Page loads, lobby says "Server unreachable · retrying" | The `/ws` proxy or the server | Same two commands. If the server is healthy, it is nginx not forwarding the upgrade |
 | Units are magenta, props are pink | A stale Web build | Deploy again **without** `--skip-build` |
 | `rung 9 gate: build is X MB, limit 25 MB` | The build grew past the limit | Nothing to do on the VPS. Tell the next session; it is a real regression |
