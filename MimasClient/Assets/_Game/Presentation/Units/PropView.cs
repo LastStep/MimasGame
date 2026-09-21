@@ -7,9 +7,9 @@ namespace Mimas.Client.Presentation
 {
     /// <summary>
     /// The view of one prop — a wall or a pillar (design: #props). Like <see cref="UnitView"/> it is a
-    /// code-built placeholder: a coloured box <c>bodyHeight</c> units tall with a collider so the cursor can
-    /// pick it, and an <c>AimPoint</c> child at the prop's aim height so a shot snaps to the same point the
-    /// rules aim at. Destructible props also get a thin ring at that point, which is the hit mark the player
+    /// code-built placeholder: a coloured <b>hex prism the size of the hex it blocks</b>, <c>bodyHeight</c>
+    /// units tall, with a collider so the cursor can pick it, and an <c>AimPoint</c> child at the prop's aim
+    /// height so a shot snaps to the same point the rules aim at. Destructible props also get a thin ring at that point, which is the hit mark the player
     /// sees. Props are created from the <see cref="Mimas.Core.Match.PlayerView"/> projection and destroyed
     /// when Core says so; this class owns no rules state.
     /// </summary>
@@ -18,14 +18,16 @@ namespace Mimas.Client.Presentation
     {
         private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
 
-        [Tooltip("Box footprint as a fraction of the tile's circumradius. Placeholder art; a model replaces the box.")]
-        [SerializeField] private float _footprint = 0.62f;
+        [Tooltip("How far past the hex's corners the hit mark reads, as a fraction of the tile's circumradius.")]
+        [SerializeField] private float _hitMarkOvershoot = 1.06f;
 
         [Tooltip("Seconds the shrink-to-nothing takes when the prop is destroyed.")]
         [SerializeField] private float _destroySeconds = 0.25f;
 
         private Transform _visual;
         private MaterialPropertyBlock _block;
+        private Mesh _bodyMesh;
+        private Mesh _hitMarkMesh;
 
         /// <summary>Body id from Core — unique across every unit and prop in the match.</summary>
         public int Id { get; private set; }
@@ -106,22 +108,31 @@ namespace Mimas.Client.Presentation
             Destroy(gameObject);
         }
 
+        /// <summary>
+        /// The placeholder is a hexagonal prism with the tile's own footprint, <c>bodyHeight</c> tall
+        /// (T-0006). It was a box at 62 % of the tile, and that was the lie: the rules block a shot with
+        /// the whole hex column, so a shot could be refused by a pillar that looked comfortably narrower
+        /// than the gap beside it. The same <see cref="HexMeshFactory"/> the board is built from draws it,
+        /// so the thing standing on the hex is exactly the hex.
+        /// </summary>
         private void BuildPlaceholder(float tileSize, float bodyHeight, float aimHeight, Color color)
         {
-            float width = Mathf.Max(0.05f, tileSize * _footprint);
+            float radius = Mathf.Max(0.05f, tileSize);
 
             var root = new GameObject("PropVisual");
             root.layer = gameObject.layer;
             root.transform.SetParent(transform, false);
             _visual = root.transform;
 
-            // The cube primitive is 1 unit across at scale 1 and is centred on its own origin.
-            GameObject body = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            body.name = "Body";
+            // The prism's base sits at y = 0 and its top at y = height, so it needs no offset at all.
+            _bodyMesh = HexMeshFactory.CreatePrism(radius, bodyHeight, "PropPrism");
+
+            var body = new GameObject("Body");
             body.layer = gameObject.layer;
             body.transform.SetParent(root.transform, false);
-            body.transform.localScale = new Vector3(width, bodyHeight, width);
-            body.transform.localPosition = new Vector3(0f, bodyHeight * 0.5f, 0f);
+            body.AddComponent<MeshFilter>().sharedMesh = _bodyMesh;
+            body.AddComponent<MeshRenderer>();
+            body.AddComponent<MeshCollider>().sharedMesh = _bodyMesh;   // the cursor picks the prop by this
             Tint(body, color);
 
             AimPoint = new GameObject("AimPoint").transform;
@@ -130,16 +141,25 @@ namespace Mimas.Client.Presentation
 
             if (!IsDamageable) return;
 
-            // The hit mark: a thin band around the prop at exactly the height shots land on.
-            GameObject ring = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            ring.name = "HitMark";
-            ring.layer = gameObject.layer;
-            ring.transform.SetParent(root.transform, false);
-            ring.transform.localScale = new Vector3(width * 1.45f, 0.02f, width * 1.45f);
-            ring.transform.localPosition = new Vector3(0f, aimHeight, 0f);
-            Collider ringCollider = ring.GetComponent<Collider>();
-            if (ringCollider != null) Destroy(ringCollider);
-            Tint(ring, new Color(1f, 0.86f, 0.62f, 1f));
+            // The hit mark: a thin band of the same shape, a little wider, at exactly the height shots
+            // land on. A cylinder would have said "round" about something that is not.
+            const float MarkHeight = 0.03f;
+            _hitMarkMesh = HexMeshFactory.CreatePrism(radius * Mathf.Max(1f, _hitMarkOvershoot), MarkHeight, "PropHitMark");
+
+            var mark = new GameObject("HitMark");
+            mark.layer = gameObject.layer;
+            mark.transform.SetParent(root.transform, false);
+            mark.transform.localPosition = new Vector3(0f, aimHeight - (MarkHeight * 0.5f), 0f);
+            mark.AddComponent<MeshFilter>().sharedMesh = _hitMarkMesh;
+            mark.AddComponent<MeshRenderer>();
+            Tint(mark, new Color(1f, 0.86f, 0.62f, 1f));
+        }
+
+        private void OnDestroy()
+        {
+            // The factory caches nothing and the caller owns what it makes.
+            if (_bodyMesh != null) Destroy(_bodyMesh);
+            if (_hitMarkMesh != null) Destroy(_hitMarkMesh);
         }
 
         private void Tint(GameObject go, Color color)
@@ -147,7 +167,8 @@ namespace Mimas.Client.Presentation
             Renderer renderer = go.GetComponent<Renderer>();
             if (renderer == null) return;
 
-            // CreatePrimitive leaves a Built-in-pipeline material behind, which is magenta under URP.
+            // A bare MeshRenderer has no material at all, and CreatePrimitive leaves a Built-in-pipeline
+            // one behind; either way it draws magenta under URP without this.
             PlaceholderMaterial.Apply(go);
             if (_block == null) _block = new MaterialPropertyBlock();
             renderer.GetPropertyBlock(_block);

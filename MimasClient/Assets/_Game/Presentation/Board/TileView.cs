@@ -23,11 +23,15 @@ namespace Mimas.Client.Presentation
         [SerializeField] private Color _targetableTint = new Color(1f, 0.32f, 0.28f, 1f);
         [SerializeField] private Color _hoveredTint = new Color(1f, 0.96f, 0.62f, 1f);
 
+        [Tooltip("The hex that stopped the shot. Deliberately AimPreview's blocked colour: the X on the curve and the tile under it are one answer.")]
+        [SerializeField] private Color _blockerTint = new Color(1f, 0.353f, 0.290f, 1f);
+
         [Header("Blend strength towards the tint")]
         [Range(0f, 1f)] [SerializeField] private float _reachableBlend = 0.45f;
         [Range(0f, 1f)] [SerializeField] private float _pathPreviewBlend = 0.70f;
         [Range(0f, 1f)] [SerializeField] private float _targetableBlend = 0.55f;
         [Range(0f, 1f)] [SerializeField] private float _hoveredBlend = 0.85f;
+        [Range(0f, 1f)] [SerializeField] private float _blockerBlend = 0.80f;
 
         [Header("Runtime (set by BoardView)")]
         [SerializeField] private Color _baseColor = Color.grey;
@@ -97,6 +101,7 @@ namespace Mimas.Client.Presentation
                 case TileHighlight.Targetable: return Color.Lerp(_baseColor, _targetableTint, _targetableBlend);
                 case TileHighlight.PathPreview: return Color.Lerp(_baseColor, _pathPreviewTint, _pathPreviewBlend);
                 case TileHighlight.Hovered: return Color.Lerp(_baseColor, _hoveredTint, _hoveredBlend);
+                case TileHighlight.Blocker: return Color.Lerp(_baseColor, _blockerTint, _blockerBlend);
                 default: return _baseColor;
             }
         }

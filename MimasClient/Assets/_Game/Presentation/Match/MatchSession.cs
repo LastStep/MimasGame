@@ -1307,8 +1307,9 @@ namespace Mimas.Client.Presentation
             {
                 _board.ShowPathPreview(null);
                 // The band stays lit while the cursor is off the board — it belongs to the armed ability, not the
-                // cursor — but there is nothing left to aim at, so the line and the tag go.
+                // cursor — but there is nothing left to aim at, so the line, the blocker and the tag go.
                 if (_aimPreview != null) _aimPreview.Hide();
+                _board.ClearBlocker();
                 bool changed = _cursorTag != null;
                 _cursorTag = null;
                 if (ClearPreview() || changed) RaiseStateChanged();
@@ -1343,6 +1344,7 @@ namespace Mimas.Client.Presentation
             int samples = FlightCurve.Samples(attack.Trajectory);
 
             ClearPreview();
+            _board.ClearBlocker();     // this hover answers for itself; only a refusal puts it back
             _cursorTag = null;
 
             switch (check.Reason)
@@ -1357,6 +1359,12 @@ namespace Mimas.Client.Presentation
                 {
                     Vector3 blocked = check.HasBlockedAt ? _board.HexToAimPoint(check.BlockedAt, 0) : aimPoint;
                     _aimPreview.ShowBlocked(curve, blocked, samples);
+
+                    // The X marks where the shot stops; the tint marks the hex the rules blamed. They are
+                    // often not the same picture: a grazing line is blocked by a pillar beside it, not on
+                    // it (design #line-of-sight rule 5), which is what "refused where it looks open" was.
+                    if (check.HasBlockedAt) _board.SetBlocker(check.BlockedAt);
+
                     ShowPreview(attack, check.Victim,
                         check.Reason == TargetRejectReason.NoLineOfSight ? "No line of sight" : "Trajectory blocked");
                     break;
@@ -1532,6 +1540,7 @@ namespace Mimas.Client.Presentation
         {
             if (_aimPreview != null) _aimPreview.Hide();
             if (_rangeCircles != null) _rangeCircles.Hide();
+            if (_board != null) _board.ClearBlocker();
             _cursorTag = null;
         }
 

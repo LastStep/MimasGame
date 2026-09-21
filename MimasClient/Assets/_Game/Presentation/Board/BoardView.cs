@@ -72,6 +72,8 @@ namespace Mimas.Client.Presentation
 
         private bool _hasHovered;
         private Hex _hovered;
+        private Hex _blocker;
+        private bool _hasBlocker;
         private int _unitsPerLevel = 1;
         private Material _tileMaterialInstance;
 
@@ -274,6 +276,7 @@ namespace Mimas.Client.Presentation
             _reachable.Clear();
             _targets.Clear();
             _path.Clear();
+            _hasBlocker = false;      // what is armed changed; the aim recomputes on the next hover
             if (hexes != null)
             {
                 foreach (Hex h in hexes) _reachable.Add(h);
@@ -287,6 +290,7 @@ namespace Mimas.Client.Presentation
             _reachable.Clear();
             _targets.Clear();
             _path.Clear();
+            _hasBlocker = false;
             if (hexes != null)
             {
                 foreach (Hex h in hexes) _targets.Add(h);
@@ -322,12 +326,35 @@ namespace Mimas.Client.Presentation
             Repaint();
         }
 
-        /// <summary>Drops the reachable set, the targets, the path preview and the hover mark.</summary>
+        /// <summary>
+        /// The tile that stops the shot currently being aimed — whatever the rules named in
+        /// <c>TargetCheck.BlockedAt</c>. The X sits on the curve, this sits on the hex the rules blame, and
+        /// between them a refusal stops being a mystery: the pillar that blocks a grazing line is often
+        /// beside the line the board draws, not on it (T-0006, design <c>#line-of-sight</c> rule 5).
+        /// </summary>
+        public void SetBlocker(Hex hex)
+        {
+            if (_hasBlocker && _blocker == hex) return;
+            _blocker = hex;
+            _hasBlocker = true;
+            Repaint();
+        }
+
+        /// <summary>No shot is being refused any more: the hover moved, or the preview was cleared.</summary>
+        public void ClearBlocker()
+        {
+            if (!_hasBlocker) return;
+            _hasBlocker = false;
+            Repaint();
+        }
+
+        /// <summary>Drops the reachable set, the targets, the path preview, the blocker and the hover mark.</summary>
         public void ClearHighlights()
         {
             _reachable.Clear();
             _targets.Clear();
             _path.Clear();
+            _hasBlocker = false;
             _hasHovered = false;
             Repaint();
         }
@@ -403,6 +430,7 @@ namespace Mimas.Client.Presentation
                 Hex hex = pair.Key;
                 TileHighlight state;
                 if (_hasHovered && hex == _hovered) state = TileHighlight.Hovered;
+                else if (_hasBlocker && hex == _blocker) state = TileHighlight.Blocker;
                 else if (_path.Contains(hex)) state = TileHighlight.PathPreview;
                 else if (_targets.Contains(hex)) state = TileHighlight.Targetable;
                 else if (_reachable.Contains(hex)) state = TileHighlight.Reachable;

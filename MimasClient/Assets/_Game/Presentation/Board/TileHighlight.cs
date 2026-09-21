@@ -21,5 +21,13 @@ namespace Mimas.Client.Presentation
 
         /// <summary>Directly under the cursor.</summary>
         Hovered = 4,
+
+        /// <summary>
+        /// The tile that stops the shot being aimed right now — the hex the rules named in
+        /// <c>TargetCheck.BlockedAt</c>. A pillar beside the drawn line can block a shot the picture makes
+        /// look open (design <c>#line-of-sight</c> rule 5), so the hex the rules blame is tinted rather
+        /// than left for the player to guess at (T-0006).
+        /// </summary>
+        Blocker = 5,
     }
 }
