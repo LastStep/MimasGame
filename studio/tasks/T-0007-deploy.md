@@ -5,7 +5,7 @@ project: mimas
 feature: F-deploy
 milestone: M2
 lane: full
-status: approved
+status: running
 owner: builder
 model: opus
 worktree:
@@ -25,10 +25,10 @@ done_when:
   - "Part 3, after Rohan deploys: the live smoke exits 0 three times, headers match spec §1, and docs/roadmap.md has a cold-load baseline"
 ladder: [0, 1, 2, 5]
 created: 2026-09-22
-started:
+started: 2026-09-22
 finished:
 cost_usd: 0
-blocked_by:
+blocked_by: Part 2 — Rohan runs docs/deploy-runbook.md (agents never deploy, spec D4)
 ---
 
 # Deploy — a link a friend can open
