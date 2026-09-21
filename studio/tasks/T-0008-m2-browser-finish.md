@@ -5,7 +5,7 @@ project: mimas
 feature: F-m2-browser-finish
 milestone: M2
 lane: full
-status: approved
+status: running
 owner: builder
 model: opus
 worktree:
@@ -13,10 +13,19 @@ depends_on: [T-0007]
 allows_assets:
   # Written by Unity itself during WebBuild.Build: productName, companyName, splash off, template.
   # Commit it with the WebBuild.cs change and nothing else under ProjectSettings/.
+  # Both spellings, for the same reason T-0003 needed both: git sees the repo-relative path, a
+  # `unity command` argument sees the Unity-relative one.
   - 'MimasClient/ProjectSettings/ProjectSettings.asset'
   - 'MimasClient/ProjectSettings/GraphicsSettings.asset'
+  - 'ProjectSettings/ProjectSettings.asset'
+  - 'ProjectSettings/GraphicsSettings.asset'
   # The design page: rematch becomes rule 9 of #online, plus the lobby and targeting bullets (spec §10.1).
   - 'docs/design/index.html'
+  # Two new Core tests that document arena-4's real refusals before the picture is changed to match
+  # them: spec §7 step 1, plan P-T-0008 step 6, and done_when "Two arena-4 sight cases are Core tests".
+  # Added by the builder on 21 Sep after the guard refused the write; nothing existing is softened or
+  # deleted, and the run report says so.
+  - 'shared/Mimas.Core.Tests/SightArena4Tests.cs'
 done_when:
   - "After a match ends, both seats receive room.state with the same code and ready:false, and both pressing Ready starts a second match with round:2 (server tests, and a two-round match over real sockets)"
   - "A seat whose connection is gone at the result is freed and a third client can take it by code; a room with no human closes"
@@ -31,7 +40,7 @@ done_when:
   - "Core tests +2, server tests +9, EditMode green, unity command console has no error CS and no Exception"
 ladder: [0, 1, 2, 5, 7, 10]
 created: 2026-09-21
-started:
+started: 2026-09-21
 finished:
 cost_usd: 0
 blocked_by:

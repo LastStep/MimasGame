@@ -5,7 +5,7 @@ project: mimas
 feature: F-online-slice
 milestone: M2
 lane: light
-status: running
+status: blocked
 owner: builder
 model: opus
 worktree: main
@@ -36,6 +36,11 @@ done_when:
   - "A mid-match refresh resyncs into the running match inside the 60 s grace (PlayerPrefs -> IndexedDB)"
   - "Resign ends the match with the right banner, in a browser"
   - "tools/smoke/browser-smoke.mjs exists and fails loudly on a console error"
+blocked_by: >
+  Waiting on Rohan since 18 Sep: one bot match at ?perf=1 and what the frame meter showed (STATE,
+  "Waiting on Rohan"). No agent has worked on it since; the status said `running`, which made the
+  asset guard treat it as the active task during T-0008 and refuse T-0008's own declared paths.
+  Status corrected by the T-0008 builder on 21 Sep — the work itself is untouched.
 ---
 
 # The Web build, in a browser
