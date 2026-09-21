@@ -39,6 +39,26 @@ These live in `MimasClient/Assets/_Game/Editor/WebBuild.cs`, **not** in the "Web
 profile — the profile carries its own PlayerSettings snapshot that disagrees. Build through the
 script, which is what `deploy.sh` does.
 
+## The page: the Mimas Web template
+
+`MimasClient/Assets/WebGLTemplates/Mimas/` — Unity's own Default template, copied from the installed
+Editor and cut down (21 Sep 2026, D2/D3). The game is the page: a dark full-window canvas that resizes
+with the window, a text wordmark, a thin loading bar with a percentage, an SVG favicon, and **no**
+footer, fullscreen button, build title or Unity splash.
+
+`WebBuild.ApplyIdentity` states four values on every build, so a build cannot come out wearing the
+wrong name: `productName = "Mimas"`, `companyName = "Trinetra"`, `SplashScreen.show = false`,
+`WebGL.template = "PROJECT:Mimas"` (`PROJECT:` means a template in this project; `APPLICATION:` would
+mean one of Unity's). The build log prints them as `[WebBuild] identity: …`. Note that in batch mode
+those values are **not** written back into the saved player settings, so the file in the repo still
+reads the old product name — what ships is what the script sets at build time, which is why it is
+stated there rather than clicked once in the Editor.
+
+Hosting consequence: `TemplateData/` is copied next to `index.html` with **unhashed** names
+(`style.css`, `favicon.svg`), so nginx serves it from the one-hour cache block rather than the
+immutable `/Build/` one. No nginx change was needed for the new template — it was already serving
+`/TemplateData/` that way, and `svg` comes from `mime.types`.
+
 ## nginx config
 
 `tools/deploy/nginx-mimas.conf` — adapted from Unity's official 6000.4 nginx sample plus a WebSocket

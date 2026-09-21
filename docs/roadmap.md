@@ -4,7 +4,7 @@
 |---|---|---|---|
 | M0 | Setup | Empty Web build loads in browser; `dotnet test` green; Unity CLI + Claude Code connected; server `/ws` echoes ping | in progress |
 | M1 | Core loop, offline | Hex map from JSON, 1 unit each, move + basic attack, turn order, win by kill; playable vs a random bot in the Editor; Core has ≥ 50 tests | **done 15 Sep 2026** |
-| M2 | Online | Same match over WebSocket via `Mimas.Server`; guest auth; rooms by code; server-authoritative turn clock; resign; reconnect | **local end to end done 17 Sep 2026**; **live at `https://mimas.laststep.cloud` since 21 Sep** (Rohan's first `deploy.sh` run; three green live smokes, headers as specified — M2-7 pending verifier) |
+| M2 | Online | Same match over WebSocket via `Mimas.Server`; guest auth; rooms by code; server-authoritative turn clock; resign; reconnect; **rematch in the room**; a page called Mimas | **local end to end done 17 Sep 2026**; **live at `https://mimas.laststep.cloud` since 21 Sep** (Rohan's first `deploy.sh` run; three green live smokes, headers as specified — M2-7 pending verifier). **M2-8 (rematch) built 21 Sep, pending verifier**, with the Mimas Web template, Copy code, the blocker shown and a production origin check (T-0008). Still waiting on M2-1: two humans, two browsers, one match |
 | M3 | Depth | Gear replaces classes (`items/`), two damage lanes + elements, three lineages with starting blessings, boons (blessing / enchant / sigil) with the between-round draft, session best-of-3 across 3 ladder maps, session-long reveals, character select and draft screens. Spec: `docs/design/index.html` | |
 | M4 | Presentation | Cinemachine tilted/top-down toggle, UI Toolkit HUD + examine mode, Shuriken VFX, FMOD music/SFX, low-poly characters with animations | |
 | M5 | Ship | Ratings (Glicko-2), deploy on VPS, size/load optimisation (Addressables, stripping), mobile browser check | |
@@ -174,6 +174,35 @@ out. All four are the kind that need a scene and a real socket, which is why sec
 
 **Not done:** deploy (M2-7, `F-deploy`), rematch without leaving the room (M2-8), and a Web build served to
 a real browser — everything above was verified in the Editor against a real server on this machine.
+
+## M2 progress (21 Sep 2026): finishing it in the browser
+
+Deploy went live the same day, and T-0008 closed what a friend meets in the first five minutes.
+
+- **M2-8 is done pending a verifier.** The room outlives the match (ADR-032): after a result both seats
+  are back in the same room with the same code, Ready reset, and pressing it again starts the next match.
+  A seat whose socket is gone at the result is freed, so a friend can rejoin by code. Nine new server
+  tests including two whole matches played in one room over real sockets; seen end to end in the Editor
+  against a real server (`room HSHT: match 1 round 1 over … round 2 started`).
+- **The page is called Mimas**: Unity's Default template replaced by a full-window dark canvas with a
+  percentage loading bar, no footer and no Unity splash. 12.31 MB, unchanged against the 13 MB ratchet.
+- **Copy code** beside Copy link, proved by reading the real browser clipboard back.
+- **Refused shots explain themselves**: the hex the rules blamed is tinted, and so is the wall or pillar
+  standing on it; props are now hex prisms the size of the hex they block, instead of boxes at 62 % of it.
+  Two arena-4 Core tests document the two refusals first (Core 321 → 323).
+- **The server only accepts sockets from the real site in production** (ADR-033), and the browser smoke
+  runs in Chromium, WebKit and Firefox.
+
+**Baselines, local build, 21 Sep** (was `boot 0.6 s / connected 3.1 s` on 18 Sep with the Unity splash):
+
+| Engine | Boot | Connected | Transferred |
+|---|---|---|---|
+| Chromium | 662 ms | 1155 ms | 12.3 MB |
+| WebKit | 1121 ms | 1446 ms | 12.3 MB |
+| Firefox | 1315 ms | 1584 ms | 12.3 MB |
+
+The live baseline of 21 Sep (`boot 3.7–9.5 s, connected 6.2–12.0 s, 12.3 MB`) is re-measured after the
+next deploy; the splash removal should show in *connected*, not in *boot*.
 
 ## Tooling backlog
 
