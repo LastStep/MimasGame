@@ -2,7 +2,7 @@
 project: mimas
 milestone: M2
 updated: 2026-09-21
-updated_by: builder (fable) — T-0008 deployed and measured live; session wrap-up
+updated_by: fable — boons spec session (F-boons, T-0009 approved, T-0010 draft); no code written
 ---
 
 # Where Mimas stands
@@ -37,7 +37,17 @@ T-0008 closed what a friend meets in the first five minutes:
 two matches in a row in one room. Both are ladder rungs, both required, both green on 21 Sep.
 Ladder for T-0008: green, 4/4 (`studio/runs/.ladder/T-0008.json`).
 
+**21 Sep, evening: the boons system is specified (F-boons).** Four question rounds and two research
+passes; eighteen decisions; a Core-only part-1 spec that Fable builds next session
+(`docs/specs/2026-09-21-boons-groundwork.md`, task **T-0009**, `approved`), and a part-2 outline
+(`docs/specs/2026-09-21-boons-in-game-outline.md`, task **T-0010**, `draft`) that Fable turns into a full
+spec after part 1 lands and Opus then executes. No code was written. Details under "Decided on 21 Sep:
+boons".
+
 ## The one thing to do next
+
+Two things, and they do not compete: **(a) the M2 playtest** below, which only Rohan can do; **(b) a
+Fable session executes `T-0009`** from its spec, Core only, no Unity needed, one session.
 
 **Send the link to one person who is not Rohan, on another network, and play them — with a
 rematch.** That one evening is M2-1, the step-4 evidence for M2-7, and M2-8 with a human on the other
@@ -68,6 +78,8 @@ Target: **Sat 10 Oct 2026**, friends playing over the internet. **18 days.**
 
 | Task | What | Status | Who |
 |---|---|---|---|
+| **T-0009** | **Boons groundwork in Core** — definitions, unit overlay, elements, reveal, draft, `Session` | **approved**, spec written 21 Sep, not started | Fable, next session |
+| T-0010 | Boons in the game — online best-of-3 with the draft in the room, presentation | draft (outline only; full spec after T-0009) | Fable specs, Opus builds |
 | **T-0008** | **Finish M2 in the browser** — rematch, the Mimas template, Copy code, the blocker shown, origin check, three-engine smoke | **verify.** Twelve commits, ladder green, deployed and measured live 21 Sep; run report `R-2026-09-21-T-0008` | verifier needed |
 | T-0007 | Deploy | verify — all three parts done, live confirmed 21 Sep | verifier needed |
 | T-0002 | Execute the online slice | verify | verifier needed |
@@ -133,6 +145,29 @@ unchanged; connected fell to 1.16 s. **Live, after the deploy (Chromium, headles
 | Optional: should a room show the other seat's chosen preset before the match starts? | design `#q-online-room-loadout` | 17 Sep 2026 |
 | Optional: should a room hold your seat for a grace **between** matches, so a page reload after a result comes back to the room? | Today a reload frees the seat and you need the code again. It is a design question, not a bug | 21 Sep 2026 |
 | Answer OQ-N03, N07, N11 on `docs/design/mechanics.xlsx` before anyone builds the board mechanics | jump/teleport crossing a beam; trap consumed on fire; lane and power for structure damage | 21 Sep 2026 |
+
+## Decided on 21 Sep: boons (F-boons, specs D part 1 and the part-2 outline)
+
+Eighteen decisions, all in the part-1 spec §2; the ones a future agent will otherwise re-ask:
+
+| Decision | Chosen |
+|---|---|
+| Shape | **Part 1 is Core only** (data, loader, effect vocabulary, unit overlay, elements/immunity, reveal rules, draft, `Session`). Part 2 = server session flow + client screens + presentation. Editor practice mode folded into part 2; a balance sim is a part 3 if wanted |
+| Session | **A Core `Session` state machine** owns builds, score, ladder, session-long reveals and the draft; constructs one `MatchState` per round; replays from one seed |
+| Evolvable core | **Skeletons, not everything at once**: multi-hit (`hits`) and the trajectory swap parse, live in Core, fail closed with a `NotSupportedException` naming the spec, and are tested. The capability matrix (spec §3) is the checklist Rohan asked for |
+| Who builds | **Fable builds part 1; Fable then specs part 2 against the real code; Opus executes part 2** |
+| Vocabulary | `stat`, `modifier`, `abilityOverride` (target = slot or one ability id; fields range/minRange/damage/cost/apex/climb/jumpHeight, + skeleton hits/trajectory/lineOfSight), `addElement`, `addTag`, `grantAbility`. Cost floor 1; self trade-offs allowed with floors hp 1 / ap 1 (all in `rules.boons`) |
+| Elements | fire, frost, lightning; **a set** on an attack (innate + added); `exclusive[]` groups stop two element Enchants on one item |
+| Draft | Symmetric, **counts in `rules.draft.offers`** (3/3); one of each kind when possible; no tiers, reroll or cap at launch; timeout = a command picking offer 0 |
+| Reveal | Enchant reveals **on the observation that contradicts what the opponent knows** (aim, cost, element, damage line, modifier); hp/AP Blessing revealed at round start; first boon of a lineage reveals the lineage; revealing a boon reveals its whole definition |
+| Series | Best of 3; round 1 coin flip then **loser moves first**; ladder **wraps** (round 3 on position 1; a third map is another session) |
+| Content in part 1 | Three lineages × six boons + starting Blessings **Athena's Guard / Thor's Vigour / Vayu's Breath**; placeholder numbers Rohan tunes |
+
+Research filed: `studio/decisions/RESEARCH-2026-09-21-boons-precedents.md` (Hades, TFT, Slay the
+Spire, Monster Train, Rounds, hidden picks) and `RESEARCH-2026-09-21-effect-systems.md` (overlay over
+immutable defs, source-tagged contributions, content-lint and golden-replay tests). **The asset guard
+refused three read-only `sed`/`cat` commands this session** (design page, `studio/game.yaml`,
+`studio/ledger.json`, `.claude/**`); the Read tool was used instead, nothing was rephrased.
 
 ## Decided on 21 Sep: the room outlives the match (ADR-032), origins in JSON (ADR-033)
 
