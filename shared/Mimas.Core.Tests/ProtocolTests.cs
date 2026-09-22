@@ -10,12 +10,15 @@ using Mimas.Core.Geometry;
 using Mimas.Core.Match;
 using Mimas.Core.Movement;
 using Mimas.Core.Protocol;
+using Mimas.Core.Session;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Xunit;
 
 namespace Mimas.Core.Tests
 {
+    using Session = Mimas.Core.Session.Session;
+
     /// <summary>
     /// The wire codec (ADR-027). Everything that crosses a socket must survive a round trip field for
     /// field, and nothing hidden may become visible on the way: these are the tests that make the client
@@ -83,9 +86,9 @@ namespace Mimas.Core.Tests
         {
             List<MatchEvent> events = EveryEventType();
 
-            // All ten types the protocol knows must have shown up, or this test proves less than it claims.
+            // All fifteen types the protocol knows must have shown up, or this test proves less than it claims.
             var kinds = events.Select(e => e.GetType().Name).Distinct().ToList();
-            Assert.Equal(10, kinds.Count);
+            Assert.Equal(15, kinds.Count);
 
             foreach (MatchEvent e in events)
             {
@@ -235,6 +238,101 @@ namespace Mimas.Core.Tests
             Assert.Equal(lineage.ToPlayer, lineageBack.ToPlayer);
         }
 
+        // ---- the session (ADR-036) ---------------------------------------------------------------------
+
+        [Fact]
+        public void Wire_DraftPick_RoundTrip()
+        {
+            foreach (DraftPickReason reason in new[] { DraftPickReason.Player, DraftPickReason.Timeout })
+            {
+                var original = new DraftPickCommand(1, 2, reason);
+                JObject encoded = Wire.Command(original);
+                Assert.Equal("draftPick", encoded.Value<string>("type"));
+                Assert.Equal(JTokenType.String, encoded["reason"].Type);
+                var back = Assert.IsType<DraftPickCommand>(Wire.ReadCommand(encoded));
+                Assert.Equal(original.Player, back.Player);
+                Assert.Equal(original.OfferIndex, back.OfferIndex);
+                Assert.Equal(reason, back.Reason);
+            }
+            Assert.Throws<WireException>(() => Wire.ReadCommand(JObject.Parse(@"{ ""type"": ""draftPick"", ""player"": 0, ""offerIndex"": 0, ""reason"": ""late"" }")));
+        }
+
+        [Fact]
+        public void Wire_Session_RoundTrip_HiddenBoonsStayNull()
+        {
+            Session session = DraftingSession();
+            SessionView view = SessionView.For(session, 0);
+            JObject encoded = Wire.Session(view);
+
+            Assert.Equal("draft", encoded.Value<string>("phase"));
+            Assert.Equal(new JArray(1, 0).ToString(Formatting.None), encoded["score"].ToString(Formatting.None));
+            Assert.Equal("trial-vigour", encoded["opponentBoons"][0]["id"].Value<string>());
+            Assert.Null(encoded["opponentBoons"][1]["id"].Value<string>());          // the opponent's pick is not ours to see
+            Assert.Equal(3, ((JArray)encoded["myOffers"]).Count);
+            Assert.Equal("props-3", encoded.Value<string>("nextMapId"));
+            Assert.Equal("props-3", encoded.Value<string>("mapId"));                 // no round runs: the board shows the next map
+
+            SessionView back = Wire.ReadSession(encoded, null);
+            Assert.Equal(view.Viewer, back.Viewer);
+            Assert.Equal(view.Round, back.Round);
+            Assert.Equal(view.Phase, back.Phase);
+            Assert.Equal(view.Score0, back.Score0);
+            Assert.Equal(view.Score1, back.Score1);
+            Assert.Equal(view.RoundsToWin, back.RoundsToWin);
+            Assert.Equal(view.IsOver, back.IsOver);
+            Assert.Equal(view.Winner, back.Winner);
+            Assert.Equal(view.MapId, back.MapId);
+            Assert.Equal(view.NextMapId, back.NextMapId);
+            Assert.Equal(view.MyBuild, back.MyBuild);
+            Assert.Equal(view.OpponentLineageId, back.OpponentLineageId);
+            Assert.Equal(view.MyOffers, back.MyOffers);
+            Assert.Equal(view.IHavePicked, back.IHavePicked);
+            Assert.Equal(view.OpponentHasPicked, back.OpponentHasPicked);
+            Assert.Null(back.Match);
+            Assert.Equal(view.OpponentBoons.Count, back.OpponentBoons.Count);
+            Assert.Null(back.OpponentBoons[1].Id);
+            Assert.Equal(Json(encoded), Json(Wire.Session(back)));
+
+            // A round's view rides beside the session block, never inside it — and only while a round runs.
+            Session running = Started(out MatchState _);
+            JObject inRound = Wire.Session(SessionView.For(running, 0));
+            Assert.Null(inRound["view"]);
+            PlayerView match = running.Match.ViewFor(0);
+            Assert.Same(match, Wire.ReadSession(inRound, match).Match);
+            Assert.Throws<WireException>(() => Wire.ReadSession(encoded, match));
+        }
+
+        [Fact]
+        public void Wire_Session_Encode_IsDeterministic()
+        {
+            Session session = DraftingSession();
+            SessionView view = SessionView.For(session, 1);
+            Assert.Equal(Json(Wire.Session(view)), Json(Wire.Session(view)));
+            Assert.Equal(Json(Wire.Session(view)), Json(Wire.Session(Wire.ReadSession(Wire.Session(view), null))));
+        }
+
+        private static Session Started(out MatchState round)
+        {
+            var session = new Session(CombatFixtures.Catalog(),
+                new SessionSetup(CombatFixtures.ArcherWith(), CombatFixtures.BruteWith()), 7);
+            session.Start();
+            round = session.Match;
+            return session;
+        }
+
+        /// <summary>A session with round 1 behind it (P0 by elimination) and the draft open, one seat having picked.</summary>
+        private static Session DraftingSession()
+        {
+            Session session = Started(out MatchState round);
+            round.Units.Get(0).MoveTo(new Hex(-1, 1));
+            round.Units.Get(1).MoveTo(new Hex(0, 0));
+            round.Units.Get(1).TakeDamage(round.Units.Get(1).Hp - 1);
+            if (round.ActivePlayer != 0) session.Apply(new EndTurnCommand(1));
+            session.Apply(new AttackCommand(0, 0, "bow", new Hex(0, 0)));
+            session.Apply(new DraftPickCommand(1, 0));
+            return session;
+        }
+
         // ---- malformed frames -------------------------------------------------------------------------
 
         [Fact]
@@ -301,11 +399,24 @@ namespace Mimas.Core.Tests
         }
 
         /// <summary>
-        /// Drives a seeded random-bot game on the shipped map until all ten event types have appeared.
-        /// Props on arena-4 give <c>propDestroyed</c>, the bot's hidden modifiers give
-        /// <c>modifierRevealed</c>, and playing to the end gives <c>unitDied</c> and <c>matchEnded</c>.
+        /// Drives a seeded random-bot game on the shipped map until all ten round event types have appeared,
+        /// then appends the session's five. Props on arena-4 give <c>propDestroyed</c>, the bot's hidden
+        /// modifiers give <c>modifierRevealed</c>, and playing to the end gives <c>unitDied</c> and
+        /// <c>matchEnded</c>. The session five are built by hand: a bot game never resigns, and the
+        /// <c>draftStarted</c> here is a filtered one, with the other seat's offers absent rather than empty.
         /// </summary>
         private static List<MatchEvent> EveryEventType()
+        {
+            List<MatchEvent> seen = EveryRoundEventType();
+            seen.Add(new RoundStartedEvent(2, "board-3", 1));
+            seen.Add(new RoundEndedEvent(1, 0, MatchEndReason.Elimination, 1, 0));
+            seen.Add(new DraftStartedEvent(1, new List<string> { "hera-resolve", "hermes-sandals", "nike-jab" }, null));
+            seen.Add(new DraftPickedEvent(1, null, DraftPickReason.Timeout));
+            seen.Add(new SessionEndedEvent(0, 2, 1, SessionEndReason.Resign));
+            return seen;
+        }
+
+        private static List<MatchEvent> EveryRoundEventType()
         {
             var catalog = ContentFixtures.RepoCatalog();
             var seen = new List<MatchEvent>();
@@ -414,6 +525,50 @@ namespace Mimas.Core.Tests
                 {
                     var y = (MatchEndedEvent)actual;
                     Assert.Equal(x.Winner, y.Winner);
+                    Assert.Equal(x.Reason, y.Reason);
+                    break;
+                }
+                case RoundStartedEvent x:
+                {
+                    var y = (RoundStartedEvent)actual;
+                    Assert.Equal(x.Round, y.Round);
+                    Assert.Equal(x.MapId, y.MapId);
+                    Assert.Equal(x.FirstPlayer, y.FirstPlayer);
+                    break;
+                }
+                case RoundEndedEvent x:
+                {
+                    var y = (RoundEndedEvent)actual;
+                    Assert.Equal(x.Round, y.Round);
+                    Assert.Equal(x.Winner, y.Winner);
+                    Assert.Equal(x.Reason, y.Reason);
+                    Assert.Equal(x.Score0, y.Score0);
+                    Assert.Equal(x.Score1, y.Score1);
+                    break;
+                }
+                case DraftStartedEvent x:
+                {
+                    var y = (DraftStartedEvent)actual;
+                    Assert.Equal(x.Round, y.Round);
+                    Assert.Equal(x.Offers0, y.Offers0);
+                    Assert.Null(x.Offers1);
+                    Assert.Null(y.Offers1);                                     // a hidden side stays absent across the wire
+                    break;
+                }
+                case DraftPickedEvent x:
+                {
+                    var y = (DraftPickedEvent)actual;
+                    Assert.Equal(x.Player, y.Player);
+                    Assert.Equal(x.BoonId, y.BoonId);
+                    Assert.Equal(x.Reason, y.Reason);
+                    break;
+                }
+                case SessionEndedEvent x:
+                {
+                    var y = (SessionEndedEvent)actual;
+                    Assert.Equal(x.Winner, y.Winner);
+                    Assert.Equal(x.Score0, y.Score0);
+                    Assert.Equal(x.Score1, y.Score1);
                     Assert.Equal(x.Reason, y.Reason);
                     break;
                 }

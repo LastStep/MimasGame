@@ -4,6 +4,7 @@ using Mimas.Core.Combat;
 using Mimas.Core.Geometry;
 using Mimas.Core.Match;
 using Mimas.Core.Movement;
+using Mimas.Core.Session;
 using Newtonsoft.Json.Linq;
 
 namespace Mimas.Core.Protocol
@@ -83,6 +84,8 @@ namespace Mimas.Core.Protocol
                     return new JObject { ["type"] = "endTurn", ["player"] = e.Player, ["reason"] = EndTurnReasonName(e.Reason) };
                 case ResignCommand r:
                     return new JObject { ["type"] = "resign", ["player"] = r.Player, ["reason"] = ResignReasonName(r.Reason) };
+                case DraftPickCommand d:
+                    return new JObject { ["type"] = "draftPick", ["player"] = d.Player, ["offerIndex"] = d.OfferIndex, ["reason"] = DraftPickReasonName(d.Reason) };
                 default:
                     throw new WireException("Cannot encode command type " + c.GetType().Name + ".");
             }
@@ -102,6 +105,8 @@ namespace Mimas.Core.Protocol
                     return new EndTurnCommand(player, ReadEndTurnReason(Str(o, "reason", "endTurn")));
                 case "resign":
                     return new ResignCommand(player, ReadResignReason(Str(o, "reason", "resign")));
+                case "draftPick":
+                    return new DraftPickCommand(player, Int(o, "offerIndex", "draftPick"), ReadDraftPickReason(Str(o, "reason", "draftPick")));
                 default:
                     throw new WireException($"Unknown command type '{type}'.");
             }
@@ -156,6 +161,32 @@ namespace Mimas.Core.Protocol
                     };
                 case MatchEndedEvent x:
                     return new JObject { ["type"] = "matchEnded", ["winner"] = x.Winner, ["reason"] = MatchEndReasonName(x.Reason) };
+
+                // ---- the session's own five (ADR-036): one event list carries a round's and the series' ----
+                case RoundStartedEvent x:
+                    return new JObject { ["type"] = "roundStarted", ["round"] = x.Round, ["mapId"] = x.MapId, ["firstPlayer"] = x.FirstPlayer };
+                case RoundEndedEvent x:
+                {
+                    var o = new JObject { ["type"] = "roundEnded", ["round"] = x.Round, ["winner"] = x.Winner, ["reason"] = MatchEndReasonName(x.Reason) };
+                    o["score"] = new JArray(x.Score0, x.Score1);
+                    return o;
+                }
+                case DraftStartedEvent x:
+                {
+                    var o = new JObject { ["type"] = "draftStarted", ["round"] = x.Round };
+                    o["offers0"] = Ids(x.Offers0);
+                    o["offers1"] = Ids(x.Offers1);
+                    return o;
+                }
+                case DraftPickedEvent x:
+                    return new JObject { ["type"] = "draftPicked", ["player"] = x.Player, ["boonId"] = x.BoonId, ["reason"] = DraftPickReasonName(x.Reason) };
+                case SessionEndedEvent x:
+                {
+                    var o = new JObject { ["type"] = "sessionEnded", ["winner"] = x.Winner };
+                    o["score"] = new JArray(x.Score0, x.Score1);
+                    o["reason"] = SessionEndReasonName(x.Reason);
+                    return o;
+                }
                 default:
                     throw new WireException("Cannot encode event type " + e.GetType().Name + ".");
             }
@@ -191,6 +222,24 @@ namespace Mimas.Core.Protocol
                     return new TurnEndedEvent(Int(o, "player", type), Int(o, "turnNumber", type), ReadEndTurnReason(Str(o, "reason", type)), Bool(o, "acted", type));
                 case "matchEnded":
                     return new MatchEndedEvent(Int(o, "winner", type), ReadMatchEndReason(Str(o, "reason", type)));
+                case "roundStarted":
+                    return new RoundStartedEvent(Int(o, "round", type), Str(o, "mapId", type), Int(o, "firstPlayer", type));
+                case "roundEnded":
+                {
+                    JArray score = ReadScore(o, type);
+                    return new RoundEndedEvent(Int(o, "round", type), Int(o, "winner", type), ReadMatchEndReason(Str(o, "reason", type)),
+                        Int(score[0], type + ".score[0]"), Int(score[1], type + ".score[1]"));
+                }
+                case "draftStarted":
+                    return new DraftStartedEvent(Int(o, "round", type), ReadIds(o, "offers0", type), ReadIds(o, "offers1", type));
+                case "draftPicked":
+                    return new DraftPickedEvent(Int(o, "player", type), NullableStr(o, "boonId", type), ReadDraftPickReason(Str(o, "reason", type)));
+                case "sessionEnded":
+                {
+                    JArray score = ReadScore(o, type);
+                    return new SessionEndedEvent(Int(o, "winner", type), Int(score[0], type + ".score[0]"), Int(score[1], type + ".score[1]"),
+                        ReadSessionEndReason(Str(o, "reason", type)));
+                }
                 default:
                     throw new WireException($"Unknown event type '{type}'.");
             }
@@ -431,6 +480,120 @@ namespace Mimas.Core.Protocol
                 Bool(o, "over", "view"), Int(o, "winner", "view"), Str(o, "mapId", "view"), units, props);
         }
 
+        // ---- the session -----------------------------------------------------------------------------
+
+        /// <summary>
+        /// The session as one seat sees it, the block that rides beside <c>view</c> on every match message
+        /// (ADR-036). The round's own view is <b>not</b> nested here: it stays the sibling <c>view</c> field,
+        /// and <see cref="ReadSession"/> is handed it.
+        /// </summary>
+        public static JObject Session(SessionView v)
+        {
+            if (v == null) throw new ArgumentNullException(nameof(v));
+
+            var boons = new JArray();
+            for (int i = 0; i < v.OpponentBoons.Count; i++) boons.Add(new JObject { ["id"] = v.OpponentBoons[i].Id });
+
+            var o = new JObject { ["viewer"] = v.Viewer, ["round"] = v.Round, ["phase"] = SessionPhaseName(v.Phase) };
+            o["score"] = new JArray(v.Score0, v.Score1);
+            o["roundsToWin"] = v.RoundsToWin;
+            o["isOver"] = v.IsOver;
+            o["winner"] = v.Winner;
+            o["mapId"] = v.MapId;
+            o["nextMapId"] = v.NextMapId;
+            o["myBuild"] = Build(v.MyBuild);
+            o["opponentLineage"] = v.OpponentLineageId;
+            o["opponentBoons"] = boons;
+            o["myOffers"] = Ids(v.MyOffers);
+            o["iHavePicked"] = v.IHavePicked;
+            o["opponentHasPicked"] = v.OpponentHasPicked;
+            return o;
+        }
+
+        /// <summary><paramref name="match"/> is the sibling <c>view</c> field, already read, or null between rounds.</summary>
+        public static SessionView ReadSession(JObject o, PlayerView match)
+        {
+            SessionPhase phase = ReadSessionPhase(Str(o, "phase", "session"));
+            if (match != null && phase != SessionPhase.Round)
+                throw new WireException($"a session in phase {SessionPhaseName(phase)} carries no view.");
+
+            JArray score = ReadScore(o, "session");
+            var boonArr = Require(o, "opponentBoons", "session") as JArray;
+            if (boonArr == null) throw new WireException("session.opponentBoons must be an array.");
+            var boons = new List<KnownEntry>(boonArr.Count);
+            for (int i = 0; i < boonArr.Count; i++)
+            {
+                var entry = boonArr[i] as JObject;
+                if (entry == null) throw new WireException($"session.opponentBoons[{i}] must be an object.");
+                boons.Add(new KnownEntry(NullableStr(entry, "id", "opponentBoon")));
+            }
+
+            List<string> offers = ReadIds(o, "myOffers", "session") ?? new List<string>();
+            return SessionView.Create(Int(o, "viewer", "session"), Int(o, "round", "session"), phase,
+                Int(score[0], "session.score[0]"), Int(score[1], "session.score[1]"), Int(o, "roundsToWin", "session"),
+                Bool(o, "isOver", "session"), Int(o, "winner", "session"),
+                NullableStr(o, "mapId", "session"), NullableStr(o, "nextMapId", "session"),
+                ReadBuild(Obj(o, "myBuild", "session")), NullableStr(o, "opponentLineage", "session"), boons, offers,
+                Bool(o, "iHavePicked", "session"), Bool(o, "opponentHasPicked", "session"), match);
+        }
+
+        private static JObject Build(PlayerBuild b)
+        {
+            if (b == null) throw new WireException("a session view must carry the viewer's own build.");
+            var loadout = new JObject
+            {
+                ["weapon"] = b.Loadout.WeaponId,
+                ["crown"] = b.Loadout.CrownId,
+                ["boots"] = b.Loadout.BootsId,
+                ["armour"] = b.Loadout.ArmourId,
+            };
+            var o = new JObject();
+            o["loadout"] = loadout;
+            o["lineage"] = b.LineageId;
+            o["boons"] = Ids(b.BoonIds);
+            return o;
+        }
+
+        private static PlayerBuild ReadBuild(JObject o)
+        {
+            JObject l = Obj(o, "loadout", "build");
+            var loadout = new Loadout(Str(l, "weapon", "loadout"), Str(l, "crown", "loadout"), Str(l, "boots", "loadout"), Str(l, "armour", "loadout"));
+            List<string> boons = ReadIds(o, "boons", "build");
+            if (boons == null) throw new WireException("build.boons must be an array.");
+            return new PlayerBuild(loadout, NullableStr(o, "lineage", "build"), boons);
+        }
+
+        /// <summary>A list of ids, or an explicit null for a list this seat may not see (a draft's other offers).</summary>
+        private static JToken Ids(IReadOnlyList<string> ids)
+        {
+            if (ids == null) return JValue.CreateNull();
+            var a = new JArray();
+            for (int i = 0; i < ids.Count; i++) a.Add(ids[i]);
+            return a;
+        }
+
+        private static List<string> ReadIds(JObject o, string field, string where)
+        {
+            JToken t = Require(o, field, where);
+            if (t.Type == JTokenType.Null) return null;
+            var a = t as JArray;
+            if (a == null) throw new WireException($"{where}.{field} must be an array of ids or null.");
+            var list = new List<string>(a.Count);
+            for (int i = 0; i < a.Count; i++)
+            {
+                if (a[i].Type != JTokenType.String) throw new WireException($"{where}.{field}[{i}] must be a string.");
+                list.Add(a[i].Value<string>());
+            }
+            return list;
+        }
+
+        private static JArray ReadScore(JObject o, string where)
+        {
+            var a = Require(o, "score", where) as JArray;
+            if (a == null || a.Count != 2) throw new WireException($"{where}.score must be an array [score0, score1].");
+            return a;
+        }
+
         // ---- enum names ------------------------------------------------------------------------------
         // Hand-written both ways: an unknown string is a malformed frame, never a silent default, and no
         // enum's integer value is ever load-bearing on the wire.
@@ -572,6 +735,70 @@ namespace Mimas.Core.Protocol
                 case "resign": return MatchEndReason.Resign;
                 case "forfeit": return MatchEndReason.Forfeit;
                 default: throw new WireException($"Unknown match end reason '{s}'.");
+            }
+        }
+
+        private static string SessionPhaseName(SessionPhase p)
+        {
+            switch (p)
+            {
+                case SessionPhase.Round: return "round";
+                case SessionPhase.Draft: return "draft";
+                case SessionPhase.Over: return "over";
+                default: throw new WireException("Unknown session phase " + p + ".");
+            }
+        }
+
+        private static SessionPhase ReadSessionPhase(string s)
+        {
+            switch (s)
+            {
+                case "round": return SessionPhase.Round;
+                case "draft": return SessionPhase.Draft;
+                case "over": return SessionPhase.Over;
+                default: throw new WireException($"Unknown session phase '{s}'.");
+            }
+        }
+
+        private static string DraftPickReasonName(DraftPickReason r)
+        {
+            switch (r)
+            {
+                case DraftPickReason.Player: return "player";
+                case DraftPickReason.Timeout: return "timeout";
+                default: throw new WireException("Unknown draft pick reason " + r + ".");
+            }
+        }
+
+        private static DraftPickReason ReadDraftPickReason(string s)
+        {
+            switch (s)
+            {
+                case "player": return DraftPickReason.Player;
+                case "timeout": return DraftPickReason.Timeout;
+                default: throw new WireException($"Unknown draft pick reason '{s}'.");
+            }
+        }
+
+        private static string SessionEndReasonName(SessionEndReason r)
+        {
+            switch (r)
+            {
+                case SessionEndReason.Score: return "score";
+                case SessionEndReason.Resign: return "resign";
+                case SessionEndReason.Forfeit: return "forfeit";
+                default: throw new WireException("Unknown session end reason " + r + ".");
+            }
+        }
+
+        private static SessionEndReason ReadSessionEndReason(string s)
+        {
+            switch (s)
+            {
+                case "score": return SessionEndReason.Score;
+                case "resign": return SessionEndReason.Resign;
+                case "forfeit": return SessionEndReason.Forfeit;
+                default: throw new WireException($"Unknown session end reason '{s}'.");
             }
         }
 
