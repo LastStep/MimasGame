@@ -49,8 +49,13 @@ against the 13 MB ratchet, and boots in 1.5–1.8 s on all three engines. Run re
    **Deploy first** (`bash tools/deploy/deploy.sh`): the live site is from before boons, and its client
    cannot talk to a server that wants a lineage.
 2. **Verifiers.** Six tasks sit at `verify` and nothing in the ledger is ticked until someone in a fresh
-   context agrees: **T-0010** (its spec §14 is the checklist), T-0009 (part-1 spec §14), and the M2 set
-   T-0008 (closes T-0005 and T-0006), T-0007, T-0002.
+   context agrees: **T-0010**, T-0009 (part-1 spec §14), and the M2 set T-0008 (closes T-0005 and T-0006),
+   T-0007, T-0002.
+   For T-0010 start at the **Definition of done** table in `studio/runs/R-2026-09-22-T-0010-build.md`: it
+   ticks spec §14 line by line and marks five things **written but never looked at** (the reveal flyover,
+   the changed-number mark on the action bar, the element words, the `boonStat` / `nullify` preview labels,
+   Back to room after a series). One practice game in the Editor reaches all five. The section under it
+   says where else to start.
 
 ## Current milestone: M2 — online
 
