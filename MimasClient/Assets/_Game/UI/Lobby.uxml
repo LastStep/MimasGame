@@ -40,6 +40,15 @@
             <ui:Label class="field-label" text="LOADOUT" />
             <ui:DropdownField name="preset" class="field" />
 
+            <!-- Who you pray to (design #lineage). Filled from the catalogue in id order; the other seat
+                 never sees which one you chose. -->
+            <ui:Label class="field-label" text="LINEAGE" />
+            <ui:VisualElement name="lineage-row" class="lineage-row">
+                <ui:Button name="lineage-0" class="button lineage" text="" />
+                <ui:Button name="lineage-1" class="button lineage" text="" />
+                <ui:Button name="lineage-2" class="button lineage" text="" />
+            </ui:VisualElement>
+
             <ui:Button name="ready" class="button button--primary" text="Ready" />
             <ui:Button name="leave-room" class="button button--quiet" text="Leave room" />
 

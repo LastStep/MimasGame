@@ -3,6 +3,7 @@
   "rootNamespace": "Mimas.Client.UI",
   "references": [
     "Mimas.Core",
+    "Mimas.Client.Content",
     "Mimas.Client.Presentation",
     "Mimas.Client.Net"
   ],

@@ -188,6 +188,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Mimas.Client.UI::Mimas.Client.UI.LobbyView
   _presets: {fileID: 11400000, guid: 7d619dd89364b1a4b87ef12c78703576, type: 2}
+  _content: {fileID: 1350561491}
   _arenaScene: Arena
 --- !u!1 &994816287
 GameObject:

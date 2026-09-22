@@ -212,3 +212,35 @@
 .seat--empty {
     color: var(--text-faint);
 }
+
+/* ---- the lineage row (design #lineage; decided 22 Sep 2026) ------------------------------------ */
+/* Three gods side by side under the preset. The column is at most 480 px, so each card is a third of
+   it with the name, the one-line description and what it starts you with; under 400 px they stack. */
+
+/* USS has no media queries, so the row wraps instead: three across at 480 px, stacked when the column
+   is too narrow for a 120 px card. */
+.lineage-row {
+    flex-direction: row;
+    flex-wrap: wrap;
+    margin-top: 6px;
+}
+
+.lineage {
+    flex-grow: 1;
+    flex-basis: 120px;
+    margin-left: 4px;
+    margin-right: 4px;
+    margin-top: 4px;
+    padding: 10px 8px;
+    font-size: 13px;
+    letter-spacing: 0;
+    white-space: normal;
+    -unity-text-align: upper-left;
+    color: var(--text-dim);
+}
+
+.lineage--selected {
+    background-color: var(--accent-soft);
+    border-color: var(--accent);
+    color: var(--text);
+}

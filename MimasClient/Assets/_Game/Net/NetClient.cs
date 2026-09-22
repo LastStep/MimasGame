@@ -39,6 +39,7 @@ namespace Mimas.Client.Net
     public sealed class NetClient : MonoBehaviour
     {
         public const string NamePref = "mimas.name";
+        public const string LineagePref = "mimas.lineage";
         public const string TokenPref = "mimas.token";
         public const string MatchPref = "mimas.matchId";
 
@@ -359,10 +360,10 @@ namespace Mimas.Client.Net
             CurrentMatchId = p.Value<int>("matchId");
             PlayerPrefs.SetInt(MatchPref, CurrentMatchId);
             SavePrefs();
-            // matchId is the room's and is reused across rounds, so the round is what tells two matches in
-            // one room apart in a log (ADR-032). Nothing else on the client reads it.
-            Debug.Log("[NetClient] match " + CurrentMatchId + " round " + p.Value<int>("round")
-                + " starting, you are seat " + p.Value<int>("youAre"));
+            // matchId is the room's and is reused across series, so series and round are what tell two of
+            // them apart in a log (ADR-032, ADR-036). Nothing else on the client reads them here.
+            Debug.Log("[NetClient] match " + CurrentMatchId + " series " + p.Value<int>("series")
+                + " round " + p.Value<int>("round") + " starting, you are seat " + p.Value<int>("youAre"));
         }
 
         private void OnError(JObject p)

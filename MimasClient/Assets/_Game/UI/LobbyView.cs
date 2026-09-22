@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
+using Mimas.Client.Content;
 using Mimas.Client.Net;
 using Mimas.Client.Presentation;
+using Mimas.Core.Content;
+using Mimas.Core.Data;
 using Mimas.Core.Protocol;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
@@ -26,6 +29,9 @@ namespace Mimas.Client.UI
         [Tooltip("The kits the room's dropdown offers. Assets/_Game/Settings/LoadoutPresets.asset.")]
         [SerializeField] private LoadoutPresets _presets;
 
+        [Tooltip("Where the lineage row's names, descriptions and starting Blessings come from. The Content object in this scene.")]
+        [SerializeField] private ContentBootstrap _content;
+
         [Tooltip("Scene loaded when the match starts.")]
         [SerializeField] private string _arenaScene = "Arena";
 
@@ -49,11 +55,18 @@ namespace Mimas.Client.UI
         private Label _seat0;
         private Label _seat1;
         private DropdownField _preset;
+        private VisualElement _lineageRow;
+        private readonly Button[] _lineageButtons = new Button[LineageSlots];
+        private readonly Action[] _lineageHandlers = new Action[LineageSlots];
+        private readonly List<LineageDef> _lineages = new List<LineageDef>();
         private Button _ready;
         private Button _leaveRoom;
         private Label _roomStatus;
 
+        private const int LineageSlots = 3;
+
         private string _code;
+        private string _lineage;
         private int _mySeat;
         private bool _inRoom;
         private bool _isReady;
@@ -131,6 +144,7 @@ namespace Mimas.Client.UI
                     _isReady = false;
                     _ready.text = "Ready";
                     _preset.SetEnabled(true);
+                    SetLineageRowEnabled(true);
                     ShowRoom(room);
                     SetRoomStatus(ResultLine(result, OpponentPresent(room)));
                     return;
@@ -171,6 +185,8 @@ namespace Mimas.Client.UI
             _seat0 = root.Q<Label>("seat-0");
             _seat1 = root.Q<Label>("seat-1");
             _preset = root.Q<DropdownField>("preset");
+            _lineageRow = root.Q<VisualElement>("lineage-row");
+            for (int i = 0; i < LineageSlots; i++) _lineageButtons[i] = root.Q<Button>("lineage-" + i);
             _ready = root.Q<Button>("ready");
             _leaveRoom = root.Q<Button>("leave-room");
             _roomStatus = root.Q<Label>("room-status");
@@ -178,7 +194,8 @@ namespace Mimas.Client.UI
             if (_lobbyPanel == null || _roomPanel == null || _name == null || _joinCode == null || _playBot == null
                 || _createRoom == null || _joinRoom == null || _status == null || _server == null || _lastResult == null
                 || _roomCode == null || _copyLink == null || _copyCode == null || _seat0 == null || _seat1 == null || _preset == null
-                || _ready == null || _leaveRoom == null || _roomStatus == null)
+                || _ready == null || _leaveRoom == null || _roomStatus == null || _lineageRow == null
+                || Array.IndexOf(_lineageButtons, null) >= 0)
             {
                 Debug.LogError("[LobbyView] Lobby.uxml is missing one of the named elements.", this);
                 enabled = false;
@@ -192,6 +209,8 @@ namespace Mimas.Client.UI
             _preset.choices = _presets != null ? _presets.Names() : new List<string>();
             if (_preset.choices.Count > 0) _preset.index = 0;
 
+            BindLineages();
+
             _server.text = _net != null ? _net.ResolvedUrl : "";
 
             _playBot.clicked += HandlePlayBot;
@@ -202,6 +221,12 @@ namespace Mimas.Client.UI
             _ready.clicked += HandleReady;
             _leaveRoom.clicked += HandleLeaveRoom;
             _preset.RegisterValueChangedCallback(HandlePresetChanged);
+            for (int i = 0; i < LineageSlots; i++)
+            {
+                int slot = i;
+                _lineageHandlers[i] = () => HandleLineageClicked(slot);
+                _lineageButtons[i].clicked += _lineageHandlers[i];
+            }
 
             // Room codes are upper case everywhere; typing them in lower case should still work.
             _joinCode.RegisterValueChangedCallback(e =>
@@ -237,6 +262,8 @@ namespace Mimas.Client.UI
             _ready.clicked -= HandleReady;
             _leaveRoom.clicked -= HandleLeaveRoom;
             _preset.UnregisterValueChangedCallback(HandlePresetChanged);
+            for (int i = 0; i < LineageSlots; i++)
+                if (_lineageHandlers[i] != null) _lineageButtons[i].clicked -= _lineageHandlers[i];
             _bound = false;
         }
 
@@ -323,29 +350,47 @@ namespace Mimas.Client.UI
                 return;
             }
 
-            _isReady = !_isReady;
-            _net.Send(Messages.RoomLoadout, new JObject
+            if (string.IsNullOrEmpty(_lineage))
             {
-                ["loadout"] = new JObject
-                {
-                    ["weapon"] = entry.Loadout.Weapon,
-                    ["crown"] = entry.Loadout.Crown,
-                    ["boots"] = entry.Loadout.Boots,
-                    ["armour"] = entry.Loadout.Armour,
-                },
-                ["ready"] = _isReady,
-            });
+                // Cannot happen with the default, and kept for honesty: the server refuses either way.
+                SetRoomStatus("Pick a lineage.");
+                return;
+            }
+
+            _isReady = !_isReady;
+            _net.Send(Messages.RoomLoadout, BuildLoadout(_isReady));
             _ready.text = _isReady ? "Not ready" : "Ready";
             _preset.SetEnabled(!_isReady);
+            SetLineageRowEnabled(!_isReady);
         }
 
         /// <summary>Changing your mind about gear un-readies you, so the match cannot start on a stale choice.</summary>
         private void HandlePresetChanged(ChangeEvent<string> e)
         {
+            UnReady();
+        }
+
+        /// <summary>Changing your god does exactly what changing your gear does, and is remembered the same way.</summary>
+        private void HandleLineageClicked(int slot)
+        {
+            if (_lineages.Count <= slot) return;
+            string chosen = _lineages[slot].Id;
+            if (chosen == _lineage) return;
+            _lineage = chosen;
+            PlayerPrefs.SetString(NetClient.LineagePref, _lineage);
+            PlayerPrefs.Save();
+            RefreshLineageRow();
+            UnReady();
+        }
+
+        private void UnReady()
+        {
             if (!_isReady) return;
             _isReady = false;
             _ready.text = "Ready";
-            _net.Send(Messages.RoomLoadout, BuildLoadout(false));
+            _preset.SetEnabled(true);
+            SetLineageRowEnabled(true);
+            if (_net != null) _net.Send(Messages.RoomLoadout, BuildLoadout(false));
         }
 
         private JObject BuildLoadout(bool ready)
@@ -359,7 +404,62 @@ namespace Mimas.Client.UI
                 loadout["boots"] = entry.Loadout.Boots;
                 loadout["armour"] = entry.Loadout.Armour;
             }
-            return new JObject { ["loadout"] = loadout, ["ready"] = ready };
+            return new JObject { ["loadout"] = loadout, ["lineage"] = _lineage ?? "", ["ready"] = ready };
+        }
+
+        // ---- the lineage row (design: #lineage; decided 22 Sep 2026, P1) --------------------------------
+
+        /// <summary>
+        /// Fills the three buttons from the catalogue, in id order. Nothing about a lineage is written in
+        /// C#: the name, the line under it and the Blessing it starts you with are all data (golden rule 5).
+        /// </summary>
+        private void BindLineages()
+        {
+            _lineages.Clear();
+            ContentCatalog catalog = _content != null ? _content.EnsureLoaded() : null;
+            if (catalog != null)
+            {
+                var all = new List<LineageDef>(catalog.Lineages.All);
+                all.Sort((a, b) => string.CompareOrdinal(a.Id, b.Id));
+                for (int i = 0; i < all.Count && i < LineageSlots; i++) _lineages.Add(all[i]);
+            }
+            else
+            {
+                Debug.LogWarning("[LobbyView] No ContentBootstrap; the lineage row cannot be filled.", this);
+            }
+
+            _lineage = PlayerPrefs.GetString(NetClient.LineagePref, "");
+            if (_lineages.Count > 0 && !_lineages.Exists(l => l.Id == _lineage)) _lineage = _lineages[0].Id;
+
+            for (int i = 0; i < LineageSlots; i++)
+            {
+                bool has = i < _lineages.Count;
+                _lineageButtons[i].style.display = has ? DisplayStyle.Flex : DisplayStyle.None;
+                if (!has) continue;
+                LineageDef lineage = _lineages[i];
+                string blessing = BlessingName(catalog, lineage);
+                _lineageButtons[i].text = lineage.Name + "\n" + lineage.Description
+                    + (blessing != null ? "\nStarts with " + blessing : "");
+            }
+            RefreshLineageRow();
+        }
+
+        private static string BlessingName(ContentCatalog catalog, LineageDef lineage)
+        {
+            if (catalog == null || lineage.StartingBlessingId == null) return null;
+            BoonDef boon;
+            return catalog.Boons.TryGet(lineage.StartingBlessingId, out boon) ? boon.Name : lineage.StartingBlessingId;
+        }
+
+        private void RefreshLineageRow()
+        {
+            for (int i = 0; i < LineageSlots; i++)
+                _lineageButtons[i].EnableInClassList("lineage--selected", i < _lineages.Count && _lineages[i].Id == _lineage);
+        }
+
+        private void SetLineageRowEnabled(bool enabled)
+        {
+            for (int i = 0; i < LineageSlots; i++) _lineageButtons[i].SetEnabled(enabled);
         }
 
         private void HandleLeaveRoom()
@@ -500,7 +600,7 @@ namespace Mimas.Client.UI
                 case "room_full": return "That room is full.";
                 case "in_room": return "You are already in a room.";
                 case "in_match": return "You are already in a match.";
-                case "bad_loadout": return "That loadout is not valid.";
+                case "bad_loadout": return "That loadout or lineage is not valid.";
                 case "bad_token": return "Starting a new session…";
                 default: return fallback ?? code;
             }
@@ -536,7 +636,7 @@ namespace Mimas.Client.UI
             }
 
             bool waitingForSomeone = seats != null && seats.Count == 2 && !(seats[1 - _mySeat] as JObject).Value<bool>("present");
-            SetRoomStatus(waitingForSomeone ? "Send the code to a friend." : _isReady ? "Waiting for your opponent…" : "Pick your gear.");
+            SetRoomStatus(waitingForSomeone ? "Send the code to a friend." : _isReady ? "Waiting for your opponent…" : "Pick your gear and your god.");
         }
 
         /// <summary>Is the other seat still filled? A room whose opponent left is still a room.</summary>
