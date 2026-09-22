@@ -5,7 +5,7 @@ project: mimas
 feature: F-boons
 milestone: M3
 lane: full
-status: running
+status: verify
 owner: builder
 model: fable
 worktree:
