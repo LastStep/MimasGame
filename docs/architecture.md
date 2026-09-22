@@ -23,18 +23,20 @@
 | `Hex` | Axial/cube coordinate struct: distance, neighbours, rings, lines, rounding (Red Blob Games) |
 | `Grid` | `TileMap`: dictionary of `Hex → Tile`; tiles have terrain, height, effects, occupant. Any shape (ring, board) is just the set of hexes in the JSON map |
 | `Pathfinding` | BFS/Dijkstra for movement range per movement type (walk / jump / fly / teleport), A* for paths |
-| `Units` | `Unit` (owner, class, position, hp, ap, ability ids, modifier ids), `UnitSet` (occupancy; dead units occupy nothing) |
+| `Units` | `Unit` (owner, gear, lineage, boons, position, hp, ap, ability ids, modifier ids; `PublicStats` = base + items, `Stats` = plus boon stats, floored), `BoonOverlay` (a unit's boons folded once into tables, every entry tagged with its boon — ADR-034), `UnitSet` (occupancy; dead units occupy nothing), `Prop` |
 | `Combat` | `AttackTargeting` (range band + line of sight), `DamageCalculator` -> `DamageBreakdown` (fixed-order signed lines, floor 0), `Knowledge` (full vs one player's view: preview and actual share one code path) |
-| `Match` | `MatchState` (full truth; `Validate` pure, `Apply` sole mutator -> events, `EnumerateLegal`; also `FromView`, the client's read-only **mirror**, ADR-026), `Command`s (move / attack / end turn incl. timeout / resign incl. disconnect forfeit), `MatchEvent`s, `PlayerView` (what one player may see), `EventFilter` (per-player event trimming), `MatchSetup` |
+| `Session` | `Session` (the best-of-N as a state machine **above** `MatchState`: builds, score, ladder, session-long reveals, the draft; constructs one round at a time from its own seeded `Rng` — ADR-035), `Draft` (offers as a pure seeded function), `DraftPickCommand` (a timeout is the same command with another reason), session events, `SessionEventFilter`, `SessionView` |
+| `Match` | `MatchState` (one round's full truth; `Validate` pure, `Apply` sole mutator -> events, `EnumerateLegal`; `ResolveAbility`, the only place a unit's ability is read, with the boon overlay applied; also `FromView`, the client's read-only **mirror**, ADR-026), `Command`s (move / attack / end turn incl. timeout / resign incl. disconnect forfeit), `MatchEvent`s (incl. boon and lineage reveals), `PlayerView` (what one player may see), `EventFilter` (per-player event trimming), `MatchSetup`, `PlayerBuild` (gear + lineage + boons) |
 | `Protocol` | `Wire` (hand-written JSON codec for commands, events and views), `Messages` (every wire type and error code as a constant), `WireException`. No attributes, no reflection, no `TypeNameHandling` (ADR-027) |
-| `Bots` | `IBot`, `RandomBot` (uniform over `EnumerateLegal`, own RNG) |
-| `Boons` | Draft offers and application (M3) |
-| `Data` | JSON parsers for terrains, rules (including the `clock` block both sides time a turn by), maps, abilities (movement, attack), gear + stat blocks, modifiers, time controls into immutable definition objects |
+| `Bots` | `IBot` (`Choose`, `ChooseDraft`), `RandomBot` (uniform over `EnumerateLegal`, own RNG; keeps offer 0 in a draft) |
+| `Data` | JSON parsers for terrains, rules (including the `clock` block both sides time a turn by, `elements`, `series`, `draft`, `boons`), maps, abilities (movement, attack incl. `element`), gear + stat blocks, modifiers (incl. `elements`, `itemKinds`, `nullify`), boons (the closed effect vocabulary), lineages, time controls into immutable definition objects |
 | `Content` | `ContentCatalog`: loads the whole data folder from `(path, text)` pairs, links cross references, sorted `DefinitionTable<T>`s, content hash for client/server parity |
 | `Movement` | `MovementDef` (data) + one `IMovementResolver` per geometry (walk / jump / teleport) behind a string-keyed registry; `MovePlan` = path to animate + tiles entered |
 | `Rng` | Seeded deterministic RNG (xoshiro/PCG) |
 
-Design rule: **Commands in, Events out.** `MatchState.Apply(Command) → IReadOnlyList<Event>`; the client animates Events; the server filters Events per player before sending.
+Design rule: **Commands in, Events out.** `MatchState.Apply(Command) → IReadOnlyList<Event>`; the client animates Events; the server filters Events per player before sending. `Session.Apply` is the same shape one level up: it forwards round commands to the current `MatchState`, takes draft picks itself, and returns one list of round and session events.
+
+Design rule: **definitions are immutable; a unit carries an overlay** (ADR-034). Rules code never reads a raw `AbilityDef` for a unit's ability; it asks `MatchState.ResolveAbility`, and every number a boon contributes is a breakdown line that names the boon, which is what reveal keys on.
 
 ## Mimas.Server (server/Mimas.Server)
 

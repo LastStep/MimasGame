@@ -46,7 +46,14 @@ is in the log, and it is in the tests.
 Commands, events and views are encoded by `Mimas.Core.Protocol.Wire`: a hand-written codec with no
 attributes, no reflection and no `TypeNameHandling` (ADR-027). Enums are lower-camel strings both ways
 and are read case-sensitively — an unknown string is a malformed frame, never a silent default. A `Hex`
-is `[q, r]`. A hidden ability or modifier id is `null` and stays `null`.
+is `[q, r]`. A hidden ability, modifier or boon id is `null` and stays `null`.
+
+A unit in a view carries, beside `items`, `abilities` and `modifiers`: `lineage` (a string, or `null`
+until revealed) and `boons` (an array of `{ id }` in grant order, `id` `null` while hidden). Two event
+types joined the twelve: `boonRevealed { unitId, boonId, toPlayer }` and `lineageRevealed { unitId,
+lineageId, toPlayer }`, routed to `toPlayer` only. Damage lines gained two kinds, `boonStat` (a Blessing's
+stat or an Enchant's damage override, `id` = the boon) and `nullify` (an immunity, `id` = the modifier).
+The session's own events and view (`Mimas.Core.Session`) are **not** on the wire yet: part 2 encodes them.
 
 ### How two players meet
 
@@ -117,13 +124,17 @@ seat. One place in the code does both (`Room.Broadcast`), which is the guarantee
 than a promise; `TwoHumans_MirrorPlayersPlayToTheEnd` asserts every view a player ever received was
 their own.
 
-- Own units: everything.
-- Enemy units: position, gear, hit points, action points, heights — and **revealed** abilities and
-  modifiers only. A hidden entry keeps its slot with a `null` id, so the opponent can see *that* there is
-  something and not *what*. For an ability the granting item is still named: which item you wear is
-  public, what it does for you is not.
+- Own units: everything, including `lineage` and every boon id.
+- Enemy units: position, gear, hit points, action points, heights — and **revealed** abilities,
+  modifiers and boons only, plus the `lineage` once it is revealed (else `null`). A hidden entry keeps its
+  slot with a `null` id, so the opponent can see *that* there is
+  something and not *what*: for an ability the granting item is still named (which item you wear is
+  public, what it does for you is not), and the number of boons is public while their identity is not.
 - An ability is revealed the first time it is used in front of the other player; a hidden modifier the
-  first time it changes a number. Reveals are per viewer and persist.
+  first time it changes a number; a boon when its stat or modifier changes a number, when its Sigil's
+  ability is used, when an observation contradicts what the opponent knew, or at round start for a Health
+  or AP Blessing (`boonRevealed`); the lineage with the first boon of it (`lineageRevealed`). Reveals are per
+  viewer and persist for the session.
 - A hidden line never appears in a damage breakdown the viewer has not earned:
   `HiddenInfo_NoHiddenLineLeaksBeforeReveal` scans a whole match to check it.
 
@@ -166,8 +177,9 @@ move, so replaying a match's command list reproduces it exactly, with no clock a
 
 Time controls with banks and increments (`timecontrols.json` stays loaded and unused; design:
 `#time-controls`), a matchmaking queue and ratings (M5), accounts and any database (M5), spectating,
-chat, move buffering across a reconnect, and a best-of-three wrapper or any session score around the
-rematch (the room's rounds are counted, nothing else is).
+chat, move buffering across a reconnect, and the best-of-3 **on the server**: `Mimas.Core.Session` exists
+and plays a whole series in a test (T-0009, 22 Sep 2026), but the room still hosts one `MatchState` at a
+time and no draft message exists; that is part 2 (T-0010).
 
 One gap worth naming: `auth.ok.room` covers a resume that arrives while the seat is still held — a
 second tab, or a reconnect the server has not yet seen the close for. A **full page reload** after a

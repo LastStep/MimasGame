@@ -8,14 +8,15 @@ Numbers are integers (no floats in rules).
 | File | Contents | Status |
 |---|---|---|
 | `terrains.json` | Terrain catalogue: `id`, `walkable`, `moveCost`, `modifiers[]` | loaded |
-| `rules.json` | Match-wide rules: `damageTypes[]` (the two lanes), `globalModifiers[]` (height advantage lives here as data), `heights` (levels → body units), `baseStats` (every hero's numbers before gear), `innateAbilities[]` (the walk), `clock` (the turn deadline both sides time by) | loaded |
+| `rules.json` | Match-wide rules: `damageTypes[]` (the two lanes), `elements[]` (fire, frost, lightning), `globalModifiers[]` (height advantage lives here as data), `heights` (levels → body units), `baseStats` (every hero's numbers before gear), `innateAbilities[]` (the walk), `clock` (the turn deadline both sides time by), `series` (best of), `draft` (offer counts, timer), `boons` (floors) | loaded |
 | `timecontrols.json` | `{ "version": 1, "timeControls": [ { "id": "3+2", "name", "baseMs", "incrementMs", "turnCapMs" } ] }` | loaded, unused until time controls return (design: `#time-controls`) |
-| `abilities/*.json` | One ability per file; `type` picks the schema (`movement`, `attack`). Every ability has an AP `cost` (default 1) | loaded |
+| `abilities/*.json` | One ability per file; `type` picks the schema (`movement`, `attack`). Every ability has an AP `cost` (default 1); an attack may carry one innate `element` | loaded |
 | `items/*.json` | One item per file: `id`, `slot`, `kind`, `stats`, `abilities`, `tags` | loaded |
 | `maps/*.json` | Map: name, hexes[] (`q,r,terrain,height,effect?,prop?`), spawns (`p1`,`p2`), symmetry type, ladder position | loaded |
-| `modifiers/*.json` | Flat damage modifiers: `trigger`, `when` conditions, `effect.damage`, `visibility`. Attached by terrains, map hexes (`effect`), `rules.globalModifiers` and (later) boons | loaded |
+| `modifiers/*.json` | Flat damage modifiers: `trigger`, `when` conditions (`damageTypes`, `tags`, `elements`, `itemKinds`, `heightAdvantage`), `effect.damage` or `effect.nullify`, `visibility`. Attached by terrains, map hexes (`effect`), `rules.globalModifiers` and boons | loaded |
 | `props/*.json` | Non-unit bodies a map hex can carry: `bodyHeight`, `aimHeight`, optional `stats` (a prop with `hp` can be destroyed) | loaded |
-| `boons/*.json` | Boon offers: tier, effects, exclusivity tags | not yet (same) |
+| `boons/*.json` | One boon per file: `kind` (blessing / enchant / sigil), `lineage`, `requires`, `effects[]` from the closed vocabulary, `stackable`, `exclusive[]` | loaded |
+| `lineages/*.json` | One lineage per file: `startingBlessing`, `pool[]` | loaded |
 
 ## The content catalogue
 
@@ -24,19 +25,22 @@ or throws one `ContentLoadException` listing **every** problem, each tagged with
 an unrecognised file or folder is an error, never ignored.
 
 1. **Parse.** Each file is parsed on its own by path: `terrains.json`, `rules.json`, `timecontrols.json`,
-   `abilities/`, `items/`, `maps/`, `modifiers/`, `props/`. Duplicate ids across files are reported with both file names.
+   `abilities/`, `items/`, `maps/`, `modifiers/`, `props/`, `boons/`, `lineages/`. Duplicate ids across files are reported with both file names.
 2. **Link.** Item ability ids must exist and must not repeat an innate one; an item in the `weapon` slot
    needs at least one attack ability and may grant only `weapon`-category ones, and a `crown` may grant only
    `spell` ones (`#attacks`: the lane and the HUD section must agree); item stat keys must name a lane. `rules.innateAbilities` ids must
    exist and at least one of them must be a movement ability (the walk). A movement's `terrainCosts` keys
    must be real terrains; `rules.baseStats` keys, item stat keys, attack `damageType`s and modifier
-   `damageTypes` conditions must name a type in `rules.damageTypes`; terrain `modifiers`, map hex `effect`s
+   `damageTypes` conditions must name a type in `rules.damageTypes`; an attack's `element` and a modifier's
+   `elements` must name one in `rules.elements`; terrain `modifiers`, map hex `effect`s
    and `rules.globalModifiers` must be real modifiers; a map hex's `prop` must name a real prop and sit on
    walkable terrain (`MapData.ValidateProps`); every map must pass `BuildTileMap` (symmetry, spawns,
-   connectivity). So a map that would fail at match start fails at boot instead.
-3. **Tables.** `Abilities`, `Items`, `Maps`, `TimeControls`, `Modifiers`, `Props` are `DefinitionTable<T>`: sorted by ordinal id,
+   connectivity). So a map that would fail at match start fails at boot instead. The boon and lineage link
+   rules are listed under *Boons* and *Lineages* below.
+3. **Tables.** `Abilities`, `Items`, `Maps`, `TimeControls`, `Modifiers`, `Props`, `Boons`, `Lineages` are `DefinitionTable<T>`: sorted by ordinal id,
    `Get` / `TryGet` / `IndexOf` / `ByIndex`. Indices are stable small integers for wire encoding.
-   `Terrains` is the existing `TerrainSet`; `Movements` is the movement subset; `GetMovement(id)`.
+   `Terrains` is the existing `TerrainSet`; `Movements` is the movement subset; `GetMovement(id)`,
+   `GetBoon(id)`, `GetLineage(id)`.
 4. **Hash.** `Hash` is SHA-256 over path + canonical JSON (sorted keys, no whitespace) of every file, in path
    order. It ignores formatting, key order, line endings and file order, and changes when any value
    changes. Server and client compare it before a match (`/health` already reports it).
@@ -50,7 +54,10 @@ lists every JSON under `Assets/_Game/Data` as TextAsset references and is regene
 
 - `id`: lowercase kebab-case, globally unique within its folder (`"fire-bolt"`).
 - Every definition has `"version": 1`; bump on breaking schema change and update the loader.
-- Effects are a small expression list, e.g. `{ "type": "damage", "amount": 30, "element": "fire" }` — Core has one handler per `type`. Add new types in Core + document here.
+- A boon's `effects[]` is a list of flat records whose `type` is one of a **closed vocabulary** — `stat`,
+  `modifier`, `abilityOverride`, `addElement`, `addTag`, `grantAbility` — with one handler each in
+  `BoonOverlay`. A new type is a design decision (`#boons` rule 2) before it is code; the loader rejects
+  unknown types and stray fields.
 - Maps must be symmetrical: the loader validates the declared symmetry (`"symmetry": "rotational-180"` / `"mirror-q"`) and that `p1`/`p2` spawns are at maximal hex distance.
 
 ## Editor-time schemas (`tools/schemas/`)
@@ -97,14 +104,28 @@ standing on the terrain carries for combat (see *Modifiers*); the catalogue reje
   "heights": { "unitsPerLevel": 3, "body": 6, "aim": 4 },
   "baseStats": { "hp": 20, "ap": 3, "power.weapon": 1, "power.spell": 1, "defense.weapon": 0, "defense.spell": 0 },
   "innateAbilities": ["move"],
-  "clock": { "turnMs": 30000, "lagGraceMs": 1000, "reconnectGraceMs": 60000 }
+  "clock": { "turnMs": 30000, "lagGraceMs": 1000, "reconnectGraceMs": 60000 },
+  "elements": ["fire", "frost", "lightning"],
+  "series": { "bestOf": 3 },
+  "draft": { "offers": { "winner": 3, "loser": 3 }, "timeoutMs": 20000 },
+  "boons": { "floors": { "hp": 1, "ap": 1 }, "minCost": 1 }
 }
 ```
 
 `damageTypes` are the two damage lanes: every `power.<type>` / `defense.<type>` stat key, every attack's
 `damageType` and every modifier `damageTypes` condition must name one, so adding a lane is one line here.
+`elements` are the modifier classes an attack may carry and a modifier may condition on (`#elements`);
+an attack's `element`, a modifier's `when.elements` and a boon's `addElement` must name one. May be empty.
 `globalModifiers` apply to every attack (height advantage is the shipped example); they are ordinary
 modifier ids. `baseStats` and `innateAbilities` are both required and are described below.
+
+`series`, `draft` and `boons` are the session's numbers (all required; the constructor defaults them
+for hand-built fixtures like `clock`): `series.bestOf` (odd, ≥ 1; first to `bestOf / 2 + 1` wins),
+`draft.offers.winner` / `.loser` (how many boons each role is offered between rounds, ≥ 0 — symmetric 3 / 3
+at launch, so a comeback draft is a number change) and `draft.timeoutMs` (the host's timer before it
+submits a timeout pick; Core never reads a clock), `boons.floors.hp` (≥ 1) / `.ap` (≥ 0) (what a self
+trade-off can never take a unit below) and `boons.minCost` (an ability's cost never drops below it through
+an Enchant; "nothing is ever free").
 
 `clock` is required and all three values must be positive. It is a **rule**, not balance, because both
 sides read it: the server times the turn by `turnMs` and the client draws the same rope from the same
@@ -195,7 +216,7 @@ end of turn.
   "version": 1, "id": "fire-bolt", "name": "Fire Bolt", "type": "attack", "category": "spell",
   "icon": "fire-bolt", "cost": 2,
   "attack": { "damage": 6, "damageType": "spell", "range": 3, "minRange": 1,
-              "trajectory": "direct", "lineOfSight": true }
+              "trajectory": "direct", "lineOfSight": true, "element": "fire" }
 }
 ```
 
@@ -209,7 +230,9 @@ end of turn.
 | `attack.trajectory` | yes | How the attack travels: `direct`, `arc` or `sky`. See *Line of sight and trajectories*. |
 | `attack.apex` | required iff `arc`, forbidden otherwise | How far above the higher endpoint the arc peaks, 0 or more. |
 | `attack.lineOfSight` | yes | Must the attacker see the target? Independent of `trajectory`; both must pass. |
-| `tags` | no | Free strings (weapon kinds, later elements) for modifiers to match. Unique. |
+| `attack.element` | no | The innate element, one of `rules.elements`. At most one; an Enchant can add more. `AttackDef.Elements` is the **set** (innate plus added, once a unit's overlay is applied); riders, resistances and immunities match on any of them. |
+| `attack.hits` | no, default 1 | **Skeleton** (spec D part 1 §6.7): parsed and stored, and a unit whose resolved attack has more than one throws `NotSupportedException`. No shipped file sets it; a repo-data test checks that. |
+| `tags` | no | Free strings (weapon kinds) for modifiers to match. Unique. |
 
 **Range is a circle.** A target is in the band when `minRange² ≤ q² + qr + r² ≤ range²` for the offset
 `target − attacker` (`Hex.EuclideanSquared`, `AttackDef.InRangeSquared`). That integer is exactly the
@@ -230,15 +253,24 @@ lists the tiles inside the circle.
 Damage (`Mimas.Core.Combat.DamageCalculator`):
 
 ```
-damage = max(0, base + power.<type> - defense.<type> + sum of flat modifiers)
+damage = max(0, base + power.<type> - defense.<type> + sum of boon stat lines + sum of flat modifiers)
+         then 0 if an immunity applied
 ```
 
 The result is a `DamageBreakdown`: a fixed-order list of signed lines (base, attacker power, target
 defense, then modifiers grouped attacker unit / attacker tile / globals for `dealDamage`, target unit /
-target tile / globals for `takeDamage`, each group sorted by id) plus the total. The same function computes
-the **preview** (`Knowledge.For(player)`: hidden enemy modifiers are dropped and counted in `UnknownCount`)
-and the **actual** result (`Knowledge.Full`). When an actual result contains a hidden line, the owner's
-opponent learns it (`ModifierRevealedEvent`) and it appears in every later preview.
+target tile / globals for `takeDamage`, each group sorted by id) plus the total. Power and defence come
+from the bodies' **public** stats (what gear explains); every boon's contribution to those keys, and
+every Enchant `damage` override on the attack, is its own hidden `BoonStat` line carrying the boon id, in
+boon order. An immunity (`effect.nullify`) never adds a flat line: the first that applies ends the
+breakdown with one `Nullify` line that takes the total to 0 after every flat line and the floor
+(`DamageBreakdown.Nullified`). The same function computes
+the **preview** (`Knowledge.For(player)`: hidden enemy modifiers and boons are dropped and counted in
+`UnknownCount` — one unknown per hidden modifier and one per hidden boon, whether or not it applies, so a
+client mirror can reproduce the count) and the **actual** result (`Knowledge.Full`). When an actual result
+contains a hidden line that changed the number, the owner's opponent learns it (`ModifierRevealedEvent`,
+and `BoonRevealedEvent` for a boon line or for the boon behind a modifier) and it appears in every later
+preview. The `attack` the calculator receives is the **resolved** definition (see *Match flow*).
 
 ## Modifiers (`modifiers/*.json`)
 
@@ -256,20 +288,111 @@ opponent learns it (`ModifierRevealedEvent`) and it appears in every later previ
 | Field | Required | Meaning |
 |---|---|---|
 | `trigger` | yes | `dealDamage` (consulted on the attacker's side: its unit, its tile, globals) or `takeDamage` (the target's side). |
-| `when` | no | All conditions must hold. `damageTypes[]` (attack type is one of), `tags[]` (attack has any of), `heightAdvantage` (attacker's tile is higher than the target's). Unknown keys are errors. |
-| `effect.damage` | yes, not 0 | Flat amount added to the damage. Only `damage` exists today; other keys are errors. |
+| `when` | no | All conditions must hold. `damageTypes[]` (attack type is one of), `tags[]` (attack has any of), `elements[]` (the resolved attack carries any of; each in `rules.elements`), `itemKinds[]` (the attack was granted by an item of any of these kinds — an innate ability never matches), `heightAdvantage` (attacker's tile is higher than the target's). Unknown keys are errors. |
+| `effect.damage` | one of the two, not 0 | Flat amount added to the damage. |
+| `effect.nullify` | one of the two, `true` | Immunity (`#damage` rule 3): when it applies, the total becomes 0 after everything else, as one `Nullify` line. **Mutually exclusive with `damage`**; the loader rejects a file that sets both. |
 | `visibility` | no, default `public` | `hidden` modifiers are unknown to the opponent until they first change a result (boons). Tile and global modifiers should stay `public`. |
 | `icon` | no | Presentation key, like abilities. |
 
-Who owns a modifier is the attachment, never the file: a unit carries it (`Unit.ModifierIds`, granted by a
-boon or, for now, `MatchSetup.WithModifier`), a terrain grants it to whoever stands on it
+Who owns a modifier is the attachment, never the file: a unit carries it (`Unit.ModifierIds`, attached by
+a boon's `modifier` effect — the unit remembers which, `Unit.BoonOfModifier` — or by
+`MatchSetup.WithModifier`), a terrain grants it to whoever stands on it
 (`terrains.json` `modifiers`), a single map hex grants it (`maps/*.json` hex `effect`), or it applies to
-every attack (`rules.globalModifiers`). The same id twice on one unit does not stack.
+every attack (`rules.globalModifiers`). The same id twice on one unit does not stack; when two boons attach
+one modifier, the first in grant order owns it.
+
+## Boons (`boons/*.json`)
+
+```json
+{
+  "version": 1, "id": "agni-crown", "name": "Agni's Crown", "kind": "enchant", "lineage": "hindu",
+  "description": "Every spell from your crown burns, and fire spells hit 2 harder.",
+  "requires": { "slot": "crown" },
+  "exclusive": ["crown-element"],
+  "effects": [ { "type": "addElement", "target": "crown", "element": "fire" },
+               { "type": "modifier", "id": "agni-fire" } ],
+  "icon": "agni-crown"
+}
+```
+
+| Field | Required | Meaning |
+|---|---|---|
+| `kind` | yes | `blessing` (a passive on the character), `enchant` (a change to one item), `sigil` (a new ability on one item). `BoonKinds`. |
+| `lineage` | yes | A `lineages/*.json` id (link). |
+| `requires` | enchant, sigil: yes; blessing: **forbidden** | `slot` (one of the four) required; `kind` optional (an item kind; link: at least one item of that slot has it). |
+| `effects[]` | yes, ≥ 1 | Flat records; `type` picks the fields (table below). A field that does not belong to the type, or an unknown type, is a load error. |
+| `stackable` | no, default false | May be drafted again while owned. Only legal when every effect is `stat` or `abilityOverride`. |
+| `exclusive[]` | no | Group tags: the draft never offers a boon sharing a group with an owned one (`crown-element` keeps two element Enchants off one crown). Unique, sorted. |
+| `name`, `description`, `icon` | no | Presentation; `name` defaults to the id. Names follow `<God>'s <thing>`, so a reveal also names the god. |
+
+The effect vocabulary (closed; one handler each in `Units/BoonOverlay.cs`):
+
+| `type` | Fields | Allowed on | Meaning |
+|---|---|---|---|
+| `stat` | `key` (`hp`, `ap`, `power.<lane>`, `defense.<lane>`), `amount` (≠ 0) | blessing | Added to the unit's stats; negatives are self trade-offs, floored on the total by `rules.boons` |
+| `modifier` | `id` | blessing, enchant | The modifier is attached to the unit for the session |
+| `abilityOverride` | `target` (an enchant's slot, or one ability id; a blessing's target must be an innate ability id), `field`, `amount` (≠ 0) or `value` | blessing, enchant | Additive integer override of one field. Numeric fields: `range`, `minRange`, `damage`, `cost`, `apex`, `hits`, `climb`, `jumpHeight`. Skeleton fields with a string `value`: `trajectory` (`direct` / `arc` / `sky`), `lineOfSight` (`true` / `false`). A slot target means every ability the item grants, Sigils included whichever was drafted first; a field with no meaning on one of them (`apex` on a direct attack) is ignored for that one |
+| `addElement` | `target` (the slot), `element` | enchant | Every attack the item grants gains the element |
+| `addTag` | `target` (the slot), `tag` | enchant | Every attack the item grants gains the tag |
+| `grantAbility` | `target` (the slot), `ability` (not innate) | sigil | The item grants one more ability, after its own; the item is the ability's public source, the boon is not |
+
+Link rules (each a `ContentError` naming the boon file): the lineage exists; `requires.kind` is some item's
+kind; modifier ids and ability ids exist; a granted ability is not innate and obeys the slot's lane rule
+(a weapon Sigil grants `weapon` attacks, a crown Sigil `spell` ones); a blessing's override names an innate
+ability; an enchant's ability-id target is granted by an item of its slot (and kind) **or by a Sigil of the
+same lineage on that slot**, so an Enchant on a Sigil's spell is legal content; a numeric field must apply
+to at least one ability the target can name (`damage` on the boots is an error, `range` is fine on either
+type); a `stat` lane is declared; an `addElement` element is declared.
+
+`hits`, `trajectory` and `lineOfSight` are **skeletons** (spec D part 1 §6.7): they parse and link, and a
+unit built with one throws `NotSupportedException` naming the spec. Nothing shipped uses them.
+
+## Lineages (`lineages/*.json`)
+
+```json
+{ "version": 1, "id": "hindu", "name": "Hindu", "description": "Pray to Agni, Vayu and Indra.",
+  "startingBlessing": "vayu-breath",
+  "pool": ["agni-warmth", "indra-wrath", "agni-crown", "indra-mail", "agni-spark", "vayu-wings"],
+  "icon": "hindu" }
+```
+
+`startingBlessing` (a `blessing` of this lineage; granted at select, appended to the build by the session)
+and `pool[]` (unique boon ids of this lineage the draft draws from). Link rules: the starting Blessing
+exists, is a blessing, belongs here; every pool id exists and belongs here; the pool holds **all three
+kinds**; and **for every item in the catalogue at least one Enchant or Sigil in the pool is applicable to
+it** — `#lineage` rule 2 read per item, through `BoonDef.IsApplicableTo(slot, kind, abilityIds)`: the
+slot and kind match, every ability-id target is one of the item's abilities, and no granted ability already
+is. Shipped: `greek` (Athena's Guard), `norse` (Thor's Vigour), `hindu` (Vayu's Breath), six boons each.
+
+## Session and draft (Core, `Mimas.Core.Session`)
+
+`Session(catalog, SessionSetup, seed)` is the best-of-N as a pure state machine (ADR-035): it owns the two
+`PlayerBuild`s (the lineage's starting Blessing appended once), the score, the ladder (map ids by
+`ladderPosition` then id; round *n* plays position `((n − 1) mod count) + 1`, so it wraps), the revealed
+knowledge that outlives a round, and the draft. `Start()` begins round 1; each round is a `MatchState` the
+session constructs with a seed from its own `Rng` — round 1's first mover by coin flip, then the loser of
+the previous round — with every `RevealedEntry` learned so far imported through `MatchSetup.WithRevealed`.
+`Apply(command)` forwards to the round; a `MatchEndedEvent` scores it (`RoundEndedEvent`) and either ends
+the session at `rules.series` (`SessionEndedEvent`) or opens a draft: `Draft.Offer` for player 0 then
+player 1 with the counts `rules.draft` gives each role (`DraftStartedEvent`); a player with no offers is
+picked at once; a `DraftPickCommand(player, offerIndex, reason)` — a timeout is the same command with
+`reason: timeout`, submitted by the host, so a replay needs no clock — appends the boon to the build
+(`DraftPickedEvent`), and the second pick starts the next round in the same `Apply`. `Phase` is `Round`,
+`Draft` or `Over`; `CommandRejectReason` gained `WrongPhase`, `AlreadyPicked`, `BadOffer`.
+
+`Draft` is pure and seeded: `IsApplicable` (the gear can use it), `IsEligible` (applicable, not owned unless
+stackable, no exclusive clash; the starting Blessing counts as owned), `Offer` (the eligible pool in ordinal
+order, shuffled, then the first Blessing, Enchant and Sigil in kind order while the count allows, then the
+rest of the shuffle; index 0 is what a timeout picks). Session events subclass `MatchEvent` so one list
+carries everything; `SessionEventFilter.ForPlayer` leaves a viewer their own offers and only "a pick was
+made" for the opponent's, and filters round events with the state that produced them; `SessionView.For`
+is the per-player projection part 2 encodes. `IBot.ChooseDraft`: the `RandomBot` keeps offer 0.
 
 ## Match flow (Core, `Mimas.Core.Match`)
 
 `MatchState(catalog, MatchSetup, seed)` builds the map, spawns one hero per player from that player's
-`Loadout` (four item ids, each checked against its slot) on `spawns.p1` / `p2`, then `Start()` begins turn 1. Commands: `MoveCommand`, `AttackCommand`, `EndTurnCommand` (reason
+`PlayerBuild` — a `Loadout` (four item ids, each checked against its slot), a lineage and the boons owned
+so far in grant order; the loadout-only constructor wraps a bare build — on `spawns.p1` / `p2`, then `Start()` begins turn 1. Commands: `MoveCommand`, `AttackCommand`, `EndTurnCommand` (reason
 `Player` or `Timeout`; the server submits the latter when the clock runs out, so replays need no clock)
 and `ResignCommand` (reason `Player` or `Disconnect`; the server submits the latter when a dropped seat
 does not come back, so a forfeit goes through the same rules path as a move). A resign is legal for either
@@ -280,10 +403,42 @@ legal command (bots, highlights). Each turn refreshes the active player's units 
 hp is dead, stops occupying its tile, and a player with no living unit loses (`MatchEndedEvent`). Clients
 only ever see `MatchState.ViewFor(player)` (`PlayerView`) and events passed through `EventFilter`.
 
+**A unit is gear + lineage + boons through one overlay** (ADR-034). `Unit` folds its boons once into a
+`BoonOverlay` — stat contributions, attached modifiers, overrides resolved to ability ids, added elements
+and tags, Sigil grants — with every entry tagged by the boon that put it there. `Unit.PublicStats` is base
++ items (what gear explains, public); `Unit.Stats` adds the boon stats and floors them by `rules.boons`.
+Abilities are innate, then each item's, then each Sigil's grant in boon order. **`MatchState.ResolveAbility`
+is the only ability lookup**: it hands back the catalogue's definition with the unit's overlay applied
+(numbers floored: cost at `minCost`, range at 1, `minRange` inside the band, apex / climb / jump at 0;
+elements and tags added; `damage` left on the def, because it becomes a breakdown line), and a test scans
+`MatchState.cs` to keep it so. `ResolveAbilityKnownTo(viewer, …)` applies only the boons that viewer has
+been shown: what the observation rule compares against and what a mirror previews with.
+
+**Reveal** (design `#hidden-info`; spec D part 1 §6.5). `BoonRevealedEvent(unitId, boonId, toPlayer)` and
+`LineageRevealedEvent(unitId, lineageId, toPlayer)`, routed by `EventFilter` to that player only. Revealing a
+boon reveals its whole definition (the modifiers it attaches and the abilities it grants become known too),
+and the first boon of a lineage reveals the lineage. Reveal events precede the event that needed them.
+
+| Trigger | Rule |
+|---|---|
+| Round start | A Health or AP Blessing is revealed to the opponent before `TurnStartedEvent` (D12: the bar shows it). |
+| A hidden line changed a result | A `Modifier` line reveals the modifier and then the boon behind it (`Unit.BoonOfModifier`); a `BoonStat` line reveals the boon; a `Nullify` line behaves as a modifier line. |
+| An ability's first use | After `AbilityRevealedEvent`, a Sigil's ability reveals the Sigil (`Unit.BoonOfAbility`). |
+| An observation contradicts what the opponent knows (D11) | Before AP is spent, the ability as the opponent knows it (`ResolveAbilityKnownTo`) is compared with the ability as it is: (a) a target or destination the known version could not reach reveals every boon overriding an aiming or movement field of this ability (`range`, `minRange`, `apex`, `climb`, `jumpHeight`); (b) a different cost reveals the boons overriding `cost`; (c) an element or tag the known version lacks reveals the boons that added it; (d) a `damage` override is a breakdown line and reveals itself like a Strength Blessing. |
+
+Boon and lineage reveals are keyed apart from ability and modifier reveals inside the revealed set
+(`KnowsBoon`, `KnowsLineage` beside `Knows`), because shipped content gives a boon and its modifier one
+name. `MatchState.RevealedEntries` exports the set in insertion order; `MatchSetup.WithRevealed` imports it
+into the next round. The `PlayerView` carries each unit's `LineageId` (own always; enemy once revealed) and
+`Boons` as id-or-null in grant order, so the count of picks is public and their identity is not.
+
 **The client's copy is a mirror** (`MatchState.FromView`, ADR-026): the same class rebuilt from one
 player's `PlayerView` and nothing else, so every preview question is answered by the same rules code
 online and offline, and it can only ever know what the server chose to send. A mirror answers questions
-and refuses to be advanced — `Start`, `Apply` and `TryApply` all throw on one.
+and refuses to be advanced — `Start`, `Apply` and `TryApply` all throw on one. A mirror's unit is built
+from gear plus the **revealed** boons and keeps hidden boon slots (`HiddenBoonCount`), and it refuses a view
+whose max hp or AP disagree with what the revealed boons explain, because every hp and AP Blessing is
+revealed at round start.
 
 Everything that crosses a socket is encoded by `Mimas.Core.Protocol.Wire`: a hand-written JSON codec with
 no attributes, no reflection and no `TypeNameHandling` (ADR-027). See `docs/networking.md`, which is the

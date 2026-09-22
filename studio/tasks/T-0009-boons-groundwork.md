@@ -48,11 +48,10 @@ allows_assets:
   - 'MimasClient/Assets/_Game/Data/modifiers/**'
   - 'MimasClient/Assets/_Game/Data/rules.json'
   - 'MimasClient/Assets/_Game/Content/GameDataManifest.asset'
-ladder:
-  - "dotnet build Mimas.slnx"
-  - "dotnet test shared/Mimas.Core.Tests"
-  - "dotnet test server/Mimas.Server.Tests"
-  - "verifier in a fresh context agrees with spec §14"
+# Rungs by number, as the runner wants them (studio/game.yaml): 0 asset safety, 1 core build, 2 core
+# tests, 5 server integration. The spec's §11 names the same three commands; the verifier is step 2 of
+# "done" in verification-ladder.md, not a rung. Changed from the command strings on 2026-09-22, as T-0008 had to.
+ladder: [0, 1, 2, 5]
 done_when:
   - "boons/ and lineages/ load from the shipped folder; every link rule in spec §5 has a failing-case test; the shipped three lineages cover every item"
   - "A unit built from gear + lineage + boons has floored stats, attached modifiers, resolved overrides, added elements and granted abilities, and MatchState.ResolveAbility is the only ability lookup (test)"

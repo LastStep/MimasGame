@@ -288,27 +288,23 @@ figure{margin:12px 0} figure svg{width:100%; height:auto; display:block} figcapt
 <!-- ============================================================ -->
 <div class="grp-title" data-group="Loop">Loop</div>
 
-<section class="concept" id="session" data-design="decided" data-impl="drift" data-title="Session">
+<section class="concept" id="session" data-design="decided" data-impl="partial" data-title="Session">
 <header><h2>Session</h2></header>
 <p class="lead">A session is one matchmade encounter between two players. It is a best-of-X series of <a href="#round">rounds</a>, each on the next map of the <a href="#maps">ladder</a>, with a <a href="#draft">draft</a> between rounds. The build (gear, lineage, boons) carries forward for the whole session.</p>
 <h3>Rules</h3>
 <ol>
   <li>A session starts after <a href="#online">matchmaking</a> pairs two players on the same <a href="#time-controls">time control</a>.</li>
   <li>Both players go through <a href="#character-select">character select</a> before round 1. Selection is simultaneous and private.</li>
-  <li>Rounds are played on ladder maps in order: round 1 on ladder position 1, round 2 on position 2, and so on.</li>
-  <li>The session ends when one player has won the majority of rounds (<mark>best of 3 at launch</mark>, so first to 2). See <a href="#win-conditions">Win conditions</a>.</li>
+  <li>Rounds are played on ladder maps in <b>strict order</b> (decided 21 Sep 2026): round <i>n</i> plays ladder position <code>((n − 1) mod length) + 1</code>, so with two maps round 3 is back on position 1. The ladder <b>wraps</b>; a third map is a later session, not a rule.</li>
+  <li>The session ends when one player has won the majority of rounds: <b>best of 3</b>, in data as <code>rules.series.bestOf</code> (odd), so first to <code>bestOf / 2 + 1</code> (decided 21 Sep 2026; the count does not depend on the time control). See <a href="#win-conditions">Win conditions</a>.</li>
   <li>After every round except the last, both players <a href="#draft">draft</a> one boon.</li>
   <li>Everything learned through <a href="#hidden-info">reveals</a> stays revealed for the rest of the session.</li>
   <li>A player who leaves and does not reconnect within the grace period forfeits the session (see <a href="#online">Online</a>).</li>
 </ol>
-<div class="drift-note"><b>Drift.</b> Code has <code>MatchState</code> for one round and no series wrapper. <code>Mimas.Core.Match</code> is one round; a <code>Session</code> (series score, ladder index, per-player build, revealed sets that outlive a round) is not started. Planned for M3.</div>
+<div class="drift-note"><b>Partial.</b> <code>Mimas.Core.Session.Session</code> since 22 Sep 2026 (T-0009, ADR-035): a pure state machine that owns the builds, the score, the ladder, the session-long revealed sets and the draft, constructs one <code>MatchState</code> per round from its own seeded RNG, and replays from one seed. It plays a whole best-of-3 in a test. <b>The server hosts it in part 2</b> (T-0010); online today the room still plays one round at a time with a rematch (<a href="#online">rule 9</a>) and no score.</div>
 <h3>Depends on</h3>
 <ul><li><a href="#round">Round</a>, <a href="#draft">Draft</a>, <a href="#maps">Maps</a>, <a href="#character-select">Character select</a></li></ul>
-<div class="open-q"><h3>Open questions</h3><ul>
-<li id="q-session-length">Best of 3 vs best of 5 as the default, and whether the count depends on the time control (bullet = single round?).</li>
-<li id="q-session-map-order">Whether the ladder is strictly ordered or the server picks from a pool per ladder position.</li>
-</ul></div>
-<p class="src">Source: pillars 3 and 6; ADR-018 (revealed sets in state).</p>
+<p class="src">Source: pillars 3 and 6; ADR-018 (revealed sets in state); ADR-035; 21 Sep 2026 question rounds (D13, D17).</p>
 </section>
 
 <section class="concept" id="round" data-design="decided" data-impl="implemented" data-title="Round">
@@ -317,13 +313,12 @@ figure{margin:12px 0} figure svg{width:100%; height:auto; display:block} figcapt
 <h3>Rules</h3>
 <ol>
   <li>Each player has exactly one hero, spawned on their map spawn (<a href="#maps">p1 / p2</a>) at full health.</li>
-  <li><mark>Who moves first:</mark> round 1 by a seeded coin flip; then the loser of the previous round moves first (proposed).</li>
+  <li><b>Who moves first:</b> round 1 by a seeded coin flip; then the loser of the previous round moves first (decided 21 Sep 2026, D13; <code>Session</code> does exactly this).</li>
   <li>The round ends the moment a hero reaches 0 health (<a href="#win-conditions">by damage or environment</a>).</li>
   <li>Between rounds, health, AP and one-round states reset; gear, lineage, boons and revealed knowledge persist.</li>
   <li>The round clock (see <a href="#time-controls">time controls</a>) restarts per round. A flag fall loses the round, not the session (proposed).</li>
 </ol>
 <div class="open-q"><h3>Open questions</h3><ul>
-<li id="q-round-first">Confirm first-mover rule: coin flip then loser-first, or alternate.</li>
 <li id="q-round-clock">Does the chess clock reset per round, or is one clock shared across the whole session?</li>
 <li id="q-round-flag">Flag fall = lose round or lose session?</li>
 </ul></div>
@@ -350,24 +345,25 @@ figure{margin:12px 0} figure svg{width:100%; height:auto; display:block} figcapt
 <p class="src">Source: notebook 16 Sep 2026 ("choose your gear… then pick a divine lineage").</p>
 </section>
 
-<section class="concept" id="draft" data-design="decided" data-impl="not-started" data-title="Draft (between rounds)">
+<section class="concept" id="draft" data-design="decided" data-impl="partial" data-title="Draft (between rounds)">
 <header><h2>Draft (between rounds)</h2></header>
-<p class="lead">After every round except the last, each player is offered <mark>three</mark> <a href="#boons">boons</a> from their <a href="#lineage">lineage</a>'s pool and keeps <mark>one</mark>. The pick is private and simultaneous.</p>
+<p class="lead">After every round except the last, each player is offered <b>three</b> <a href="#boons">boons</a> from their <a href="#lineage">lineage</a>'s pool and keeps <b>one</b>. The pick is private and simultaneous.</p>
 <h3>Rules</h3>
 <ol>
-  <li>Offers are drawn with the session <a href="#determinism">seeded RNG</a>, so a replay reproduces them.</li>
-  <li>Only boons the player can use are offered: an <a href="#enchant">Enchant</a> or <a href="#sigil">Sigil</a> whose <code>requires</code> does not match the player's gear is excluded; a boon already owned is excluded unless it declares <code>stackable</code>.</li>
-  <li>Offers are one of each kind when possible (<mark>one Blessing, one Enchant, one Sigil</mark>, proposed); otherwise filled from what remains.</li>
-  <li>Draft timer: <mark>20 s</mark> (proposed). Timeout picks the first offer.</li>
+  <li>Offers are drawn with the session <a href="#determinism">seeded RNG</a>, so a replay reproduces them. Player 0's offer is drawn first, then player 1's.</li>
+  <li>Only boons the player can use are offered: an <a href="#enchant">Enchant</a> or <a href="#sigil">Sigil</a> whose <code>requires</code> does not match the player's gear is excluded, as is one whose ability target the player does not have or whose granted ability they already have; a boon already owned is excluded unless it declares <code>stackable</code>; a boon sharing an <code>exclusive</code> group with an owned one is excluded. The starting Blessing counts as owned.</li>
+  <li>Offers are one of each kind when possible (one Blessing, one Enchant, one Sigil, in that order); otherwise filled from what remains. Fewer eligible boons than offers means fewer offers, possibly none.</li>
+  <li><b>The draft is symmetric</b> (decided 21 Sep 2026, D10): the counts live in data as <code>rules.draft.offers.winner</code> and <code>.loser</code>, both 3 at launch, so a comeback draft is a number change, not a rule change.</li>
+  <li>Draft timer: <code>rules.draft.timeoutMs</code>, 20 s at launch. Timeout picks the first offer, as a command the host submits (Core never reads a clock).</li>
   <li>The pick is <a href="#hidden-info">hidden</a>. The opponent sees only that a pick was made.</li>
-  <li>Picks apply immediately and last for the session.</li>
+  <li>Picks apply immediately and last for the session. <b>No tiers, no rarity, no reroll, no cap at best of 3</b> (decided 21 Sep 2026, D18): later, not at launch.</li>
 </ol>
+<div class="drift-note"><b>Partial.</b> <code>Mimas.Core.Session.Draft</code> (22 Sep 2026): <code>IsApplicable</code>, <code>IsEligible</code> and <code>Offer</code> as the rules above, pure and seeded; the <code>Session</code> runs it between rounds and takes <code>DraftPickCommand</code>s. No draft screen, no wire message: part 2.</div>
 <div class="open-q"><h3>Open questions</h3><ul>
-<li id="q-draft-comeback">Comeback mechanic: does the round loser get a better offer (a tier up, or four options), or is the draft symmetric?</li>
-<li id="q-draft-tiers">Do boons have tiers/rarity (TFT silver/gold/prismatic) and does the tier depend on the round number?</li>
-<li id="q-draft-reroll">Is there a reroll?</li>
+<li id="q-draft-tiers">Tiers / rarity (TFT silver/gold/prismatic), and whether the tier depends on the round number. <b>Later, not at launch</b> (21 Sep 2026); the data has no tier field yet.</li>
+<li id="q-draft-reroll">A reroll. <b>Later, not at launch</b> (21 Sep 2026).</li>
 </ul></div>
-<p class="src">Source: pillar 7; notebook 16 Sep 2026; round-2 answer "starting passive + lineage pool".</p>
+<p class="src">Source: pillar 7; notebook 16 Sep 2026; round-2 answer "starting passive + lineage pool"; 21 Sep 2026 question rounds (D10, D18).</p>
 </section>
 
 <section class="concept" id="turns" data-design="decided" data-impl="implemented" data-title="Turns and action points">
@@ -573,13 +569,10 @@ r=+4        . . . , .</code></pre>
 <ol>
   <li>Keys follow <code>power.&lt;lane&gt;</code> / <code>defense.&lt;lane&gt;</code> for the two lanes in <code>rules.damageTypes</code> (weapon, spell). This keeps the existing generic stat table; only the lane list and display names change.</li>
   <li>Every hero has the same base stats, in <code>rules.json</code> <code>baseStats</code> (current placeholders: hp 20, ap 3, Strength 1, Magic 1, armour 0/0). Items are pure additions, so the stat block is a sum. New stats are JSON only.</li>
-  <li>No item carries a negative stat at launch (the loader rejects them). <code>hp</code> is at least 1, <code>ap</code> at least 0. Negative effects, if ever, come from boons and need a floor rule first.</li>
-  <li>Enemy stats are public because gear is public. A hidden Blessing that changed a stat is <a href="#hidden-info">revealed</a> the first time the changed stat alters a result (for hp: at round start, since max health is visible on the bar; so hp Blessings are effectively public).</li>
+  <li>No item carries a negative stat at launch (the loader rejects them). <code>hp</code> is at least 1, <code>ap</code> at least 0. <b>A Blessing may lower the owner's own stats as a trade-off</b> (decided 21 Sep 2026, D8: "+2 Strength, −2 Health"), with floors on the total in <code>rules.boons.floors</code>: <code>hp</code> never below 1, <code>ap</code> never below 1, every other stat never below 0. Floors apply once, to the sum, never to a single boon. <b>Debuffs on the enemy are not a thing at launch</b>: a boon only ever changes its owner.</li>
+  <li>Enemy stats are public because gear is public: a unit's <em>public</em> stats are base + items, and every Blessing's contribution is a separate hidden line. A hidden Blessing that changed a stat is <a href="#hidden-info">revealed</a> the first time the changed stat alters a result; an hp or AP Blessing is revealed at round start, since max health and action points are visible on the bar, so those are effectively public.</li>
 </ol>
-<div class="open-q"><h3>Open questions</h3><ul>
-<li id="q-stats-negative">Can Enchants or Blessings ever lower an enemy's stats (debuffs), or only the owner's?</li>
-</ul></div>
-<p class="src">Source: notebook page 1 (Health, Strength, Magic; armour negates damage); round-2 answer "separate weapon and spell reduction"; ADR-017.</p>
+<p class="src">Source: notebook page 1 (Health, Strength, Magic; armour negates damage); round-2 answer "separate weapon and spell reduction"; ADR-017; 21 Sep 2026 question rounds (D8, D12).</p>
 </section>
 
 <section class="concept" id="equipment" data-design="decided" data-impl="implemented" data-title="Equipment (gear)">
@@ -701,9 +694,9 @@ r=+4        . . . , .</code></pre>
   <li>Targeting and legality come from one function used by HUD, server and bots. A refusal names its reason and, for a blocked shot, the hex that stopped it.</li>
   <li>Multi-target shapes (cone, line, area) are <mark>not designed</mark>; Sigils like Triple Shot will need a <code>shape</code> or a multi-hit count. See open question.</li>
 </ol>
-<div class="drift-note"><b>Partial.</b> Lanes are weapon / spell; the <code>element</code> field does not exist yet. Everything else on this page is in code.</div>
+<div class="drift-note"><b>Partial.</b> Lanes are weapon / spell; <code>element</code> exists (22 Sep 2026: Fire Bolt is fire, and an Enchant can add one). <code>attack.hits</code> is a <b>skeleton</b>: it parses and is stored, and a unit whose attack has more than one hit fails closed with a message naming the spec (part 1 §6.7), because the rule is still the open question below. Everything else in this section is in code.</div>
 <div class="open-q"><h3>Open questions</h3><ul>
-<li id="q-attacks-multi">Multi-hit and area attacks (Triple Shot, Cleave): repeated single resolution vs a shape. Proposed: <code>hits: 3</code> repeats the single-target resolution; shapes later.</li>
+<li id="q-attacks-multi">Multi-hit and area attacks (Triple Shot, Cleave): repeated single resolution vs a shape. Proposed: <code>hits: 3</code> repeats the single-target resolution; shapes later. The <code>hits</code> field exists as a skeleton; the resolution rule does not.</li>
 </ul></div>
 <p class="src">Source: ADR-017, ADR-023; design v0.1 targeting decision.</p>
 </section>
@@ -727,7 +720,7 @@ r=+4        . . . , .</code></pre>
   <li><b>The override seam.</b> Resolution reads trajectory, apex, sight and the range band from the attack definition through one place, so an <a href="#enchant">Enchant</a> can hand it a modified copy without touching the resolvers. No enchant does this yet.</li>
 </ol>
 <div class="open-q"><h3>Open questions</h3><ul>
-<li id="q-trajectory-enchant">Which Enchant first swaps a trajectory ("your gun shots arc", "your arrows fly flat and gain range"), and does swapping it also change <code>lineOfSight</code>?</li>
+<li id="q-trajectory-enchant">Which Enchant first swaps a trajectory ("your gun shots arc", "your arrows fly flat and gain range"), and does swapping it also change <code>lineOfSight</code>? <b>A skeleton exists</b> (22 Sep 2026): an <code>abilityOverride</code> on <code>trajectory</code> or <code>lineOfSight</code> parses and links, and a unit built with one fails closed naming the spec. The rule is still open.</li>
 </ul></div>
 <h3>Depends on</h3><ul><li><a href="#attacks">Attacks</a>, <a href="#line-of-sight">Line of sight</a>, <a href="#board">Board</a></li></ul>
 <p class="src">Source: ADR-023; 16 Sep 2026 question round (spec <code>docs/specs/2026-09-16-aiming-rules.md</code>).</p>
@@ -748,26 +741,26 @@ r=+4        . . . , .</code></pre>
   <li><b>High ground</b> applies to every <a href="#trajectories">trajectory</a>: the condition is the attacker's tile being higher than the target's, whatever the shot did on the way.</li>
   <li>Enemy health is fully visible (pillar 8 surprise lives in abilities and modifiers, not in the health bar).</li>
 </ol>
-<div class="drift-note"><b>Partial.</b> Two lanes in code; <code>nullify</code> (immunity) does not exist yet.</div>
+<div class="drift-note"><b>Partial.</b> Two lanes, <code>nullify</code> (one <code>Nullify</code> line, total 0 after every flat line and the floor), boon stat lines and element riders are in code (22 Sep 2026). The tooltip's "Immune (fire)" wording is presentation, part 2.</div>
 <h3>Depends on</h3><ul><li><a href="#stats">Stats</a>, <a href="#modifiers">Modifiers</a>, <a href="#elements">Elements</a>, <a href="#hidden-info">Hidden information</a></li></ul>
 <p class="src">Source: ADR-017; round-1 answer "everything is either WP or SP".</p>
 </section>
 
-<section class="concept" id="elements" data-design="decided" data-impl="not-started" data-title="Elements and modifier classes">
+<section class="concept" id="elements" data-design="decided" data-impl="partial" data-title="Elements and modifier classes">
 <header><h2>Elements and modifier classes</h2></header>
-<p class="lead">An element (fire, frost, lightning, …) is a <b>modifier class</b>: a tag an attack carries that resistances, immunities and riders match on. It is not a third damage lane. Other modifier classes (e.g. bleed, holy) can be added the same way later.</p>
+<p class="lead">An element (fire, frost, lightning) is a <b>modifier class</b>: a tag an attack carries that resistances, immunities and riders match on. It is not a third damage lane. Other modifier classes (e.g. bleed, holy) can be added the same way later.</p>
 <ol>
-  <li><code>rules.json</code> declares <code>elements[]</code>. An attack may carry at most one innate <code>element</code>; an <a href="#enchant">Enchant</a> can add one to every attack of an item.</li>
+  <li><code>rules.json</code> declares <code>elements[]</code>: <b>fire, frost, lightning</b> at launch (decided 21 Sep 2026, D14; lineages share them). An attack may carry at most one innate <code>element</code>; an <a href="#enchant">Enchant</a> can add one to every attack of an item. <b>The elements on an attack are a set</b> (D9): innate plus added, and a rider, resistance or immunity matches on any of them. Element Enchants on one slot share an <code>exclusive</code> group, so the draft never offers two for one item.</li>
   <li>A <b>rider</b> is a <code>dealDamage</code> modifier with <code>when.elements</code> and a positive <code>effect.damage</code> ("+2 fire").</li>
   <li>A <b>resistance</b> is a <code>takeDamage</code> modifier with <code>when.elements</code> and a negative <code>effect.damage</code>; an <b>immunity</b> uses <code>effect.nullify</code>.</li>
   <li>Elements have no rock-paper-scissors table at launch (fire beats frost etc.). Any such interaction is a modifier in data.</li>
   <li>Elements are shown as an icon on the ability button and as a line in the damage tooltip.</li>
 </ol>
+<div class="drift-note"><b>Partial.</b> <code>rules.elements</code>, <code>attack.element</code>, the element set on a resolved attack, <code>when.elements</code> riders and resistances and <code>nullify</code> immunities are in code (22 Sep 2026). The icon on the button and the tooltip line are presentation, part 2.</div>
 <div class="open-q"><h3>Open questions</h3><ul>
-<li id="q-elements-list">Launch element list. Proposed: fire, frost, lightning (one per lineage flavour is tempting but lineages should share elements).</li>
 <li id="q-elements-status">Do elements ever apply a status (burn per turn, frost slows)? Needs a status system; not at launch.</li>
 </ul></div>
-<p class="src">Source: notebook page 2 (Damage types: weapon, spell, elemental); round-1 answer "elemental has its own class (fire, frost, etc), other kinds of damage modifiers later".</p>
+<p class="src">Source: notebook page 2 (Damage types: weapon, spell, elemental); round-1 answer "elemental has its own class (fire, frost, etc), other kinds of damage modifiers later"; 21 Sep 2026 question rounds (D9, D14).</p>
 </section>
 
 <section class="concept" id="modifiers" data-design="decided" data-impl="partial" data-title="Modifiers">
@@ -787,36 +780,38 @@ r=+4        . . . , .</code></pre>
   <li>Order never matters for the total (all flat, then floor, then nullify).</li>
   <li>Modifiers never change AP, range or stats; those are <a href="#enchant">Enchant</a> stat effects. Modifiers only touch damage results.</li>
 </ol>
-<div class="drift-note"><b>Partial.</b> Trigger, <code>damageTypes</code>, <code>tags</code>, <code>heightAdvantage</code>, <code>effect.damage</code>, visibility and reveal exist. <code>elements</code>, <code>itemKinds</code>, <code>nullify</code> are new.</div>
+<div class="drift-note"><b>Partial.</b> Everything in the table is in code (22 Sep 2026): <code>elements</code>, <code>itemKinds</code> and <code>nullify</code> joined the existing conditions and effect. A modifier attached by a boon remembers its boon, so revealing the modifier reveals the boon. What is not in code is any effect key beyond <code>damage</code> and <code>nullify</code>: more are design decisions.</div>
 <p class="src">Source: ADR-017; docs/data.md "Modifiers".</p>
 </section>
 
 <!-- ============================================================ -->
 <div class="grp-title" data-group="Divine">Divine</div>
 
-<section class="concept" id="lineage" data-design="decided" data-impl="not-started" data-title="Divine lineage">
+<section class="concept" id="lineage" data-design="decided" data-impl="partial" data-title="Divine lineage">
 <header><h2>Divine lineage</h2></header>
 <p class="lead">At character select, after picking gear, the player chooses the divine lineage they pray to. Launch lineages: <b>Greek</b>, <b>Norse</b>, <b>Hindu</b>. A lineage grants one fixed <b>starting Blessing</b> immediately and defines the <b>pool of boons</b> offered in every <a href="#draft">draft</a>. Lineages shape a build; they do not lock a playstyle.</p>
 <ol>
   <li>Each lineage has: <code>id</code>, <code>name</code>, <code>startingBlessing</code> (a Blessing id), <code>pool[]</code> (boon ids), one-line flavour, presentation keys.</li>
-  <li>The pool must contain all three <a href="#boons">boon kinds</a> and cover every item kind at least once, so no gear choice makes a lineage empty. The content loader enforces this.</li>
+  <li>The pool must contain all three <a href="#boons">boon kinds</a> and, <b>for every item in the catalogue</b>, hold at least one Enchant or Sigil applicable to it (its slot and kind match, its ability targets are the item's, its granted ability is not one the item has) — so no gear choice makes a lineage empty, read per item. The content loader enforces this.</li>
   <li>The lineage and its starting Blessing are <a href="#hidden-info">hidden</a>. The lineage is revealed the first time any of its boons is revealed (a boon's name shows its god).</li>
+  <li><b>The three starting Blessings</b> (decided 21 Sep 2026, D15): Greek <b>Athena's Guard</b> (+1 armour against weapons, +1 against spells); Norse <b>Thor's Vigour</b> (+4 Health); Hindu <b>Vayu's Breath</b> (+1 walk range). Placeholder numbers.</li>
+  <li><b>Boons are named "&lt;God&gt;'s &lt;thing&gt;"</b> (decided 21 Sep 2026): Apollo's Bowstring, Skadi's Hide, Agni's Crown — so a reveal names the god and therefore the lineage.</li>
   <li>Flavour direction (proposed, not rules): Greek = precision and control (Apollo range, Athena defence, Hermes movement); Norse = aggression and endurance (Thor lightning, berserk trades, Odin knowledge); Hindu = elements and transformation (Agni fire, Vayu wind movement, Indra storms).</li>
   <li>Adding a lineage is data plus art. Balance goal: every lineage viable with every kit.</li>
 </ol>
-<h3>Data (proposed, <code>lineages/*.json</code>)</h3>
+<h3>Data (<code>lineages/*.json</code>)</h3>
 <pre><code>{ "version": 1, "id": "hindu", "name": "Hindu", "description": "Pray to Agni, Vayu and Indra.",
-  "startingBlessing": "breath-of-vayu",
-  "pool": ["agni-crown", "vayu-boots", "indra-bolt", "trimurti-vigour", "..."] }</code></pre>
+  "startingBlessing": "vayu-breath",
+  "pool": ["agni-warmth", "indra-wrath", "agni-crown", "indra-mail", "agni-spark", "vayu-wings"],
+  "icon": "hindu" }</code></pre>
+<div class="drift-note"><b>Partial.</b> Three lineages with six boons each ship and load (22 Sep 2026); the lineage row in the room, the choice at select and the bot picking one are part 2.</div>
 <div class="open-q"><h3>Open questions</h3><ul>
-<li id="q-lineage-starting">Starting Blessing per lineage (three concrete passives to write).</li>
 <li id="q-lineage-mirror">Mirror matches (both Greek): fine, or any special rule? Proposed: fine.</li>
-<li id="q-lineage-names">Naming style for boons: "<god>'s <thing>" consistently, so the reveal also reveals the lineage.</li>
 </ul></div>
-<p class="src">Source: notebook page 1 (Divine Blessing); round-1 answers.</p>
+<p class="src">Source: notebook page 1 (Divine Blessing); round-1 answers; 21 Sep 2026 question rounds (D15, D16).</p>
 </section>
 
-<section class="concept" id="boons" data-design="decided" data-impl="not-started" data-title="Boons">
+<section class="concept" id="boons" data-design="decided" data-impl="partial" data-title="Boons">
 <header><h2>Boons</h2></header>
 <p class="lead"><b>Boon</b> is the umbrella term for anything a lineage grants. Three kinds: a <a href="#blessing">Blessing</a> (a passive on the character), an <a href="#enchant">Enchant</a> (a change to one equipped item), a <a href="#sigil">Sigil</a> (a new active ability on one equipped item). Boons are drafted between rounds and last the session.</p>
 <table>
@@ -827,62 +822,69 @@ r=+4        . . . , .</code></pre>
 </table>
 <h3>Rules</h3>
 <ol>
-  <li>A boon has: <code>id</code>, <code>name</code>, <code>kind</code>, <code>lineage</code>, <code>requires</code> (slot and/or item kind; none for most Blessings), <code>effects[]</code>, <code>stackable</code> (default false), description, icon.</li>
-  <li>Effect vocabulary (proposed, closed list, each one handler in Core): <code>stat</code> (key, amount), <code>modifier</code> (id, attached to unit), <code>abilityOverride</code> (ability id or item, field, amount: range / damage / cost), <code>addElement</code> (item, element), <code>grantAbility</code> (item, ability id). New effect types are design decisions.</li>
-  <li>Boons are <a href="#hidden-info">hidden</a>: a Blessing reveals when its modifier or stat changes a result; an Enchant reveals when an altered number is observed (a shot lands from beyond normal range, a preview differs); a Sigil reveals when its ability is used.</li>
+  <li>A boon has: <code>id</code>, <code>name</code>, <code>kind</code>, <code>lineage</code>, <code>requires</code> (a slot and optionally an item kind; <b>forbidden on a Blessing</b>, required on the other two), <code>effects[]</code>, <code>stackable</code> (default false), <code>exclusive[]</code>, description, icon.</li>
+  <li><b>Effect vocabulary</b> (decided 21 Sep 2026; closed list, one handler each in Core): <code>stat</code> (key, amount — Blessing only), <code>modifier</code> (id, attached to the unit — Blessing or Enchant), <code>abilityOverride</code> (target = the Enchant's slot or one ability id, a Blessing's target = an innate ability id; field one of <code>range</code>, <code>minRange</code>, <code>damage</code>, <code>cost</code>, <code>apex</code>, <code>climb</code>, <code>jumpHeight</code> with an additive amount, plus the skeletons <code>hits</code>, <code>trajectory</code>, <code>lineOfSight</code>), <code>addElement</code> and <code>addTag</code> (the Enchant's slot: every attack the item grants), <code>grantAbility</code> (Sigil only: the slot and an ability id). Loading fails closed on an unknown type or a field that does not belong to the type. <b>New effect types are design decisions.</b></li>
+  <li><b><code>stackable</code></b> (decided 21 Sep 2026): a boon may be drafted again while owned only when every effect is a <code>stat</code> or an <code>abilityOverride</code>. <b><code>exclusive[]</code></b> (decided 21 Sep 2026, D18): group tags; the draft never offers a boon sharing a group with an owned one. Two element Enchants on one slot share a group.</li>
+  <li>Boons are <a href="#hidden-info">hidden</a>: a Blessing reveals when its modifier or stat changes a result (an hp or AP Blessing at round start); an Enchant reveals on the observation that contradicts what the opponent knows (the table in <a href="#hidden-info">Hidden information</a>); a Sigil reveals when its ability is used. <b>Revealing a boon reveals its whole definition</b> — name, god, every effect — and the first boon of a lineage reveals the lineage.</li>
   <li>The starting Blessing from the <a href="#lineage">lineage</a> is an ordinary Blessing, granted at select instead of drafted.</li>
-  <li>Boons never remove abilities or items.</li>
+  <li>Boons never remove abilities or items. <b>No cap at best of 3</b> (decided 21 Sep 2026): at most two drafted and one starting; a longer series is when a cap or tiering gets designed.</li>
 </ol>
-<h3>Data (proposed, <code>boons/*.json</code>)</h3>
-<pre><code>{ "version": 1, "id": "agni-crown", "name": "Agni's Crown", "kind": "enchant", "lineage": "hindu",
+<h3>Data (<code>boons/*.json</code>)</h3>
+<pre><code>{ "$schema": "../../../../../tools/schemas/boon.schema.json",
+  "version": 1, "id": "agni-crown", "name": "Agni's Crown", "kind": "enchant", "lineage": "hindu",
+  "description": "Every spell from your crown burns, and fire spells hit 2 harder.",
   "requires": { "slot": "crown" },
+  "exclusive": ["crown-element"],
   "effects": [ { "type": "addElement", "target": "crown", "element": "fire" },
-               { "type": "modifier", "id": "agni-fire" } ] }
+               { "type": "modifier", "id": "agni-fire" } ],
+  "icon": "agni-crown" }
 
-{ "version": 1, "id": "hermes-heels", "name": "Heels of Hermes", "kind": "sigil", "lineage": "greek",
-  "requires": { "slot": "boots" }, "effects": [ { "type": "grantAbility", "target": "boots", "ability": "blink" } ] }
+{ "version": 1, "id": "hermes-heels", "name": "Hermes' Heels", "kind": "sigil", "lineage": "greek",
+  "requires": { "slot": "boots" }, "effects": [ { "type": "grantAbility", "target": "boots", "ability": "dash" } ] }
 
-{ "version": 1, "id": "trimurti-vigour", "name": "Trimurti's Vigour", "kind": "blessing", "lineage": "hindu",
+{ "version": 1, "id": "thor-vigour", "name": "Thor's Vigour", "kind": "blessing", "lineage": "norse",
   "effects": [ { "type": "stat", "key": "hp", "amount": 4 } ] }</code></pre>
-<div class="drift-note"><b>Not started.</b> <code>boons/</code> is an empty folder; the catalogue rejects unknown files, so the loader needs the schema first. Units can already carry modifiers (<code>Unit.ModifierIds</code>), which is what a Blessing resolves to.</div>
+<div class="drift-note"><b>Partial.</b> The whole system exists in <code>Mimas.Core</code> since 22 Sep 2026 (T-0009; ADR-034): <code>boons/</code> and <code>lineages/</code> load and link with every rule above, a unit is gear + lineage + boons through one overlay, every ability is read through <code>MatchState.ResolveAbility</code>, the reveal rules fire, the draft and the session play a best-of-3 in a test, and three lineages with six boons each ship. What a player sees — the lineage in the room, the draft screen, the examine panel, the reveal flyover — is part 2 (T-0010). The capability matrix in the spec (part 1 §3) is the checklist of what works, what is a skeleton and what is a design question first.</div>
 <h3>Depends on</h3><ul><li><a href="#lineage">Lineage</a>, <a href="#draft">Draft</a>, <a href="#equipment">Equipment</a>, <a href="#modifiers">Modifiers</a>, <a href="#hidden-info">Hidden information</a></li></ul>
-<div class="open-q"><h3>Open questions</h3><ul>
-<li id="q-boons-cap">Is there a cap on boons per session (best of 3 gives at most 2 drafts + 1 starting)? With longer series, a cap or tiering may be needed.</li>
-<li id="q-boons-exclusive">Exclusivity groups (only one element per crown)? Proposed: yes, <code>exclusive</code> tag list.</li>
-</ul></div>
-<p class="src">Source: notebook page 2; round-1 and round-2 naming answers (Boon umbrella; Blessing / Enchant / Sigil).</p>
+<p class="src">Source: notebook page 2; round-1 and round-2 naming answers (Boon umbrella; Blessing / Enchant / Sigil); 21 Sep 2026 question rounds (D6–D9, D16, D18); ADR-034.</p>
 </section>
 
-<section class="concept" id="blessing" data-design="decided" data-impl="not-started" data-title="Blessing (boon kind)">
+<section class="concept" id="blessing" data-design="decided" data-impl="partial" data-title="Blessing (boon kind)">
 <header><h2>Blessing (boon kind)</h2></header>
-<p class="lead">A passive on the character. Examples from the notebook: immune to fire damage, increased max health. Implemented as stat effects and/or unit-attached <a href="#modifiers">modifiers</a>.</p>
+<p class="lead">A passive on the character. Examples from the notebook: immune to fire damage, increased max health. Implemented as stat effects, unit-attached <a href="#modifiers">modifiers</a>, or an override on the innate walk.</p>
 <ol>
   <li>Requires nothing (any kit).</li>
   <li>The lineage's starting Blessing is one of these.</li>
-  <li>Hidden until it changes a result; stat Blessings on visible stats (hp) are effectively public at round start.</li>
+  <li>Hidden until it changes a result; stat Blessings on visible stats (hp, AP) are revealed at round start.</li>
+  <li><b>Self trade-offs are allowed</b> (decided 21 Sep 2026, D8): a Blessing may lower the owner's own stat ("+2 Strength, −2 Health"), never an enemy's, and the total is floored by <code>rules.boons.floors</code> (<a href="#stats">Stats</a> rule 3).</li>
 </ol>
+<div class="drift-note"><b>Partial.</b> In code (22 Sep 2026): stat, modifier and walk-override Blessings, floors, reveal. Presentation is part 2.</div>
 <p class="src">Source: notebook page 2.</p>
 </section>
 
-<section class="concept" id="enchant" data-design="decided" data-impl="not-started" data-title="Enchant (boon kind)">
+<section class="concept" id="enchant" data-design="decided" data-impl="partial" data-title="Enchant (boon kind)">
 <header><h2>Enchant (boon kind)</h2></header>
 <p class="lead">A property change on one equipped item. Examples from the notebook: increase range on bow; add fire damage on crown (adds a fire rider to every spell). The notebook called this kind "boon"; renamed to avoid clashing with the umbrella term.</p>
 <ol>
   <li><code>requires</code> names a slot and optionally an item kind; the draft never offers an Enchant the player cannot attach.</li>
-  <li>An Enchant may override numbers of the item's abilities (range, damage, cost), add an element, or attach a modifier while the item is equipped (always, since gear is locked).</li>
-  <li>Overrides are additive integers; the ability definition file is never edited.</li>
+  <li>An Enchant may override numbers of the item's abilities (range, minimum range, damage, cost, apex; on boots the movement's range, climb and jump height), add an element or a tag to every attack of the item, or attach a modifier while the item is equipped (always, since gear is locked).</li>
+  <li><b>An override's target is the slot or one named ability</b> (decided 21 Sep 2026, D6). A slot means <em>every</em> ability the item grants, including a Sigil's ability drafted later; a named ability means that one, and it must be one an item of that slot (or a Sigil of the same lineage on that slot) grants.</li>
+  <li>Overrides are additive integers; the ability definition file is never edited. A field with no meaning on one of the item's abilities (an apex on a straight shot) is ignored for that ability.</li>
+  <li><b>Cost never drops below <code>rules.boons.minCost</code></b>, 1 at launch (decided 21 Sep 2026, D7): nothing is ever free. Range never drops below 1; the minimum range stays inside the band.</li>
 </ol>
+<div class="drift-note"><b>Partial.</b> In code (22 Sep 2026): every kind of override above, elements, tags, modifiers, the floors, the reveal by observation. The skeletons <code>hits</code>, <code>trajectory</code> and <code>lineOfSight</code> parse and fail closed. Presentation (the changed number on the button) is part 2.</div>
 <p class="src">Source: notebook page 2.</p>
 </section>
 
-<section class="concept" id="sigil" data-design="decided" data-impl="not-started" data-title="Sigil (boon kind)">
+<section class="concept" id="sigil" data-design="decided" data-impl="partial" data-title="Sigil (boon kind)">
 <header><h2>Sigil (boon kind)</h2></header>
 <p class="lead">A new active ability inscribed on one equipped item. Examples from the notebook: triple shot on gun, teleport on boots. The notebook called this kind "gift"; renamed Sigil (a mark on the item that unlocks a power).</p>
 <ol>
-  <li><code>requires</code> names a slot and usually an item kind (Triple Shot needs a gun).</li>
-  <li>The granted ability is an ordinary <a href="#abilities">ability</a> file; it appears in the HUD section of its category and in examine under the item.</li>
-  <li>Hidden until first used, like every ability.</li>
+  <li><code>requires</code> names a slot and optionally an item kind (Triple Shot needs a gun). A Sigil's only effects are <code>grantAbility</code> on that slot.</li>
+  <li>The granted ability is an ordinary <a href="#abilities">ability</a> file; it appears in the HUD section of its category and in examine under the item, after the item's own abilities. A weapon Sigil grants weapon attacks, a crown Sigil spells (the slot's lane rule); the granted ability must not be innate, and the draft never offers a Sigil granting an ability the player already has.</li>
+  <li>Hidden until first used, like every ability; using it reveals the Sigil and its lineage. <b>The item is the ability's public source</b>: an extra "?" under the crown is a fair tell.</li>
 </ol>
+<div class="drift-note"><b>Partial.</b> In code (22 Sep 2026): Sigils granting attacks of an existing shape and movement modes; six ship. A multi-hit Sigil is a skeleton (<a href="#attacks">Attacks</a>); cones, lines, areas and non-damage spells are design questions first. Presentation is part 2.</div>
 <p class="src">Source: notebook page 2; round-2 naming answer.</p>
 </section>
 
@@ -910,14 +912,21 @@ r=+4        . . . , .</code></pre>
   <li>Reveal events precede the event that needed them, so a client updates atomically.</li>
   <li>The damage preview is computed with the attacker's knowledge; hidden enemy modifiers count as "?" lines. Preview and actual share one function (ADR-017).</li>
   <li>A passive hidden modifier that has no visible effect produces no event for the opponent.</li>
-  <li>The examine panel shows unknown abilities as "?" slots under each item, so the <em>count</em> of abilities per item is public while their identity is not. A later Sigil therefore shows as an extra "?", which is a fair tell.</li>
-  <li><b>The client mirror.</b> Online, the client's only rules object is a <code>MatchState</code> rebuilt from its own <code>PlayerView</code> on every server message (ADR-026). It answers previews with exactly the viewer's knowledge (hidden enemy modifiers survive as a "?" count), can refuse an illegal command before it is sent, and cannot apply commands. Nothing the server never sent can be in it.</li>
+  <li>The examine panel shows unknown abilities as "?" slots under each item, so the <em>count</em> of abilities per item is public while their identity is not. A later Sigil therefore shows as an extra "?", which is a fair tell. The count of drafted boons is public the same way.</li>
+  <li><b>The client mirror.</b> Online, the client's only rules object is a <code>MatchState</code> rebuilt from its own <code>PlayerView</code> on every server message (ADR-026). It answers previews with exactly the viewer's knowledge (hidden enemy modifiers and boons survive as a "?" count), can refuse an illegal command before it is sent, and cannot apply commands. Nothing the server never sent can be in it.</li>
+  <li><b>An Enchant reveals on the observation that contradicts what the opponent knows</b> (decided 21 Sep 2026, D11). Before the action is applied, the ability <em>as the opponent knows it</em> is compared with the ability as it is:
+    <table>
+    <tr><th>Observation</th><th>What it reveals</th></tr>
+    <tr><td>Aim or movement: a target or destination the known version could not reach (range, minimum range, apex, climb, jump height)</td><td>every boon overriding an aiming or movement field of that ability</td></tr>
+    <tr><td>Cost: the AP spent differs from the known cost</td><td>the boons overriding that ability's cost</td></tr>
+    <tr><td>Element or tag: the attack carries one the known version does not (visible in flight)</td><td>the boons that added it</td></tr>
+    <tr><td>Damage: the actual differs from the preview</td><td>a damage override is its own hidden line in the breakdown, like a Strength Blessing, and reveals the same way</td></tr>
+    </table>
+  </li>
+  <li>Revealing a boon reveals its <b>whole definition</b>: the modifier it attaches and the ability it grants become known with it, and the first boon of a lineage reveals the lineage.</li>
 </ol>
-<div class="drift-note"><b>Partial.</b> Ability and modifier reveal exist. Lineage, boon and enchant-observation reveals, and series-long persistence, are not started.</div>
-<div class="open-q"><h3>Open questions</h3><ul>
-<li id="q-hidden-enchant-obs">Precise definition of "observed number" for Enchant reveal (range: the shot lands; cost: the AP dots differ; damage: the preview differs).</li>
-</ul></div>
-<p class="src">Source: pillar 8; ADR-010, ADR-017, ADR-018; round-2 answer "gear visible, everything else hidden".</p>
+<div class="drift-note"><b>Partial.</b> Ability, modifier, boon (all six rules of the spec's §6.5), lineage and enchant-observation reveals exist in Core, and the session carries the revealed sets from round to round (22 Sep 2026). The reveal flyover and the examine panel's boon list are part 2.</div>
+<p class="src">Source: pillar 8; ADR-010, ADR-017, ADR-018, ADR-034; round-2 answer "gear visible, everything else hidden"; 21 Sep 2026 question rounds (D11, D12).</p>
 </section>
 
 <section class="concept" id="determinism" data-design="decided" data-impl="implemented" data-title="Determinism and replays">
@@ -1011,14 +1020,14 @@ r=+4        . . . , .</code></pre>
 <p class="lead">All content is JSON under <code>MimasClient/Assets/_Game/Data/</code>, loaded by one fail-closed catalogue on every peer. This table is the target layout; field-level schemas live in <code>docs/data.md</code>.</p>
 <table>
 <tr><th>File / folder</th><th>Contents</th><th>Design</th><th>Code</th></tr>
-<tr><td><code>rules.json</code></td><td><code>damageTypes</code> (weapon, spell), <code>elements[]</code>, <code>globalModifiers[]</code>, <code>heights</code>, <code>baseStats</code>, <code>innateAbilities[]</code>, <code>series</code> (best of)</td><td><a href="#stats">Stats</a>, <a href="#board">Board</a>, <a href="#elements">Elements</a></td><td>partial (no elements, no series)</td></tr>
+<tr><td><code>rules.json</code></td><td><code>damageTypes</code> (weapon, spell), <code>elements[]</code>, <code>globalModifiers[]</code>, <code>heights</code>, <code>baseStats</code>, <code>innateAbilities[]</code>, <code>clock</code>, <code>series</code> (best of), <code>draft</code> (offer counts, timer), <code>boons</code> (floors, minimum cost)</td><td><a href="#stats">Stats</a>, <a href="#board">Board</a>, <a href="#elements">Elements</a>, <a href="#session">Session</a>, <a href="#draft">Draft</a></td><td>in code</td></tr>
 <tr><td><code>terrains.json</code></td><td>terrain catalogue</td><td><a href="#board">Board</a></td><td>in code</td></tr>
 <tr><td><code>timecontrols.json</code></td><td>time controls</td><td><a href="#time-controls">Time controls</a></td><td>in code</td></tr>
-<tr><td><code>abilities/</code></td><td>movement and attack abilities (attack carries <code>trajectory</code>, <code>apex</code>, <code>lineOfSight</code>; gains <code>element</code>)</td><td><a href="#abilities">Abilities</a>, <a href="#trajectories">Trajectories</a></td><td>partial</td></tr>
+<tr><td><code>abilities/</code></td><td>movement and attack abilities (attack carries <code>trajectory</code>, <code>apex</code>, <code>lineOfSight</code>, <code>element</code>; <code>hits</code> is a skeleton)</td><td><a href="#abilities">Abilities</a>, <a href="#trajectories">Trajectories</a></td><td>in code</td></tr>
 <tr><td><code>items/</code></td><td>gear: slot, kind, stats, abilities, tags</td><td><a href="#equipment">Equipment</a></td><td>in code</td></tr>
-<tr><td><code>lineages/</code></td><td>starting blessing, pool</td><td><a href="#lineage">Lineage</a></td><td>not started</td></tr>
-<tr><td><code>boons/</code></td><td>blessings, enchants, sigils</td><td><a href="#boons">Boons</a></td><td>not started (empty folder)</td></tr>
-<tr><td><code>modifiers/</code></td><td>flat damage modifiers (gain <code>elements</code>, <code>itemKinds</code>, <code>nullify</code>)</td><td><a href="#modifiers">Modifiers</a></td><td>partial</td></tr>
+<tr><td><code>lineages/</code></td><td>starting blessing, pool</td><td><a href="#lineage">Lineage</a></td><td>in code</td></tr>
+<tr><td><code>boons/</code></td><td>blessings, enchants, sigils: kind, lineage, requires, effects, stackable, exclusive</td><td><a href="#boons">Boons</a></td><td>in code</td></tr>
+<tr><td><code>modifiers/</code></td><td>flat damage modifiers (<code>elements</code>, <code>itemKinds</code>, <code>nullify</code>)</td><td><a href="#modifiers">Modifiers</a></td><td>in code</td></tr>
 <tr><td><code>maps/</code></td><td>hex lists (<code>prop?</code> per hex), spawns, ladder position</td><td><a href="#maps">Maps</a></td><td>in code</td></tr>
 <tr><td><code>props/</code></td><td>walls and pillars: <code>bodyHeight</code>, <code>aimHeight</code>, optional <code>stats</code></td><td><a href="#props">Props</a></td><td>in code</td></tr>
 <tr><td><code>classes/</code></td><td><s>class definitions</s></td><td><a href="#classes">superseded</a></td><td>removed</td></tr>
@@ -1071,6 +1080,23 @@ r=+4        . . . , .</code></pre>
 <tr><td>2026-09-17</td><td><b>One flat 30 s turn at launch.</b> No bank, no increment, no time-control choice, no idle penalty online; server deadline plus a lag grace of the measured round trip capped at 1 s; the client counts down from the remaining time each message carries. Time controls become a proposed later section; <code>timecontrols.json</code> stays as data</td><td><a href="#time-controls">Time controls</a>, <a href="#turns">Turns</a></td><td>027</td></tr>
 <tr><td>2026-09-17</td><td><b>The client mirror.</b> Online, the client rebuilds a knowledge-limited <code>MatchState</code> from the <code>PlayerView</code> attached to every server message and asks it every preview question; it never applies commands</td><td><a href="#hidden-info">Hidden info</a>, <a href="#online">Online</a></td><td>026</td></tr>
 <tr><td>2026-09-17</td><td><b>Lobby scene.</b> A separate first scene (name, preset, bot, queue), later home of character select and the draft; a persistent connection object; the arena loads on match start; loadout presets are client data</td><td><a href="#presentation">Presentation</a></td><td>028</td></tr>
+<tr><td>2026-09-21</td><td><b>Boons, part 1 is Core only</b> (D1, D2, D5): data, loader, the effect vocabulary, the unit overlay, elements, reveal, the draft and a Core <code>Session</code>; part 2 is the server session flow and every screen. Fable builds part 1, Opus part 2</td><td><a href="#boons">Boons</a>, <a href="#session">Session</a></td><td>034, 035</td></tr>
+<tr><td>2026-09-21</td><td><b>Evolvable core, not every effect at once</b> (D3): multi-hit and the trajectory swap are skeletons that parse and fail closed naming the spec; launch Sigils grant abilities of existing shapes</td><td><a href="#attacks">Attacks</a>, <a href="#trajectories">Trajectories</a>, <a href="#sigil">Sigil</a></td><td>034</td></tr>
+<tr><td>2026-09-21</td><td><b>An Enchant's override targets a slot or one named ability</b> (D6); a slot means every ability the item grants, later Sigils included</td><td><a href="#enchant">Enchant</a></td><td>034</td></tr>
+<tr><td>2026-09-21</td><td><b>Cost never below <code>rules.boons.minCost</code></b> (D7): nothing is ever free</td><td><a href="#enchant">Enchant</a></td><td>—</td></tr>
+<tr><td>2026-09-21</td><td><b>Self trade-offs are allowed, with floors</b> (D8): hp ≥ 1, ap ≥ 1, everything else ≥ 0 in <code>rules.boons.floors</code>; a boon only ever changes its owner, enemy debuffs are later</td><td><a href="#stats">Stats</a>, <a href="#blessing">Blessing</a></td><td>—</td></tr>
+<tr><td>2026-09-21</td><td><b>Elements are a set on an attack</b> (D9): innate plus added; riders, resistances and immunities match any; element Enchants on one slot share an <code>exclusive</code> group</td><td><a href="#elements">Elements</a></td><td>—</td></tr>
+<tr><td>2026-09-21</td><td><b>The draft is symmetric; the counts are data</b> (D10): <code>rules.draft.offers.winner</code> / <code>.loser</code>, both 3. <code>q-draft-comeback</code> closed</td><td><a href="#draft">Draft</a></td><td>—</td></tr>
+<tr><td>2026-09-21</td><td><b>An Enchant reveals on the observation that contradicts what the opponent knows</b> (D11): aim or movement, cost, element or tag, damage line. <code>q-hidden-enchant-obs</code> closed</td><td><a href="#hidden-info">Hidden info</a></td><td>034</td></tr>
+<tr><td>2026-09-21</td><td><b>A Health or AP Blessing is revealed at round start</b> (D12): the bar shows it, so it is public; the lineage follows</td><td><a href="#stats">Stats</a>, <a href="#hidden-info">Hidden info</a></td><td>—</td></tr>
+<tr><td>2026-09-21</td><td><b>First mover: round 1 by seeded coin flip, then the loser of the previous round</b> (D13). <code>q-round-first</code> closed</td><td><a href="#round">Round</a></td><td>035</td></tr>
+<tr><td>2026-09-21</td><td><b>Elements at launch: fire, frost, lightning</b> (D14); Fire Bolt is fire. <code>q-elements-list</code> closed</td><td><a href="#elements">Elements</a></td><td>—</td></tr>
+<tr><td>2026-09-21</td><td><b>Starting Blessings</b> (D15): Greek Athena's Guard (+1 armour each lane), Norse Thor's Vigour (+4 Health), Hindu Vayu's Breath (+1 walk range). <code>q-lineage-starting</code> closed; boons are named "&lt;God&gt;'s &lt;thing&gt;", <code>q-lineage-names</code> closed</td><td><a href="#lineage">Lineage</a></td><td>—</td></tr>
+<tr><td>2026-09-21</td><td><b>Part-1 content</b> (D16): three lineages, six boons each (two Blessings, two Enchants, two Sigils) plus the starting Blessing, using only effects that work; placeholder numbers</td><td><a href="#lineage">Lineage</a>, <a href="#boons">Boons</a></td><td>—</td></tr>
+<tr><td>2026-09-21</td><td><b>The ladder wraps</b> (D17): round <i>n</i> plays position <code>((n − 1) mod length) + 1</code>; <code>rules.series.bestOf</code> is 3; a third map is a later session. <code>q-session-length</code> and <code>q-session-map-order</code> closed</td><td><a href="#session">Session</a></td><td>035</td></tr>
+<tr><td>2026-09-21</td><td><b>No tiers, no reroll, no cap at best of 3; <code>exclusive[]</code> groups exist</b> (D18). <code>q-boons-cap</code> and <code>q-boons-exclusive</code> closed; tiers and reroll stay open as "later"</td><td><a href="#boons">Boons</a>, <a href="#draft">Draft</a></td><td>—</td></tr>
+<tr><td>2026-09-22</td><td><b>Boons are a per-unit overlay over immutable definitions; every contribution carries its boon id, and that id is what reveal keys on.</b> One resolver (<code>MatchState.ResolveAbility</code>), no raw lookups, skeletons fail closed</td><td><a href="#boons">Boons</a>, <a href="#hidden-info">Hidden info</a></td><td>034</td></tr>
+<tr><td>2026-09-22</td><td><b>The session is a Core state machine that constructs the rounds</b>; the server hosts it in part 2, replay covers drafts, clocks stay outside Core</td><td><a href="#session">Session</a></td><td>035</td></tr>
 </table>
 </section>
 
@@ -1090,6 +1116,7 @@ r=+4        . . . , .</code></pre>
 <header><h2>Changelog</h2></header>
 <table>
 <tr><th>Date</th><th>Change</th></tr>
+<tr><td>2026-09-22</td><td><b>Boons groundwork shipped in Core (T-0009, part 1 of F-boons).</b> <code>boons/</code> and <code>lineages/</code> load and link with every rule; <code>rules.json</code> gains <code>elements</code>, <code>series</code>, <code>draft</code> and <code>boons</code>; attacks carry an element, modifiers condition on elements and item kinds and may nullify; a unit is gear + lineage + boons through one overlay, and <code>MatchState.ResolveAbility</code> is the only ability lookup; boons and lineages reveal by the six rules of the spec's §6.5, and the view, the mirror and the wire carry them; <code>Draft</code> offers as a pure seeded function; <code>Mimas.Core.Session.Session</code> plays a best-of-3 with a draft between rounds and replays from one seed; three lineages with six boons each, six Sigil abilities and nine hidden modifiers ship. <a href="#boons">Boons</a>, <a href="#blessing">Blessing</a>, <a href="#enchant">Enchant</a>, <a href="#sigil">Sigil</a>, <a href="#lineage">Lineage</a>, <a href="#draft">Draft</a>, <a href="#session">Session</a>, <a href="#elements">Elements</a> become partial; thirteen open questions closed by the 21 Sep question rounds (D6–D18) are written into their sections and logged. ADR-034, ADR-035. 323 → 445 Core tests; 47 server tests, no server file changed. Nothing a player sees yet: part 2 (T-0010) is the server session flow and the screens.</td></tr>
 <tr><td>2026-09-17</td><td><b>M2 shipped (local end to end).</b> The match moved onto the server: guest auth with a resumable token, rooms reached by a four-letter code, gear chosen in the room, the server bot, a 30&nbsp;s server-authoritative turn with a measured lag grace, resign, a 60&nbsp;s reconnect grace ending in forfeit, and the client mirror. <a href="#online">Online</a> becomes implemented for that scope; <a href="#win-conditions">Win conditions</a> gains resign and forfeit in code; the Lobby in <a href="#presentation">Presentation</a> is built. <b>OPT-0001 decided: room codes, not a queue</b>, with the loadout chosen after joining — the queue moves to M5 with ratings. 321 Core tests, 34 server tests (two whole matches played over real sockets by the client's own mirror). Not done: deploy.</td></tr>
 <tr><td>2026-09-17</td><td>v0.2.2. Both aiming specs verified by review. Online question round: M2 scoped to guest auth, one queue, a server bot, one flat 30 s server turn with a lag grace, resign, a 60 s reconnect grace, the client mirror and a lobby scene. <a href="#online">Online</a> becomes decided, <a href="#time-controls">Time controls</a> becomes proposed-for-later, the idle penalty is deferred, <a href="#presentation">Presentation</a> gains Lobby. ADR-026..028. Spec written for the next session.</td></tr>
 <tr><td>2026-09-16</td><td>Aiming slice shipped (client half): range circles in the tile shader, the four-state path preview with blocked reasons and a cursor tag, props on the board with hp tags and examine, the projectile, and facing. <a href="#presentation">Presentation</a> gains a decided "Targeting" subsection; ADR-025.</td></tr>
