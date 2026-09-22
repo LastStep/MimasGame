@@ -78,6 +78,59 @@ namespace Mimas.Client.Presentation
         public string Icon;
     }
 
+    /// <summary>One of the three cards a draft offers (design: #draft; decided 22 Sep 2026, P1).</summary>
+    public sealed class HudDraftCard
+    {
+        public string Id;
+        public string Name;
+
+        /// <summary>"Blessing" / "Enchant" / "Sigil" — what kind of boon this is, and the colour of the card.</summary>
+        public string Kind;
+
+        /// <summary>The god: the name up to its first apostrophe ("Hera" from "Hera's Resolve"), or the whole name.</summary>
+        public string God;
+
+        /// <summary>The lineage's name, for the line under the god.</summary>
+        public string Lineage;
+
+        /// <summary>The boon's own description, in its own words.</summary>
+        public string Effect;
+
+        /// <summary>Where it lands: "On you" for a Blessing, "On your Longbow" for anything with a slot.</summary>
+        public string Attach;
+
+        public string Icon;
+    }
+
+    /// <summary>
+    /// The draft, drawn over the dimmed board between rounds. Null whenever no draft is open; the HUD shows
+    /// nothing and the board is undimmed then.
+    /// </summary>
+    public sealed class HudDraft
+    {
+        /// <summary>"ROUND 1 LOST · 0 – 1" — the round that just ended, in the score's own words.</summary>
+        public string Headline;
+
+        /// <summary>"Choose one boon · Round 2 on Board".</summary>
+        public string NextRoundLine;
+
+        public List<HudDraftCard> Cards = new List<HudDraftCard>();
+
+        /// <summary>Index of the highlighted card, or -1.</summary>
+        public int Selected = -1;
+
+        /// <summary>This seat has picked; the cards lock and the status says who we are waiting for.</summary>
+        public bool Picked;
+
+        public bool OpponentPicked;
+
+        /// <summary>"Guest-4471 has picked" / "Waiting for Guest-4471…".</summary>
+        public string Status;
+
+        public float SecondsRemaining;
+        public float SecondsTotal;
+    }
+
     /// <summary>
     /// One unit's floating overlay: hit points, action points and revealed passives, anchored to a
     /// transform in the world. The session mutates the numbers as events play; the HUD repositions the
@@ -206,7 +259,16 @@ namespace Mimas.Client.Presentation
         /// <summary>Cursor position in screen pixels, for placing <see cref="CursorTag"/>.</summary>
         Vector2 CursorScreenPosition { get; }
 
-        /// <summary>Centre-screen text once the match is over ("VICTORY" / "DEFEAT"), else null.</summary>
+        /// <summary>
+        /// "ROUND 2 · 0 – 1" above the turn owner: which round of the series this is and the score, your own
+        /// first (decided 22 Sep 2026, P2). Null before the first round.
+        /// </summary>
+        string SeriesLine { get; }
+
+        /// <summary>The open draft, or null when there is none.</summary>
+        HudDraft Draft { get; }
+
+        /// <summary>Centre-screen text once a round or the series is over ("VICTORY" / "DEFEAT"), else null.</summary>
         string Banner { get; }
 
         /// <summary>
@@ -253,6 +315,12 @@ namespace Mimas.Client.Presentation
 
         /// <summary>Closes the examine panel.</summary>
         void CloseExamine();
+
+        /// <summary>Highlights one of the draft's cards; -1 clears. Ignored when no draft is open or this seat has picked.</summary>
+        void SelectDraftCard(int index);
+
+        /// <summary>Keeps the selected card. Ignored when nothing is selected, no draft is open, or this seat has picked.</summary>
+        void ConfirmDraft();
 
         /// <summary>Concedes the match. The HUD asks twice before calling this; ignored when <see cref="CanResign"/> is false.</summary>
         void Resign();

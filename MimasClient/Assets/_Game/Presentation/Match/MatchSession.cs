@@ -11,6 +11,7 @@ using Mimas.Core.Data;
 using Mimas.Core.Geometry;
 using Mimas.Core.Match;
 using Mimas.Core.Movement;
+using Mimas.Core.Session;
 using Mimas.Core.Units;
 
 namespace Mimas.Client.Presentation
@@ -78,6 +79,12 @@ namespace Mimas.Client.Presentation
         /// <summary>How long the result sits before the way out of it appears.</summary>
         private const float BackToLobbyDelaySeconds = 3f;
 
+        /// <summary>How long a "ROUND 2" card stays up before the board is the player's again.</summary>
+        private const float RoundCardSeconds = 1.5f;
+
+        /// <summary>How long the round's result holds the screen before the draft cards drop in (P1).</summary>
+        private const float DraftRevealDelaySeconds = 2f;
+
         // Rules.
         private ContentCatalog _catalog;
         private IMatchDriver _driver;
@@ -129,6 +136,17 @@ namespace Mimas.Client.Presentation
         private float _backToLobbyAt = -1f;
         private bool _ready;
 
+        // The series (ADR-036): the score line above the turn owner, and the draft over the dimmed board.
+        private string _seriesLine;
+        private HudDraft _draft;
+        private float _draftOpensAt = -1f;
+
+        /// <summary>When a round card should clear itself, or -1. A result banner never clears.</summary>
+        private float _bannerClearsAt = -1f;
+
+        private string _lastRoundHeadline;
+        private MatchEndReason _lastReason = MatchEndReason.Elimination;
+
         private float _ropeSeconds = 10f;
         private int _localTurnNumber;
 
@@ -149,6 +167,8 @@ namespace Mimas.Client.Presentation
         public HudPreview Preview => _preview;
         public string CursorTag => _cursorTag;
         public Vector2 CursorScreenPosition => _input != null ? _input.PointerPosition : Vector2.zero;
+        public string SeriesLine => _seriesLine;
+        public HudDraft Draft => _draft;
         public string Banner => _banner;
         public string BannerDetail => _bannerDetail;
         public bool ShowBackToLobby => _backToLobbyAt >= 0f && Time.time >= _backToLobbyAt;
@@ -224,9 +244,10 @@ namespace Mimas.Client.Presentation
                 return;
             }
 
+            SessionView session = _driver != null ? _driver.Session : null;
             net.LastResult = new MatchResult
             {
-                Won = Rules != null && Rules.Winner == LocalPlayer,
+                Won = session != null ? session.Winner == LocalPlayer : Rules != null && Rules.Winner == LocalPlayer,
                 Reason = _bannerDetail,
                 OpponentName = OpponentName,
             };
@@ -241,6 +262,134 @@ namespace Mimas.Client.Presentation
             _examinedPropId = None;
             RefreshView();
             RaiseStateChanged();
+        }
+
+        // ---- the draft (design: #draft; decided 22 Sep 2026, P1) ---------------------------------------
+
+        public void SelectDraftCard(int index)
+        {
+            if (_draft == null || _draft.Picked) return;
+            _draft.Selected = index >= 0 && index < _draft.Cards.Count ? index : -1;
+            RaiseStateChanged();
+        }
+
+        public void ConfirmDraft()
+        {
+            if (_draft == null || _draft.Picked || _draft.Selected < 0) return;
+            if (_driver == null || !_driver.SubmitDraftPick(_draft.Selected)) return;
+            // The pick is only believed once the event comes back; the button locks meanwhile.
+            _draft.Picked = true;
+            _draft.Status = "Waiting for " + OpponentLabel() + "…";
+            RaiseStateChanged();
+        }
+
+        private string OpponentLabel()
+        {
+            string name = _driver != null ? _driver.OpponentName : null;
+            return string.IsNullOrEmpty(name) ? "your opponent" : name;
+        }
+
+        /// <summary>
+        /// Builds the three cards from the session's own offers and dims the board behind them. Every word on
+        /// a card is data: the kind, the god (the name up to its first apostrophe), the boon's own line, and
+        /// the item in the slot it needs.
+        /// </summary>
+        private void OpenDraft()
+        {
+            SessionView session = _driver != null ? _driver.Session : null;
+            if (session == null || session.Phase != SessionPhase.Draft) return;
+
+            var draft = new HudDraft
+            {
+                Headline = _lastRoundHeadline ?? "DRAFT",
+                Picked = session.IHavePicked,
+                OpponentPicked = session.OpponentHasPicked,
+                Selected = -1,
+            };
+
+            string nextMap = MapName(session.NextMapId);
+            draft.NextRoundLine = "Choose one boon · Round " + (session.Round + 1)
+                + (nextMap != null ? " on " + nextMap : "");
+
+            for (int i = 0; i < session.MyOffers.Count; i++)
+            {
+                BoonDef boon;
+                if (!_catalog.Boons.TryGet(session.MyOffers[i], out boon)) continue;
+                draft.Cards.Add(new HudDraftCard
+                {
+                    Id = boon.Id,
+                    Name = boon.Name,
+                    Kind = KindName(boon.Kind),
+                    God = GodOf(boon.Name),
+                    Lineage = LineageName(boon.LineageId),
+                    Effect = boon.Description,
+                    Attach = AttachLine(boon, session),
+                    Icon = boon.Icon,
+                });
+            }
+
+            // The opponent may have picked before the cards even dropped in: read it, do not wait for the event.
+            draft.Status = draft.Picked ? "Waiting for " + OpponentLabel() + "…"
+                : draft.OpponentPicked ? OpponentLabel() + " has picked"
+                : null;
+
+            _draft = draft;
+            _draftOpensAt = -1f;
+            _banner = null;
+            _bannerDetail = null;
+            _bannerClearsAt = -1f;
+            Disarm();
+            RaiseStateChanged();
+            Debug.Log("[MatchSession] draft: " + draft.Cards.Count + " cards, " + draft.NextRoundLine);
+        }
+
+        /// <summary>
+        /// The board goes dark behind the cards through the HUD's own full-screen scrim (§13's default:
+        /// no shader change, and it dims the heroes too), so closing the draft is just dropping the model.
+        /// </summary>
+        private void CloseDraft()
+        {
+            _draftOpensAt = -1f;
+            _draft = null;
+        }
+
+        /// <summary>"On you" for a Blessing, "On your Longbow" for anything that needs a slot.</summary>
+        private string AttachLine(BoonDef boon, SessionView session)
+        {
+            if (boon.Requires == null) return "On you";
+            string slot = boon.Requires.Slot;
+            string itemId = session.MyBuild != null ? session.MyBuild.Loadout.IdForSlot(slot) : null;
+            ItemDef item;
+            if (itemId != null && _catalog.Items.TryGet(itemId, out item)) return "On your " + item.Name;
+            return "On your " + slot;
+        }
+
+        /// <summary>The god is the name up to its first apostrophe; a name without one is all god.</summary>
+        private static string GodOf(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return name;
+            int apostrophe = name.IndexOf('\'');
+            return apostrophe > 0 ? name.Substring(0, apostrophe) : name;
+        }
+
+        private static string KindName(string kind)
+        {
+            if (string.IsNullOrEmpty(kind)) return "";
+            return char.ToUpperInvariant(kind[0]) + kind.Substring(1);
+        }
+
+        private string LineageName(string lineageId)
+        {
+            LineageDef lineage;
+            if (lineageId == null) return null;
+            return _catalog.Lineages.TryGet(lineageId, out lineage) ? lineage.Name : lineageId;
+        }
+
+        private string MapName(string mapId)
+        {
+            MapData map;
+            if (mapId == null) return null;
+            return _catalog.Maps.TryGet(mapId, out map) ? map.Name : mapId;
         }
 
         // ---- lifecycle ------------------------------------------------------------------------------
@@ -327,6 +476,21 @@ namespace Mimas.Client.Presentation
             // The "Back to lobby" button appears a beat after the banner, so the result can land first.
             if (_backToLobbyAt >= 0f && Time.time >= _backToLobbyAt && Time.time - Time.deltaTime < _backToLobbyAt)
                 RaiseStateChanged();
+
+            // A round card clears itself; the draft's cards drop in a beat after the round's result.
+            if (_bannerClearsAt >= 0f && Time.time >= _bannerClearsAt)
+            {
+                _bannerClearsAt = -1f;
+                _banner = null;
+                _bannerDetail = null;
+                RaiseStateChanged();
+            }
+            if (_draftOpensAt >= 0f && Time.time >= _draftOpensAt) OpenDraft();
+            if (_draft != null)
+            {
+                _draft.SecondsRemaining = _driver.TurnSecondsRemaining;
+                _draft.SecondsTotal = _driver.TurnSecondsTotal;
+            }
         }
 
         // ---- setup ----------------------------------------------------------------------------------
@@ -434,9 +598,16 @@ namespace Mimas.Client.Presentation
             CollectAbilities();
             RefreshMarkers();
 
+            RefreshSeriesLine();
+
             var local = _driver as LocalMatchDriver;
             if (local != null) local.Begin();
             else ((OnlineMatchDriver)_driver).Begin(start);
+
+            // Arriving mid-draft (a reload, or a practice scene that came up between rounds): the board is
+            // already built and dimmed, and the cards go straight up (P4).
+            SessionView arrived = _driver.Session;
+            if (_draft == null && arrived != null && arrived.Phase == SessionPhase.Draft) OpenDraft();
 
             RaiseStateChanged();
         }
@@ -558,9 +729,13 @@ namespace Mimas.Client.Presentation
             Disarm();
 
             // Between rounds there is no board to snap: the session block is all there is, and the draft
-            // overlay is drawn from it.
+            // overlay is drawn from it. A reload lands here too — straight back into the draft, with the
+            // seconds the server says are left (P4).
             if (View == null)
             {
+                SessionView session = _driver.Session;
+                if (session != null && session.IsOver) ShowSeriesResultFromView(session);
+                else if (session != null && session.Phase == SessionPhase.Draft) OpenDraft();
                 RefreshView();
                 RaiseStateChanged();
                 return;
@@ -599,8 +774,7 @@ namespace Mimas.Client.Presentation
                 if (_hudUnitsById.TryGetValue(View.Props[i].Id, out hud)) hud.Hp = View.Props[i].Hp;
             }
 
-            if (View.IsOver && _banner == null) ShowResult(View.Winner, MatchEndReason.Elimination, true);
-
+            RefreshSeriesLine();
             RefreshView();
             RefreshMarkers();
             FaceNearestEnemies();
@@ -719,13 +893,156 @@ namespace Mimas.Client.Presentation
                     RaiseStateChanged();
                     break;
 
-                case MatchEndedEvent over:
-                    ShowResult(over.Winner, over.Reason, false);
+                // A round ending is not the story any more: the RoundEndedEvent right behind it is, and the
+                // SessionEndedEvent behind that. All this does is stop the clock and put the board down.
+                case MatchEndedEvent _:
                     Disarm();
                     RefreshView();
                     RaiseStateChanged();
                     break;
+
+                case RoundStartedEvent round:
+                    PlayRoundStarted(round);
+                    break;
+
+                case RoundEndedEvent round:
+                    PlayRoundEnded(round);
+                    break;
+
+                case DraftStartedEvent _:
+                    // The round banner lands first; the cards drop in a beat later.
+                    _draftOpensAt = Time.time + DraftRevealDelaySeconds;
+                    RaiseStateChanged();
+                    break;
+
+                case DraftPickedEvent picked:
+                    PlayDraftPicked(picked);
+                    break;
+
+                case SessionEndedEvent over:
+                    ShowSeriesResult(over);
+                    break;
             }
+        }
+
+        /// <summary>The round card, and the score line that stays up for the whole round.</summary>
+        private void PlayRoundStarted(RoundStartedEvent round)
+        {
+            CloseDraft();
+            RefreshSeriesLine();
+
+            string mapName = _board != null && _board.MapData != null ? _board.MapData.Name : round.MapId;
+            bool mineFirst = round.FirstPlayer == LocalPlayer;
+            _banner = "ROUND " + round.Round;
+            _bannerDetail = mapName + (mineFirst ? " · you move first" : " · opponent moves first");
+            _backToLobbyAt = -1f;                         // a round card is not a result; there is no way out of it
+            _bannerClearsAt = Time.time + RoundCardSeconds;
+            RaiseStateChanged();
+        }
+
+        /// <summary>
+        /// The round's result, without a way out: the series goes on. When the series ended too, the
+        /// SessionEndedEvent right behind this replaces the banner before anybody reads it.
+        /// </summary>
+        private void PlayRoundEnded(RoundEndedEvent round)
+        {
+            bool won = round.Winner == LocalPlayer;
+            int mine = LocalPlayer == 0 ? round.Score0 : round.Score1;
+            int theirs = LocalPlayer == 0 ? round.Score1 : round.Score0;
+
+            _banner = "ROUND " + round.Round + (won ? " WON" : " LOST");
+            _bannerDetail = mine + " – " + theirs + " · " + ReasonLine(round.Reason, won);
+            _lastRoundHeadline = "ROUND " + round.Round + (won ? " WON" : " LOST") + " · " + mine + " – " + theirs;
+            _lastReason = round.Reason;
+            _bannerClearsAt = -1f;
+            _backToLobbyAt = -1f;
+            RefreshSeriesLine();
+            Disarm();
+            RefreshView();
+            RaiseStateChanged();
+            Debug.Log("[MatchSession] round " + round.Round + " over: " + _banner + " (" + _bannerDetail + ")");
+        }
+
+        private void PlayDraftPicked(DraftPickedEvent picked)
+        {
+            if (_draft == null)
+            {
+                RaiseStateChanged();
+                return;
+            }
+            if (picked.Player == LocalPlayer)
+            {
+                _draft.Picked = true;
+                _draft.Selected = IndexOfCard(picked.BoonId, _draft.Selected);
+                _draft.Status = "Waiting for " + OpponentLabel() + "…";
+            }
+            else
+            {
+                _draft.OpponentPicked = true;
+                _draft.Status = _draft.Picked
+                    ? "Waiting for " + OpponentLabel() + "…"
+                    : OpponentLabel() + " has picked";
+            }
+            RaiseStateChanged();
+        }
+
+        private int IndexOfCard(string boonId, int fallback)
+        {
+            if (boonId == null || _draft == null) return fallback;
+            for (int i = 0; i < _draft.Cards.Count; i++) if (_draft.Cards[i].Id == boonId) return i;
+            return fallback;
+        }
+
+        /// <summary>The series result: the only banner in a session that offers a way out.</summary>
+        private void ShowSeriesResult(SessionEndedEvent over)
+        {
+            CloseDraft();
+            bool won = over.Winner == LocalPlayer;
+            int mine = LocalPlayer == 0 ? over.Score0 : over.Score1;
+            int theirs = LocalPlayer == 0 ? over.Score1 : over.Score0;
+
+            _banner = won ? "VICTORY" : "DEFEAT";
+            _bannerDetail = "series " + mine + " – " + theirs + " · " + SeriesReasonLine(over.Reason, won);
+            _bannerClearsAt = -1f;
+            _backToLobbyAt = Time.time + BackToLobbyDelaySeconds;
+            _seriesLine = null;
+            Disarm();
+            RefreshView();
+            RaiseStateChanged();
+            Debug.Log("[MatchSession] series over: " + _banner + " (" + _bannerDetail + ").");
+        }
+
+        private static string ReasonLine(MatchEndReason reason, bool won)
+        {
+            switch (reason)
+            {
+                case MatchEndReason.Resign: return won ? "opponent resigned" : "you resigned";
+                case MatchEndReason.Forfeit: return won ? "opponent left" : "you were disconnected";
+                default: return "by elimination";
+            }
+        }
+
+        private static string SeriesReasonLine(SessionEndReason reason, bool won)
+        {
+            switch (reason)
+            {
+                case SessionEndReason.Resign: return won ? "opponent resigned" : "you resigned";
+                case SessionEndReason.Forfeit: return won ? "opponent left" : "you were disconnected";
+                default: return "by elimination";
+            }
+        }
+
+        private void RefreshSeriesLine()
+        {
+            SessionView session = _driver != null ? _driver.Session : null;
+            if (session == null || session.IsOver || session.Round <= 0)
+            {
+                _seriesLine = null;
+                return;
+            }
+            int mine = LocalPlayer == 0 ? session.Score0 : session.Score1;
+            int theirs = LocalPlayer == 0 ? session.Score1 : session.Score0;
+            _seriesLine = "ROUND " + session.Round + " · " + mine + " – " + theirs;
         }
 
         private void PlayTurnStarted(TurnStartedEvent started)
@@ -747,31 +1064,22 @@ namespace Mimas.Client.Presentation
         }
 
         /// <summary>
-        /// The banner and the line under it. How a match ended matters as much as who won: "you resigned" and
-        /// "opponent left" are different stories about the same DEFEAT, and a player who reconnected into a
-        /// finished match deserves to be told which one happened.
+        /// The result a reconnect found rather than watched. How it ended matters as much as who won, and the
+        /// events that said so are gone — so the reason falls back to the last round's, or to elimination.
         /// </summary>
-        private void ShowResult(int winner, MatchEndReason reason, bool fromResync)
+        private void ShowSeriesResultFromView(SessionView session)
         {
-            bool won = winner == LocalPlayer;
+            if (_banner != null) return;
+            bool won = session.Winner == LocalPlayer;
+            int mine = LocalPlayer == 0 ? session.Score0 : session.Score1;
+            int theirs = LocalPlayer == 0 ? session.Score1 : session.Score0;
+
             _banner = won ? "VICTORY" : "DEFEAT";
-
-            switch (reason)
-            {
-                case MatchEndReason.Resign:
-                    _bannerDetail = won ? "opponent resigned" : "you resigned";
-                    break;
-                case MatchEndReason.Forfeit:
-                    _bannerDetail = won ? "opponent left" : "you were disconnected";
-                    break;
-                default:
-                    _bannerDetail = "by elimination";
-                    break;
-            }
-
+            _bannerDetail = "series " + mine + " – " + theirs + " · " + ReasonLine(_lastReason, won);
+            _bannerClearsAt = -1f;
+            _seriesLine = null;
             _backToLobbyAt = Time.time + BackToLobbyDelaySeconds;
-            Debug.Log("[MatchSession] match over: player " + winner + " wins " + _bannerDetail
-                + (fromResync ? " (found on resync)" : "") + ".");
+            Debug.Log("[MatchSession] series found over on resync: player " + session.Winner + " wins " + _bannerDetail + ".");
         }
 
         private void PlayMove(UnitMovedEvent moved)

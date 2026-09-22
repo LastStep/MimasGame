@@ -23,6 +23,8 @@
 
         <!-- Top centre: whose turn. No numbers; a rope burns down for the last seconds (ADR-015). -->
         <ui:VisualElement name="turn-panel" class="turn-panel">
+            <!-- Which round of the series this is, and the score, your own first (P2). -->
+            <ui:Label name="series-line" class="series-line" text="ROUND 2 · 0 – 1" picking-mode="Ignore" />
             <ui:Label name="turn-owner" class="turn-owner" text="YOUR TURN" />
             <ui:VisualElement name="rope" class="rope" picking-mode="Ignore">
                 <ui:VisualElement name="rope-track" class="rope-track" picking-mode="Ignore">
@@ -39,6 +41,25 @@
             <ui:Label name="banner" class="banner" text="VICTORY" picking-mode="Ignore" />
             <ui:Label name="banner-detail" class="banner-detail" text="by elimination" picking-mode="Ignore" />
             <ui:Button name="banner-button" class="banner-button" text="Back to lobby" />
+        </ui:VisualElement>
+
+        <!-- Between rounds: the draft over the dimmed board (P1). The scrim is what dims it — no shader
+             change, and it darkens the heroes too. Three cards are built in code into draft-cards. -->
+        <ui:VisualElement name="draft-panel" class="draft-panel">
+            <ui:VisualElement name="draft-scrim" class="draft-scrim" />
+            <ui:VisualElement name="draft-body" class="draft-body">
+                <ui:Label name="draft-headline" class="draft-headline" text="ROUND 1 LOST · 0 – 1" picking-mode="Ignore" />
+                <ui:Label name="draft-next" class="draft-next" text="Choose one boon · Round 2 on Board" picking-mode="Ignore" />
+                <ui:VisualElement name="draft-cards" class="draft-cards" />
+                <ui:VisualElement name="draft-timer-track" class="draft-timer-track" picking-mode="Ignore">
+                    <ui:VisualElement name="draft-timer-fill" class="draft-timer-fill" picking-mode="Ignore" />
+                </ui:VisualElement>
+                <ui:VisualElement class="draft-footer">
+                    <ui:VisualElement name="draft-dot" class="draft-dot" picking-mode="Ignore" />
+                    <ui:Label name="draft-status" class="draft-status" text="" picking-mode="Ignore" />
+                    <ui:Button name="draft-confirm" class="draft-confirm" text="Confirm" />
+                </ui:VisualElement>
+            </ui:VisualElement>
         </ui:VisualElement>
 
         <!-- Left: examine panel for the clicked unit. -->

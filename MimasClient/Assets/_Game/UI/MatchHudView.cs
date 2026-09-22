@@ -100,6 +100,25 @@ namespace Mimas.Client.UI
         private Label _statusLine;
         private Button _resign;
 
+        // The series line and the draft over the dimmed board (P1, P2).
+        private Label _seriesLine;
+        private VisualElement _draftPanel;
+        private Label _draftHeadline;
+        private Label _draftNext;
+        private VisualElement _draftCards;
+        private VisualElement _draftTimerFill;
+        private VisualElement _draftDot;
+        private Label _draftStatus;
+        private Button _draftConfirm;
+
+        /// <summary>The card elements currently in the panel, in offer order.</summary>
+        private readonly List<VisualElement> _draftSlots = new List<VisualElement>();
+
+        private readonly System.Text.StringBuilder _draftKeys = new System.Text.StringBuilder();
+
+        /// <summary>The ids the cards were built from, so a repaint does not rebuild them.</summary>
+        private string _draftSignature;
+
         /// <summary>When the armed resign button gives up and goes back to asking.</summary>
         private float _resignArmedUntil;
         private Button _examineClose;
@@ -185,6 +204,21 @@ namespace Mimas.Client.UI
             bool showBack = !string.IsNullOrEmpty(_source.Banner) && _source.ShowBackToLobby;
             if (showBack != _bannerButton.ClassListContains("banner-button--visible"))
                 _bannerButton.EnableInClassList("banner-button--visible", showBack);
+
+            UpdateDraftTimer();
+        }
+
+        /// <summary>
+        /// One bar for the draft's one deadline. A late message can leave it below zero: show nothing left
+        /// and wait for the server's timeout pick, which is on its way (§13).
+        /// </summary>
+        private void UpdateDraftTimer()
+        {
+            HudDraft draft = _source.Draft;
+            if (draft == null) return;
+            float total = draft.SecondsTotal > 0f ? draft.SecondsTotal : 1f;
+            float fraction = Mathf.Clamp01(draft.SecondsRemaining / total);
+            _draftTimerFill.style.width = Length.Percent(fraction * 100f);
         }
 
         private void LateUpdate()
@@ -240,6 +274,15 @@ namespace Mimas.Client.UI
             _bannerButton = root.Q<Button>("banner-button");
             _statusLine = root.Q<Label>("status-line");
             _resign = root.Q<Button>("resign");
+            _seriesLine = root.Q<Label>("series-line");
+            _draftPanel = root.Q<VisualElement>("draft-panel");
+            _draftHeadline = root.Q<Label>("draft-headline");
+            _draftNext = root.Q<Label>("draft-next");
+            _draftCards = root.Q<VisualElement>("draft-cards");
+            _draftTimerFill = root.Q<VisualElement>("draft-timer-fill");
+            _draftDot = root.Q<VisualElement>("draft-dot");
+            _draftStatus = root.Q<Label>("draft-status");
+            _draftConfirm = root.Q<Button>("draft-confirm");
 
             if (_root == null || _turnPanel == null || _turnOwner == null || _rope == null || _ropeFill == null || _ropeEmber == null
                 || _actionBar == null || _tooltip == null || _tooltipTitle == null || _tooltipDetail == null || _tooltipBody == null
@@ -249,13 +292,16 @@ namespace Mimas.Client.UI
                 || _unitLayer == null || _preview == null || _previewTitle == null || _previewTotal == null
                 || _previewBlocked == null || _previewLines == null || _cursorTag == null
                 || _flyLayer == null || _banner == null || _bannerPanel == null || _bannerDetail == null || _bannerButton == null
-                || _statusLine == null || _resign == null)
+                || _statusLine == null || _resign == null
+                || _seriesLine == null || _draftPanel == null || _draftHeadline == null || _draftNext == null
+                || _draftCards == null || _draftTimerFill == null || _draftDot == null || _draftStatus == null || _draftConfirm == null)
             {
                 Debug.LogError("[MatchHudView] MatchHud.uxml is missing one of the named elements.", this);
                 enabled = false;
                 return false;
             }
 
+            _draftConfirm.clicked += HandleDraftConfirmClicked;
             _endTurn.clicked += HandleEndTurnClicked;
             _examineClose.clicked += HandleExamineCloseClicked;
             _resign.clicked += HandleResignClicked;
@@ -275,6 +321,8 @@ namespace Mimas.Client.UI
             _examineClose.clicked -= HandleExamineCloseClicked;
             _resign.clicked -= HandleResignClicked;
             _bannerButton.clicked -= HandleBackToLobbyClicked;
+            _draftConfirm.clicked -= HandleDraftConfirmClicked;
+            ClearDraftCards();
             ClearSlots();
             foreach (UnitTag tag in _unitTags.Values) tag.Root.RemoveFromHierarchy();
             _unitTags.Clear();
@@ -302,7 +350,113 @@ namespace Mimas.Client.UI
             RefreshExamine();
             RefreshPreview();
             RefreshBanner();
+            RefreshSeriesLine();
+            RefreshDraft();
             SyncUnitTags();
+        }
+
+        private void RefreshSeriesLine()
+        {
+            string line = _source.SeriesLine;
+            bool visible = !string.IsNullOrEmpty(line);
+            _seriesLine.text = line ?? string.Empty;
+            _seriesLine.EnableInClassList("series-line--visible", visible);
+        }
+
+        /// <summary>
+        /// The draft over the dimmed board. The cards are built once per offer set and then only restyled,
+        /// so hovering one and selecting another does not rebuild the panel under the pointer.
+        /// </summary>
+        private void RefreshDraft()
+        {
+            HudDraft draft = _source.Draft;
+            bool visible = draft != null;
+            _draftPanel.EnableInClassList("draft-panel--visible", visible);
+            if (!visible)
+            {
+                if (_draftSignature != null) ClearDraftCards();
+                return;
+            }
+
+            _draftHeadline.text = draft.Headline ?? string.Empty;
+            _draftNext.text = draft.NextRoundLine ?? string.Empty;
+
+            _draftKeys.Length = 0;
+            for (int i = 0; i < draft.Cards.Count; i++) _draftKeys.Append(draft.Cards[i].Id).Append('|');
+            string signature = _draftKeys.ToString();
+            if (signature != _draftSignature)
+            {
+                BuildDraftCards(draft);
+                _draftSignature = signature;
+            }
+
+            for (int i = 0; i < _draftSlots.Count; i++)
+            {
+                _draftSlots[i].EnableInClassList("draft-card--selected", i == draft.Selected);
+                _draftSlots[i].SetEnabled(!draft.Picked);
+            }
+
+            _draftDot.EnableInClassList("draft-dot--visible", draft.OpponentPicked);
+            _draftStatus.text = draft.Status ?? string.Empty;
+            _draftConfirm.text = draft.Picked ? "Kept" : "Confirm";
+            _draftConfirm.SetEnabled(!draft.Picked && draft.Selected >= 0);
+        }
+
+        private void BuildDraftCards(HudDraft draft)
+        {
+            ClearDraftCards();
+            for (int i = 0; i < draft.Cards.Count; i++)
+            {
+                HudDraftCard card = draft.Cards[i];
+                int index = i;
+
+                var root = new VisualElement { name = "draft-card-" + i };
+                root.AddToClassList("draft-card");
+
+                var kind = new Label(card.Kind != null ? card.Kind.ToUpperInvariant() : "") { name = "card-kind" };
+                kind.AddToClassList("card-kind");
+                if (!string.IsNullOrEmpty(card.Kind)) kind.AddToClassList("kind--" + card.Kind.ToLowerInvariant());
+                kind.pickingMode = PickingMode.Ignore;
+                root.Add(kind);
+
+                var name = new Label(card.Name ?? "") { name = "card-name" };
+                name.AddToClassList("card-name");
+                name.pickingMode = PickingMode.Ignore;
+                root.Add(name);
+
+                string godLine = card.God;
+                if (!string.IsNullOrEmpty(card.Lineage)) godLine = godLine + " · " + card.Lineage;
+                var god = new Label(godLine ?? "") { name = "card-god" };
+                god.AddToClassList("card-god");
+                god.pickingMode = PickingMode.Ignore;
+                root.Add(god);
+
+                var effect = new Label(card.Effect ?? "") { name = "card-effect" };
+                effect.AddToClassList("card-effect");
+                effect.pickingMode = PickingMode.Ignore;
+                root.Add(effect);
+
+                var attach = new Label(card.Attach ?? "") { name = "card-attach" };
+                attach.AddToClassList("card-attach");
+                attach.pickingMode = PickingMode.Ignore;
+                root.Add(attach);
+
+                root.RegisterCallback<ClickEvent>(_ => _source.SelectDraftCard(index));
+                _draftCards.Add(root);
+                _draftSlots.Add(root);
+            }
+        }
+
+        private void ClearDraftCards()
+        {
+            for (int i = 0; i < _draftSlots.Count; i++) _draftSlots[i].RemoveFromHierarchy();
+            _draftSlots.Clear();
+            _draftSignature = null;
+        }
+
+        private void HandleDraftConfirmClicked()
+        {
+            _source.ConfirmDraft();
         }
 
         private void RefreshActionBar()
