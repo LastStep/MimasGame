@@ -413,6 +413,145 @@ namespace Mimas.Core.Tests
             Assert.False(DamageCalculator.Applies(catalog.Modifiers.Get("ward"), strike, null, null));
         }
 
+        // ---- boons in the arithmetic (spec D part 1 §6.4) ------------------------------------------------
+
+        private static readonly Hex ArcherAt = new Hex(-1, 1);     // flat grass; (-1,0) is a height-1 bump and would add high ground
+        private static readonly Hex BruteAt = new Hex(0, 0);
+
+        [Fact]
+        public void Damage_BoonStat_IsItsOwnHiddenLine()
+        {
+            var catalog = CombatFixtures.Catalog();
+            var state = CombatFixtures.StartedWith(catalog, CombatFixtures.ArcherWith("trial-might"), CombatFixtures.BruteWith(), ArcherAt, BruteAt);
+            var actual = state.ResolveAttackFully(0, "bow", BruteAt);
+
+            // base 5, power.ranged 2 (public), Might +2 (its own hidden line), defense.ranged -3.
+            Assert.Equal(new[] { "base", "power.ranged", "trial-might", "defense.ranged" }, actual.Lines.Select(l => l.Id));
+            Assert.Equal(new[] { DamageLineKind.Base, DamageLineKind.Power, DamageLineKind.BoonStat, DamageLineKind.Defense }, actual.Lines.Select(l => l.Kind));
+            var might = actual.FindBoon("trial-might");
+            Assert.Equal(2, might.Amount);
+            Assert.True(might.Hidden);
+            Assert.Equal(DamageLineOwner.Attacker, might.Owner);
+            Assert.Equal(6, actual.Total);
+            Assert.Equal(2, actual.Lines[1].Amount);              // the power line is what gear explains, unchanged
+
+            // The owner's own preview has the line; the opponent's has an unknown instead.
+            Assert.NotNull(state.PreviewAttack(0, 0, "bow", BruteAt).FindBoon("trial-might"));
+            var theirs = state.PreviewAgainst(1, 0, catalog.GetAttack("bow"), state.Units.Get(1));
+            Assert.Null(theirs.FindBoon("trial-might"));
+            Assert.Equal(1, theirs.UnknownCount);
+            Assert.Equal(4, theirs.Total);
+        }
+
+        [Fact]
+        public void Damage_DefenceBlessing_IsANegativeHiddenLineOnTheTarget()
+        {
+            var catalog = CombatFixtures.Catalog();
+            var guard = new BoonDef("guard", "Guard", BoonKinds.Blessing, "trial", null,
+                new List<BoonEffect> { new BoonEffect(BoonEffectTypes.Stat, key: "defense.ranged", amount: 2) });
+            var items = ItemSlots.All.Select(s => catalog.GetItemForSlot(s, CombatFixtures.Brute.IdForSlot(s))).ToList();
+            var state = CombatFixtures.StartedWith(catalog, CombatFixtures.ArcherWith(), CombatFixtures.BruteWith(), ArcherAt, BruteAt);
+            var brute = new Unit(7, 1, new Hex(1, 0), catalog.Rules, items, "trial", new[] { guard });
+
+            var calculator = new DamageCalculator(catalog);
+            var breakdown = calculator.Compute(state.Map, state.Units.Get(0), brute, catalog.GetAttack("bow"), Knowledge.Full);
+            var line = breakdown.FindBoon("guard");
+            Assert.Equal(-2, line.Amount);
+            Assert.Equal(DamageLineOwner.Target, line.Owner);
+            Assert.Equal(7, line.OwnerUnitId);
+            Assert.True(line.Hidden);
+            Assert.Equal(5 + 2 - 3 - 2, breakdown.Total);
+        }
+
+        [Fact]
+        public void Damage_ElementRider_MatchesAddedElement()
+        {
+            var catalog = CombatFixtures.Catalog();
+            // Frost on the crown attaches trial-chill (+2 on frost attacks); the Zap sigil's spell carries the frost, the bow does not.
+            var state = CombatFixtures.StartedWith(catalog, CombatFixtures.ArcherWith("trial-frost", "trial-zap"), CombatFixtures.BruteWith(), ArcherAt, BruteAt);
+            var zap = state.ResolveAttackFully(0, "zap", BruteAt);
+            var chill = zap.FindModifier("trial-chill");
+            Assert.NotNull(chill);
+            Assert.Equal(2, chill.Amount);
+            Assert.True(chill.Hidden);
+            Assert.Null(state.ResolveAttackFully(0, "bow", BruteAt).FindModifier("trial-chill"));
+
+            // The rider reads the resolved attack: the catalogue's zap alone (lightning only) would not satisfy it.
+            Assert.False(DamageCalculator.Applies(catalog.Modifiers.Get("trial-chill"), catalog.GetAttack("zap"), null, null));
+        }
+
+        [Fact]
+        public void Damage_Nullify_ZeroesTotalAfterEverything()
+        {
+            var catalog = CombatFixtures.Catalog();
+            var state = CombatFixtures.StartedWith(catalog, CombatFixtures.ArcherWith("trial-frost", "trial-zap"), CombatFixtures.BruteWith("trial-frostproof"), ArcherAt, BruteAt);
+            var zap = state.ResolveAttackFully(0, "zap", BruteAt);
+
+            var nullify = zap.FindNullify();
+            Assert.NotNull(nullify);
+            Assert.True(zap.Nullified);
+            Assert.Equal("trial-frostproof", nullify.Id);
+            Assert.Equal(DamageLineKind.Nullify, nullify.Kind);
+            Assert.Equal(DamageLineOwner.Target, nullify.Owner);
+            Assert.True(nullify.Hidden);
+            Assert.Same(nullify, zap.Lines[zap.Lines.Count - 1]);          // last, after every flat line
+            int flat = zap.Lines.Where(l => l.Kind != DamageLineKind.Nullify).Sum(l => l.Amount);
+            Assert.True(flat > 0);
+            Assert.Equal(-flat, nullify.Amount);
+            Assert.Equal(0, zap.Total);
+            Assert.Null(zap.FindModifier("trial-frostproof"));            // an immunity is never a flat line
+
+            // A frost-less attack is untouched by the immunity.
+            var bow = state.ResolveAttackFully(0, "bow", BruteAt);
+            Assert.False(bow.Nullified);
+            Assert.True(bow.Total > 0);
+
+            // And the hit lands for nothing.
+            int hpBefore = state.Units.Get(1).Hp;
+            var resolved = state.Apply(new AttackCommand(0, 0, "zap", BruteAt)).OfType<AttackResolvedEvent>().Single();
+            Assert.Equal(0, resolved.Damage);
+            Assert.Equal(hpBefore, state.Units.Get(1).Hp);
+        }
+
+        [Fact]
+        public void Damage_HiddenNullify_CountsAsUnknownInPreview()
+        {
+            var catalog = CombatFixtures.Catalog();
+            var state = CombatFixtures.StartedWith(catalog, CombatFixtures.ArcherWith("trial-frost", "trial-zap"), CombatFixtures.BruteWith("trial-frostproof"), ArcherAt, BruteAt);
+
+            var preview = state.PreviewAttack(0, 0, "zap", BruteAt);
+            Assert.False(preview.Nullified);
+            Assert.True(preview.Total > 0);
+            Assert.Equal(1, preview.UnknownCount);
+
+            // The actual result reveals it; the next preview knows.
+            var events = state.Apply(new AttackCommand(0, 0, "zap", BruteAt));
+            Assert.Contains(events.OfType<ModifierRevealedEvent>(), e => e.ModifierId == "trial-frostproof" && e.ToPlayer == 0);
+            Assert.True(state.Knows(0, 1, "trial-frostproof"));
+            var after = state.PreviewAgainst(0, 0, catalog.GetAttack("zap").WithOverlay(1, 2, 1, 0, 1, new[] { "frost", "lightning" }, null), state.Units.Get(1));
+            Assert.True(after.Nullified);
+            Assert.Equal(0, after.Total);
+            Assert.True(after.IsExact);
+        }
+
+        [Fact]
+        public void Damage_DamageOverride_IsALineNotABaseChange()
+        {
+            var catalog = CombatFixtures.Catalog();
+            var state = CombatFixtures.StartedWith(catalog, CombatFixtures.ArcherWith("trial-heavy"), CombatFixtures.BruteWith(), ArcherAt, BruteAt);
+            var actual = state.ResolveAttackFully(0, "bow", BruteAt);
+            Assert.Equal(5, actual.Lines[0].Amount);                       // base is the file's number
+            var heavy = actual.FindBoon("trial-heavy");
+            Assert.Equal(2, heavy.Amount);
+            Assert.True(heavy.Hidden);
+            Assert.Equal(DamageLineOwner.Attacker, heavy.Owner);
+            Assert.Equal(5 + 2 + 2 - 3, actual.Total);
+
+            var theirs = state.PreviewAgainst(1, 0, catalog.GetAttack("bow"), state.Units.Get(1));
+            Assert.Null(theirs.FindBoon("trial-heavy"));
+            Assert.Equal(1, theirs.UnknownCount);
+        }
+
         /// <summary>An item-kind condition asks who granted the attack, not what it is: the same bow shot matches from a bow and never when innate (spec D part 1 §5.3).</summary>
         [Fact]
         public void Damage_ItemKindCondition_MatchesGrantingItem_NotInnate()

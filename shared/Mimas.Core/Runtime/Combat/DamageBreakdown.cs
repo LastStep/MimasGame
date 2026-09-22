@@ -18,6 +18,19 @@ namespace Mimas.Core.Combat
 
         /// <summary>A <c>modifiers/*.json</c> entry that applied.</summary>
         Modifier = 3,
+
+        /// <summary>
+        /// A boon's contribution: a Blessing's stat on the attacker's power or the target's defence, or an
+        /// Enchant's damage override on this attack. <c>Id</c> is the boon id, and the line is hidden until
+        /// the boon is revealed (spec D part 1 §6.4; ADR-034).
+        /// </summary>
+        BoonStat = 4,
+
+        /// <summary>
+        /// Immunity: a modifier with <c>effect.nullify</c> applied, and this line takes the total to 0 after
+        /// everything else (design: #damage rule 3). <c>Id</c> is the modifier id. At most one per breakdown.
+        /// </summary>
+        Nullify = 5,
     }
 
     /// <summary>Whose side a line belongs to. Decides visibility and the breakdown's display order.</summary>
@@ -88,6 +101,17 @@ namespace Mimas.Core.Combat
         /// <summary>True when nothing the viewer cannot see could change <see cref="Total"/>.</summary>
         public bool IsExact => UnknownCount == 0;
 
+        /// <summary>True when an immunity applied: the breakdown ends in a <see cref="DamageLineKind.Nullify"/> line and the total is 0.</summary>
+        public bool Nullified
+        {
+            get
+            {
+                for (int i = 0; i < _lines.Count; i++)
+                    if (_lines[i].Kind == DamageLineKind.Nullify) return true;
+                return false;
+            }
+        }
+
         public DamageBreakdown(List<DamageLine> lines, int unknownCount)
         {
             _lines = lines ?? throw new ArgumentNullException(nameof(lines));
@@ -114,6 +138,22 @@ namespace Mimas.Core.Combat
         {
             for (int i = 0; i < _lines.Count; i++)
                 if (_lines[i].Kind == DamageLineKind.Modifier && _lines[i].Id == modifierId) return _lines[i];
+            return null;
+        }
+
+        /// <summary>The first line a boon put here (a stat or a damage override), or null.</summary>
+        public DamageLine FindBoon(string boonId)
+        {
+            for (int i = 0; i < _lines.Count; i++)
+                if (_lines[i].Kind == DamageLineKind.BoonStat && _lines[i].Id == boonId) return _lines[i];
+            return null;
+        }
+
+        /// <summary>The immunity line, or null when no immunity applied.</summary>
+        public DamageLine FindNullify()
+        {
+            for (int i = 0; i < _lines.Count; i++)
+                if (_lines[i].Kind == DamageLineKind.Nullify) return _lines[i];
             return null;
         }
 

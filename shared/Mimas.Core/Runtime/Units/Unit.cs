@@ -259,11 +259,11 @@ namespace Mimas.Core.Units
 
         public bool HasBoon(string boonId) => boonId != null && _boonIds.Contains(boonId);
 
-        /// <summary>Every boon contribution to one stat key, in boon order (what the calculator turns into lines).</summary>
+        /// <summary>Every boon contribution to one stat key, in boon order (what the calculator turns into lines). A fresh list each call.</summary>
         public IReadOnlyList<StatContribution> BoonStatContributions(string key)
         {
             Overlay.StatContributionsFor(key, _statScratch);
-            return _statScratch;
+            return new List<StatContribution>(_statScratch);
         }
 
         /// <summary>The item that granted an ability, or null for an innate ability or an unknown id.</summary>

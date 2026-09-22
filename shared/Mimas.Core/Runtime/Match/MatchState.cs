@@ -524,11 +524,13 @@ namespace Mimas.Core.Match
 
             DamageBreakdown breakdown = _damage.Compute(Map, attacker, victim, def, Knowledge.Full);
 
-            // Any hidden line that changed the number is now known to the other side.
+            // Any hidden line that changed the number is now known to the other side. A boon's line (a stat
+            // or a damage override) and the boon behind a modifier line are picked up in §6.5.
             for (int i = 0; i < breakdown.Lines.Count; i++)
             {
                 DamageLine line = breakdown.Lines[i];
                 if (!line.Hidden || line.Amount == 0) continue;
+                if (line.Kind != DamageLineKind.Modifier && line.Kind != DamageLineKind.Nullify) continue;
                 IBody body;
                 // Props carry no hidden modifiers; the guard keeps the reveal honest if one ever does.
                 if (!Bodies.TryGetBody(line.OwnerUnitId, out body) || !(body is Unit owner)) continue;

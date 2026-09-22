@@ -9,17 +9,22 @@ namespace Mimas.Core.Combat
 {
     /// <summary>
     /// Resolves an attack's damage as a <see cref="DamageBreakdown"/>:
-    /// <c>base + power.&lt;type&gt; − defense.&lt;type&gt; + Σ flat modifiers</c>, floored at 0.
-    /// Modifier groups are consulted in a fixed order (attacker unit, attacker tile, globals for dealing;
-    /// target unit, target tile, globals for taking), each group sorted by ordinal id, so the breakdown a
-    /// player sees is the same list the server computed, line for line. The same method serves the
-    /// preview (a <see cref="Knowledge"/> limited to one player drops the lines they cannot know) and the
-    /// actual resolution (<see cref="Knowledge.Full"/>). Pure: no state, no RNG.
+    /// <c>base + power.&lt;type&gt; − defense.&lt;type&gt; + Σ boon stats + Σ flat modifiers</c>, floored at 0,
+    /// then taken to 0 by an immunity if one applied. Power and defence come from the bodies' public stats;
+    /// every boon's contribution to those keys, and every damage override on the attack, is its own hidden
+    /// <see cref="DamageLineKind.BoonStat"/> line so that reveal has something to key on (spec D part 1
+    /// §6.4). Modifier groups are consulted in a fixed order (attacker unit, attacker tile, globals for
+    /// dealing; target unit, target tile, globals for taking), each group sorted by ordinal id, so the
+    /// breakdown a player sees is the same list the server computed, line for line. The same method serves
+    /// the preview (a <see cref="Knowledge"/> limited to one player drops the lines they cannot know) and
+    /// the actual resolution (<see cref="Knowledge.Full"/>). Pure: no state, no RNG.
+    /// <para>The <paramref name="attack"/> it receives is the <b>resolved</b> definition (elements and tags added).</para>
     /// </summary>
     public sealed class DamageCalculator
     {
         private readonly ContentCatalog _catalog;
         private readonly List<ModifierDef> _scratch = new List<ModifierDef>();
+        private readonly List<AbilityOverride> _overrideScratch = new List<AbilityOverride>();
 
         public DamageCalculator(ContentCatalog catalog)
         {
@@ -39,29 +44,85 @@ namespace Mimas.Core.Combat
             var situation = new Situation(attack, attackerTile, targetTile, SourceItemKindOf(attacker, attack));
 
             var lines = new List<DamageLine>();
+            int unknown = 0;
             lines.Add(new DamageLine(DamageLineKind.Base, "base", DamageLineOwner.None, -1, attack.Damage, false));
 
             string powerKey = StatBlock.PowerKey(attack.DamageType);
-            int power = attacker.Stats.Get(powerKey);
+            int power = attacker.PublicStats.Get(powerKey);
             if (power != 0) lines.Add(new DamageLine(DamageLineKind.Power, powerKey, DamageLineOwner.Attacker, attacker.Id, power, false));
+            unknown += AddBoonStats(lines, attacker, DamageLineOwner.Attacker, powerKey, 1, knowledge);
 
             string defenseKey = StatBlock.DefenseKey(attack.DamageType);
-            int defense = target.Stats.Get(defenseKey);
+            int defense = target.PublicStats.Get(defenseKey);
             if (defense != 0) lines.Add(new DamageLine(DamageLineKind.Defense, defenseKey, DamageLineOwner.Target, target.Id, -defense, false));
+            unknown += AddBoonStats(lines, target, DamageLineOwner.Target, defenseKey, -1, knowledge);
 
-            int unknown = 0;
+            // An Enchant's damage override on this attack: a line, never a change to the base (spec §6.5 (d)).
+            attacker.Overlay.OverridesFor(attack.Id, _overrideScratch);
+            for (int i = 0; i < _overrideScratch.Count; i++)
+            {
+                AbilityOverride o = _overrideScratch[i];
+                if (o.Field != AbilityFields.Damage) continue;
+                if (!knowledge.CanSee(attacker.Owner, attacker.Id, o.BoonId)) { unknown++; continue; }
+                lines.Add(new DamageLine(DamageLineKind.BoonStat, o.BoonId, DamageLineOwner.Attacker, attacker.Id, o.Amount, true));
+            }
+
+            Immunity immunity = default;
 
             // Dealing: the attacker's side.
-            unknown += AddUnitModifiers(lines, attacker, DamageLineOwner.Attacker, ModifierTriggers.DealDamage, situation, knowledge);
-            AddTileModifiers(lines, attackerTile, DamageLineOwner.AttackerTile, ModifierTriggers.DealDamage, situation);
-            AddGlobalModifiers(lines, ModifierTriggers.DealDamage, situation);
+            unknown += AddUnitModifiers(lines, attacker, DamageLineOwner.Attacker, ModifierTriggers.DealDamage, situation, knowledge, ref immunity);
+            AddTileModifiers(lines, attackerTile, DamageLineOwner.AttackerTile, ModifierTriggers.DealDamage, situation, ref immunity);
+            AddGlobalModifiers(lines, ModifierTriggers.DealDamage, situation, ref immunity);
 
             // Taking: the target's side.
-            unknown += AddUnitModifiers(lines, target, DamageLineOwner.Target, ModifierTriggers.TakeDamage, situation, knowledge);
-            AddTileModifiers(lines, targetTile, DamageLineOwner.TargetTile, ModifierTriggers.TakeDamage, situation);
-            AddGlobalModifiers(lines, ModifierTriggers.TakeDamage, situation);
+            unknown += AddUnitModifiers(lines, target, DamageLineOwner.Target, ModifierTriggers.TakeDamage, situation, knowledge, ref immunity);
+            AddTileModifiers(lines, targetTile, DamageLineOwner.TargetTile, ModifierTriggers.TakeDamage, situation, ref immunity);
+            AddGlobalModifiers(lines, ModifierTriggers.TakeDamage, situation, ref immunity);
+
+            // Immunity last: all flat, floor, then nullify (design: #modifiers rule 2). One line, taking the total to 0.
+            if (immunity.Found)
+            {
+                int sum = 0;
+                for (int i = 0; i < lines.Count; i++) sum += lines[i].Amount;
+                if (sum < 0) sum = 0;
+                lines.Add(new DamageLine(DamageLineKind.Nullify, immunity.ModifierId, immunity.Owner, immunity.OwnerUnitId, -sum, immunity.Hidden));
+            }
 
             return new DamageBreakdown(lines, unknown);
+        }
+
+        /// <summary>One hidden line per boon contribution to <paramref name="key"/>, or an unknown when the viewer cannot see that boon.</summary>
+        private static int AddBoonStats(List<DamageLine> lines, IBody body, DamageLineOwner owner, string key, int sign, Knowledge knowledge)
+        {
+            int unknown = 0;
+            IReadOnlyList<StatContribution> contributions = body.BoonStatContributions(key);
+            for (int i = 0; i < contributions.Count; i++)
+            {
+                StatContribution c = contributions[i];
+                if (!knowledge.CanSee(body.Owner, body.Id, c.BoonId)) { unknown++; continue; }
+                lines.Add(new DamageLine(DamageLineKind.BoonStat, c.BoonId, owner, body.Id, sign * c.Amount, true));
+            }
+            return unknown;
+        }
+
+        /// <summary>The first immunity that applied, in the fixed evaluation order.</summary>
+        private struct Immunity
+        {
+            public bool Found;
+            public string ModifierId;
+            public DamageLineOwner Owner;
+            public int OwnerUnitId;
+            public bool Hidden;
+
+            public void Take(ModifierDef def, DamageLineOwner owner, int ownerUnitId)
+            {
+                if (Found) return;
+                Found = true;
+                ModifierId = def.Id;
+                Owner = owner;
+                OwnerUnitId = ownerUnitId;
+                Hidden = def.IsHidden;
+            }
         }
 
         /// <summary>Whether a modifier's conditions hold for this attack, as if it were innate (no granting item). Public so tests and tools can ask directly.</summary>
@@ -84,7 +145,7 @@ namespace Mimas.Core.Combat
             return itemId != null && _catalog.Items.TryGet(itemId, out item) ? item.Kind : null;
         }
 
-        private int AddUnitModifiers(List<DamageLine> lines, IBody unit, DamageLineOwner owner, string trigger, Situation situation, Knowledge knowledge)
+        private int AddUnitModifiers(List<DamageLine> lines, IBody unit, DamageLineOwner owner, string trigger, Situation situation, Knowledge knowledge, ref Immunity immunity)
         {
             int unknown = 0;
             CollectSorted(unit.ModifierIds, _scratch);
@@ -95,12 +156,13 @@ namespace Mimas.Core.Combat
                 if (!visible) unknown++;
                 if (def.Trigger != trigger || !situation.Satisfies(def)) continue;
                 if (!visible) continue;
+                if (def.Nullify) { immunity.Take(def, owner, unit.Id); continue; }
                 lines.Add(new DamageLine(DamageLineKind.Modifier, def.Id, owner, unit.Id, def.Damage, def.IsHidden));
             }
             return unknown;
         }
 
-        private void AddTileModifiers(List<DamageLine> lines, Tile tile, DamageLineOwner owner, string trigger, Situation situation)
+        private void AddTileModifiers(List<DamageLine> lines, Tile tile, DamageLineOwner owner, string trigger, Situation situation, ref Immunity immunity)
         {
             if (tile == null) return;
             var ids = new List<string>();
@@ -113,17 +175,19 @@ namespace Mimas.Core.Combat
             {
                 ModifierDef def = _scratch[i];
                 if (def.Trigger != trigger || !situation.Satisfies(def)) continue;
+                if (def.Nullify) { immunity.Take(def, owner, -1); continue; }
                 lines.Add(new DamageLine(DamageLineKind.Modifier, def.Id, owner, -1, def.Damage, false));
             }
         }
 
-        private void AddGlobalModifiers(List<DamageLine> lines, string trigger, Situation situation)
+        private void AddGlobalModifiers(List<DamageLine> lines, string trigger, Situation situation, ref Immunity immunity)
         {
             CollectSorted(_catalog.Rules.GlobalModifierIds, _scratch);
             for (int i = 0; i < _scratch.Count; i++)
             {
                 ModifierDef def = _scratch[i];
                 if (def.Trigger != trigger || !situation.Satisfies(def)) continue;
+                if (def.Nullify) { immunity.Take(def, DamageLineOwner.Global, -1); continue; }
                 lines.Add(new DamageLine(DamageLineKind.Modifier, def.Id, DamageLineOwner.Global, -1, def.Damage, false));
             }
         }

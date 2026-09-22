@@ -36,7 +36,14 @@ namespace Mimas.Core.Units
 
         int MaxHp { get; }
 
+        /// <summary>The numbers the rules read: everything, boons included.</summary>
         StatBlock Stats { get; }
+
+        /// <summary>The numbers gear explains, and therefore public (design: #hidden-info). A prop's are its <see cref="Stats"/>.</summary>
+        StatBlock PublicStats { get; }
+
+        /// <summary>Every boon contribution to one stat key, in boon order: each one is its own hidden damage line. Always empty for props.</summary>
+        IReadOnlyList<StatContribution> BoonStatContributions(string key);
 
         /// <summary>Modifier ids this body carries, in grant order. Always empty for props.</summary>
         IReadOnlyList<string> ModifierIds { get; }

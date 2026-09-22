@@ -13,6 +13,7 @@ namespace Mimas.Core.Units
     public sealed class Prop : IBody
     {
         private static readonly IReadOnlyList<string> NoModifiers = new string[0];
+        private static readonly IReadOnlyList<StatContribution> NoContributions = new StatContribution[0];
 
         public int Id { get; }
 
@@ -28,6 +29,11 @@ namespace Mimas.Core.Units
         public int AimHeight => Def.AimHeight;
 
         public StatBlock Stats => Def.Stats;
+
+        /// <summary>A prop has nothing to hide: its public stats are its stats.</summary>
+        public StatBlock PublicStats => Def.Stats;
+
+        public IReadOnlyList<StatContribution> BoonStatContributions(string key) => NoContributions;
 
         public int MaxHp => Def.Stats.Hp;
 

@@ -440,6 +440,8 @@ namespace Mimas.Core.Protocol
                 case DamageLineKind.Power: return "power";
                 case DamageLineKind.Defense: return "defense";
                 case DamageLineKind.Modifier: return "modifier";
+                case DamageLineKind.BoonStat: return "boonStat";
+                case DamageLineKind.Nullify: return "nullify";
                 default: throw new WireException("Unknown damage line kind " + k + ".");
             }
         }
@@ -452,6 +454,8 @@ namespace Mimas.Core.Protocol
                 case "power": return DamageLineKind.Power;
                 case "defense": return DamageLineKind.Defense;
                 case "modifier": return DamageLineKind.Modifier;
+                case "boonStat": return DamageLineKind.BoonStat;
+                case "nullify": return DamageLineKind.Nullify;
                 default: throw new WireException($"Unknown damage line kind '{s}'.");
             }
         }

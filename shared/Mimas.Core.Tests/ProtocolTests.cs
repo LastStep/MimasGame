@@ -119,6 +119,32 @@ namespace Mimas.Core.Tests
             Assert.Equal(attack.TargetHpAfter, back.TargetHpAfter);
         }
 
+        /// <summary>The two line kinds boons added (spec D part 1 §6.4) cross the wire by name and come back whole.</summary>
+        [Fact]
+        public void Wire_Breakdown_RoundTripsBoonStatAndNullify()
+        {
+            var lines = new List<DamageLine>
+            {
+                new DamageLine(DamageLineKind.Base, "base", DamageLineOwner.None, -1, 5, false),
+                new DamageLine(DamageLineKind.BoonStat, "trial-might", DamageLineOwner.Attacker, 0, 2, true),
+                new DamageLine(DamageLineKind.Nullify, "trial-frostproof", DamageLineOwner.Target, 1, -7, true),
+            };
+            var breakdown = new DamageBreakdown(lines, 0);
+            Assert.True(breakdown.Nullified);
+            Assert.Equal(0, breakdown.Total);
+
+            JObject encoded = Wire.Breakdown(breakdown);
+            Assert.Equal("boonStat", encoded["lines"][1]["kind"].Value<string>());
+            Assert.Equal("nullify", encoded["lines"][2]["kind"].Value<string>());
+
+            DamageBreakdown back = Wire.ReadBreakdown(encoded);
+            Assert.Equal(breakdown.ToString(), back.ToString());
+            Assert.True(back.Nullified);
+            Assert.Equal(2, back.FindBoon("trial-might").Amount);
+            Assert.Equal("trial-frostproof", back.FindNullify().Id);
+            Assert.Throws<WireException>(() => Wire.ReadBreakdown(JObject.Parse(@"{ ""total"": 0, ""unknown"": 0, ""lines"": [ { ""kind"": ""immune"", ""id"": ""x"", ""owner"": ""target"", ""ownerUnitId"": 1, ""amount"": 0, ""hidden"": true } ] }")));
+        }
+
         // ---- views -----------------------------------------------------------------------------------
 
         [Fact]
