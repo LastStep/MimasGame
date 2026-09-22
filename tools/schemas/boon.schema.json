@@ -1,0 +1,133 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://mimas.game/schemas/boon.schema.json",
+  "title": "Mimas boon",
+  "description": "One boon (boons/*.json): a Blessing (passive on the character), an Enchant (a change to one item) or a Sigil (a new ability on one item). Design: #boons. The loader also checks the cross-file rules (lineage, modifier and ability ids, the slot's lane rule, which abilities a target can name).",
+  "type": "object",
+  "required": ["version", "id", "kind", "lineage", "effects"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "const": 1 },
+    "id": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+    "name": { "type": "string", "minLength": 1, "description": "Display name, '<God>'s <thing>'; defaults to the id." },
+    "description": { "type": "string" },
+    "icon": { "type": "string" },
+    "kind": { "enum": ["blessing", "enchant", "sigil"] },
+    "lineage": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$", "description": "A lineages/*.json id." },
+    "requires": {
+      "type": "object",
+      "description": "The gear an Enchant or Sigil needs. Forbidden on a Blessing.",
+      "required": ["slot"],
+      "additionalProperties": false,
+      "properties": {
+        "slot": { "enum": ["weapon", "crown", "boots", "armour"] },
+        "kind": { "type": "string", "minLength": 1, "description": "An item kind the item in that slot must have (bow, gun, ...)." }
+      }
+    },
+    "stackable": { "type": "boolean", "default": false, "description": "May be drafted again while owned. Only legal when every effect is stat or abilityOverride." },
+    "exclusive": {
+      "type": "array",
+      "uniqueItems": true,
+      "description": "Exclusivity groups: the draft never offers a boon sharing a group with an owned one.",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "effects": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["type"],
+        "properties": {
+          "type": { "enum": ["stat", "modifier", "abilityOverride", "addElement", "addTag", "grantAbility"] }
+        },
+        "allOf": [
+          {
+            "if": { "properties": { "type": { "const": "stat" } } },
+            "then": {
+              "required": ["key", "amount"],
+              "additionalProperties": false,
+              "properties": {
+                "type": true,
+                "key": { "type": "string", "pattern": "^(hp|ap|power\\.(weapon|spell)|defense\\.(weapon|spell))$" },
+                "amount": { "type": "integer", "not": { "const": 0 }, "description": "Signed; negatives are self trade-offs, floored by rules.boons." }
+              }
+            }
+          },
+          {
+            "if": { "properties": { "type": { "const": "modifier" } } },
+            "then": {
+              "required": ["id"],
+              "additionalProperties": false,
+              "properties": {
+                "type": true,
+                "id": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$", "description": "A modifiers/*.json id, attached to the unit for the session." }
+              }
+            }
+          },
+          {
+            "if": { "properties": { "type": { "const": "abilityOverride" } } },
+            "then": {
+              "required": ["target", "field"],
+              "additionalProperties": false,
+              "properties": {
+                "type": true,
+                "target": { "type": "string", "minLength": 1, "description": "The enchant's slot (every ability the item grants, Sigils included) or one ability id. A blessing targets an innate ability id." },
+                "field": { "enum": ["range", "minRange", "damage", "cost", "apex", "hits", "climb", "jumpHeight", "trajectory", "lineOfSight"] },
+                "amount": { "type": "integer", "not": { "const": 0 }, "description": "Additive, for the numeric fields." },
+                "value": { "type": "string", "description": "For the skeleton fields trajectory (direct / arc / sky) and lineOfSight (true / false)." }
+              },
+              "oneOf": [
+                { "required": ["amount"], "not": { "required": ["value"] } },
+                { "required": ["value"], "not": { "required": ["amount"] } }
+              ]
+            }
+          },
+          {
+            "if": { "properties": { "type": { "const": "addElement" } } },
+            "then": {
+              "required": ["target", "element"],
+              "additionalProperties": false,
+              "properties": {
+                "type": true,
+                "target": { "enum": ["weapon", "crown", "boots", "armour"] },
+                "element": { "enum": ["fire", "frost", "lightning"], "description": "One of rules.elements; update this enum when it changes." }
+              }
+            }
+          },
+          {
+            "if": { "properties": { "type": { "const": "addTag" } } },
+            "then": {
+              "required": ["target", "tag"],
+              "additionalProperties": false,
+              "properties": {
+                "type": true,
+                "target": { "enum": ["weapon", "crown", "boots", "armour"] },
+                "tag": { "type": "string", "minLength": 1 }
+              }
+            }
+          },
+          {
+            "if": { "properties": { "type": { "const": "grantAbility" } } },
+            "then": {
+              "required": ["target", "ability"],
+              "additionalProperties": false,
+              "properties": {
+                "type": true,
+                "target": { "enum": ["weapon", "crown", "boots", "armour"] },
+                "ability": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$", "description": "An abilities/*.json id, not an innate one. A weapon may only take weapon attacks, a crown only spells." }
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "kind": { "const": "blessing" } } },
+      "then": { "not": { "required": ["requires"] } },
+      "else": { "required": ["requires"] }
+    }
+  ]
+}

@@ -29,6 +29,8 @@ file can know about on its own.
 | `modifier.schema.json` | `modifiers/*.json` |
 | `map.schema.json` | `maps/*.json` (a hex's `prop` names a `props/*.json` id) |
 | `prop.schema.json` | `props/*.json` |
+| `boon.schema.json` | `boons/*.json` (the effect record's fields are chosen on `type`) |
+| `lineage.schema.json` | `lineages/*.json` |
 
 Two things the schemas deliberately go **stricter** than the loader:
 
@@ -37,7 +39,9 @@ Two things the schemas deliberately go **stricter** than the loader:
 - The damage-lane enums list `weapon` and `spell` literally, and `ability.schema.json` requires an
   attack's `category` to equal its `attack.damageType`. The lane list really lives in `rules.json` and
   the engine is lane-agnostic (test fixtures still use `melee` / `ranged` / `magic`), so **update these
-  enums when `rules.damageTypes` changes.**
+  enums when `rules.damageTypes` changes.** The same goes for the **element** enum (`fire`, `frost`,
+  `lightning`) in `ability.schema.json`, `modifier.schema.json` and `boon.schema.json`: the real list is
+  `rules.elements`, so **update those three enums when `rules.elements` changes.**
 
 The second point is deliberate belt-and-braces: the catalogue also enforces the slot-to-category rule at
 link time (`item 'x' is a weapon but grants spell attack 'y'`) and a repo-data test checks

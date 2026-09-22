@@ -32,6 +32,14 @@
     {
       "fileMatch": ["/MimasClient/Assets/_Game/Data/props/*.json"],
       "url": "./tools/schemas/prop.schema.json"
+    },
+    {
+      "fileMatch": ["/MimasClient/Assets/_Game/Data/boons/*.json"],
+      "url": "./tools/schemas/boon.schema.json"
+    },
+    {
+      "fileMatch": ["/MimasClient/Assets/_Game/Data/lineages/*.json"],
+      "url": "./tools/schemas/lineage.schema.json"
     }
   ]
 }

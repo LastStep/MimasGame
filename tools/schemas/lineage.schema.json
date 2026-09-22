@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://mimas.game/schemas/lineage.schema.json",
+  "title": "Mimas lineage",
+  "description": "One divine lineage (lineages/*.json): the Blessing a player starts with and the pool the draft draws from. Design: #lineage. The loader also checks that the pool holds all three kinds and covers every item.",
+  "type": "object",
+  "required": ["version", "id", "startingBlessing", "pool"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "const": 1 },
+    "id": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+    "name": { "type": "string", "minLength": 1, "description": "Display name; defaults to the id." },
+    "description": { "type": "string", "description": "One line of flavour: 'Pray to Agni, Vayu and Indra.'" },
+    "icon": { "type": "string" },
+    "startingBlessing": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$", "description": "A boons/*.json id of kind blessing belonging to this lineage." },
+    "pool": {
+      "type": "array",
+      "minItems": 3,
+      "uniqueItems": true,
+      "description": "Boon ids of this lineage the draft may offer. Must contain a blessing, an enchant and a sigil, and cover every item.",
+      "items": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" }
+    }
+  }
+}
