@@ -5,7 +5,7 @@ project: mimas
 feature: F-boons
 milestone: M3
 lane: full
-status: approved
+status: running
 owner: builder
 model: fable
 worktree:
@@ -14,6 +14,28 @@ plan: docs/specs/2026-09-21-boons-groundwork.md
 allows_assets:
   # The design page records the thirteen closed questions and the new data schema (spec §10.4).
   - 'docs/design/index.html'
+  # Spec §9 requires five new test files and additions to five existing ones (new tests only; no
+  # existing assertion is softened or removed). Added 2026-09-22 by the build session, as T-0008 did.
+  - 'shared/Mimas.Core.Tests/BoonContentTests.cs'
+  - 'shared/Mimas.Core.Tests/BoonOverlayTests.cs'
+  - 'shared/Mimas.Core.Tests/BoonRevealTests.cs'
+  - 'shared/Mimas.Core.Tests/DraftTests.cs'
+  - 'shared/Mimas.Core.Tests/SessionTests.cs'
+  - 'shared/Mimas.Core.Tests/DataTests.cs'
+  - 'shared/Mimas.Core.Tests/CombatTests.cs'
+  - 'shared/Mimas.Core.Tests/MirrorTests.cs'
+  - 'shared/Mimas.Core.Tests/ProtocolTests.cs'
+  - 'shared/Mimas.Core.Tests/ContentTests.cs'
+  - 'shared/Mimas.Core.Tests/LoadoutTests.cs'
+  # Spec §0.7: the Editor generates a .meta for every new Core source and golden rule 1 says an asset
+  # and its .meta are committed together. Written by the Editor, never by hand.
+  - 'shared/Mimas.Core/Runtime/Data/BoonDef.cs.meta'
+  - 'shared/Mimas.Core/Runtime/Data/LineageDef.cs.meta'
+  - 'shared/Mimas.Core/Runtime/Data/SeriesDef.cs.meta'
+  - 'shared/Mimas.Core/Runtime/Data/DraftDef.cs.meta'
+  - 'shared/Mimas.Core/Runtime/Data/BoonRulesDef.cs.meta'
+  - 'shared/Mimas.Core/Runtime/Units/BoonOverlay.cs.meta'
+  - 'shared/Mimas.Core/Runtime/Match/PlayerBuild.cs.meta'
   # New Core folder and its Unity .meta, written by the Editor if one is reachable (spec §0.7);
   # Unity owns every .meta, so they are declared, never hand-made.
   - 'shared/Mimas.Core/Runtime/Session.meta'

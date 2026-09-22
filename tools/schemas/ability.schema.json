@@ -102,6 +102,16 @@
               "lineOfSight": {
                 "type": "boolean",
                 "description": "Must the attacker see the target? Independent of trajectory; both must pass."
+              },
+              "element": {
+                "enum": ["fire", "frost", "lightning"],
+                "description": "The innate element, one of rules.elements (design: #elements). At most one; an Enchant can add more. Update this enum when rules.elements changes."
+              },
+              "hits": {
+                "type": "integer",
+                "minimum": 1,
+                "default": 1,
+                "description": "Skeleton (spec D part 1 §6.7): how many times the single-target resolution repeats. Parsed, but a unit with hits > 1 fails closed. No shipped file sets it."
               }
             },
             "allOf": [

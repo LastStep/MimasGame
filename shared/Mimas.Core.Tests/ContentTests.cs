@@ -23,7 +23,8 @@ namespace Mimas.Core.Tests
         {
             new ContentFile("terrains.json", @"{ ""version"": 1, ""terrains"": [ { ""id"": ""grass"", ""walkable"": true } ] }"),
             new ContentFile("rules.json", @"{ ""version"": 1, ""damageTypes"": [ ""melee"", ""ranged"", ""magic"" ],
-                ""heights"": { ""unitsPerLevel"": 3, ""body"": 6, ""aim"": 4 }, ""baseStats"": { ""hp"": 10, ""ap"": 3 }, ""innateAbilities"": [ ""move"" ], ""clock"": { ""turnMs"": 30000, ""lagGraceMs"": 1000, ""reconnectGraceMs"": 60000 } }"),
+                ""heights"": { ""unitsPerLevel"": 3, ""body"": 6, ""aim"": 4 }, ""baseStats"": { ""hp"": 10, ""ap"": 3 }, ""innateAbilities"": [ ""move"" ], ""clock"": { ""turnMs"": 30000, ""lagGraceMs"": 1000, ""reconnectGraceMs"": 60000 },
+                ""elements"": [ ""fire"", ""frost"", ""lightning"" ], ""series"": { ""bestOf"": 3 }, ""draft"": { ""offers"": { ""winner"": 3, ""loser"": 3 }, ""timeoutMs"": 20000 }, ""boons"": { ""floors"": { ""hp"": 1, ""ap"": 1 }, ""minCost"": 1 } }"),
             new ContentFile("abilities/move.json", @"{ ""version"": 1, ""id"": ""move"", ""type"": ""movement"", ""movement"": { ""mode"": ""walk"", ""range"": 1 } }"),
         };
 

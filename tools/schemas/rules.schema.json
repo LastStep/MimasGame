@@ -4,7 +4,7 @@
   "title": "Mimas rules",
   "description": "Match-wide rules (rules.json): the damage lanes, the stats and abilities every hero has before gear, and the modifiers that apply to every attack.",
   "type": "object",
-  "required": ["version", "damageTypes", "heights", "baseStats", "innateAbilities", "clock"],
+  "required": ["version", "damageTypes", "heights", "baseStats", "innateAbilities", "clock", "elements", "series", "draft", "boons"],
   "additionalProperties": false,
   "properties": {
     "$schema": { "type": "string" },
@@ -15,6 +15,57 @@
       "uniqueItems": true,
       "description": "The damage lanes. Changing this list means updating the enums in item.schema.json and ability.schema.json too.",
       "items": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" }
+    },
+    "elements": {
+      "type": "array",
+      "uniqueItems": true,
+      "description": "The elements an attack may carry and a modifier may condition on (design: #elements). Changing this list means updating the enums in ability.schema.json, modifier.schema.json and boon.schema.json too.",
+      "items": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" }
+    },
+    "series": {
+      "type": "object",
+      "description": "How long a session is (design: #session).",
+      "required": ["bestOf"],
+      "additionalProperties": false,
+      "properties": {
+        "bestOf": { "type": "integer", "minimum": 1, "description": "Maximum rounds; odd. First to bestOf / 2 + 1 wins." }
+      }
+    },
+    "draft": {
+      "type": "object",
+      "description": "The draft between rounds (design: #draft): offer counts per role and the host's timer.",
+      "required": ["offers", "timeoutMs"],
+      "additionalProperties": false,
+      "properties": {
+        "offers": {
+          "type": "object",
+          "required": ["winner", "loser"],
+          "additionalProperties": false,
+          "properties": {
+            "winner": { "type": "integer", "minimum": 0, "description": "Offers for the player who won the previous round." },
+            "loser": { "type": "integer", "minimum": 0, "description": "Offers for the player who lost the previous round." }
+          }
+        },
+        "timeoutMs": { "type": "integer", "minimum": 0, "description": "How long the host waits before it submits a timeout pick (offer 0). Core never reads a clock." }
+      }
+    },
+    "boons": {
+      "type": "object",
+      "description": "The floors boons are held to (design: #stats rule 3, #enchant).",
+      "required": ["floors", "minCost"],
+      "additionalProperties": false,
+      "properties": {
+        "floors": {
+          "type": "object",
+          "required": ["hp", "ap"],
+          "additionalProperties": false,
+          "properties": {
+            "hp": { "type": "integer", "minimum": 1, "description": "A unit's maximum hit points never drop below this." },
+            "ap": { "type": "integer", "minimum": 0, "description": "A unit's action points per turn never drop below this." }
+          }
+        },
+        "minCost": { "type": "integer", "minimum": 0, "description": "An ability's cost never drops below this through overrides. Nothing is ever free." }
+      }
     },
     "globalModifiers": {
       "type": "array",

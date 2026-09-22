@@ -115,7 +115,8 @@ namespace Mimas.Core.Tests
     /// </summary>
     public class HeightsAndTrajectoryParsingTests
     {
-        private const string RulesHead = @"{ ""version"": 1, ""damageTypes"": [ ""weapon"" ], ""baseStats"": { ""hp"": 20, ""ap"": 3 }, ""innateAbilities"": [ ""move"" ], ""clock"": { ""turnMs"": 30000, ""lagGraceMs"": 1000, ""reconnectGraceMs"": 60000 }";
+        private const string RulesHead = @"{ ""version"": 1, ""damageTypes"": [ ""weapon"" ], ""baseStats"": { ""hp"": 20, ""ap"": 3 }, ""innateAbilities"": [ ""move"" ], ""clock"": { ""turnMs"": 30000, ""lagGraceMs"": 1000, ""reconnectGraceMs"": 60000 },
+            ""elements"": [], ""series"": { ""bestOf"": 3 }, ""draft"": { ""offers"": { ""winner"": 3, ""loser"": 3 }, ""timeoutMs"": 20000 }, ""boons"": { ""floors"": { ""hp"": 1, ""ap"": 1 }, ""minCost"": 1 }";
 
         private static RulesDef Rules(string heights) => RulesDef.FromJson(RulesHead + @", ""heights"": " + heights + " }");
 
@@ -593,7 +594,8 @@ namespace Mimas.Core.Tests
     public class ClockParsingTests
     {
         private const string Head = @"{ ""version"": 1, ""damageTypes"": [ ""weapon"" ], ""heights"": { ""unitsPerLevel"": 3, ""body"": 6, ""aim"": 4 },
-            ""baseStats"": { ""hp"": 20, ""ap"": 3 }, ""innateAbilities"": [ ""move"" ]";
+            ""baseStats"": { ""hp"": 20, ""ap"": 3 }, ""innateAbilities"": [ ""move"" ],
+            ""elements"": [], ""series"": { ""bestOf"": 3 }, ""draft"": { ""offers"": { ""winner"": 3, ""loser"": 3 }, ""timeoutMs"": 20000 }, ""boons"": { ""floors"": { ""hp"": 1, ""ap"": 1 }, ""minCost"": 1 }";
 
         private static RulesDef WithClock(string clock) => RulesDef.FromJson(Head + @", ""clock"": " + clock + " }");
 
@@ -629,6 +631,180 @@ namespace Mimas.Core.Tests
             Assert.Equal(30000, rules.Clock.TurnMs);
             Assert.Equal(1000, rules.Clock.LagGraceMs);
             Assert.Equal(60000, rules.Clock.ReconnectGraceMs);
+        }
+    }
+
+    /// <summary>
+    /// The four rules blocks the boons system reads (spec D part 1 §5.1): <c>elements</c>, <c>series</c>,
+    /// <c>draft</c>, <c>boons</c>. All required, each failing closed on a bad number; the constructor
+    /// defaults them for hand-built fixtures exactly as <c>clock</c> is defaulted.
+    /// </summary>
+    public class BoonRulesParsingTests
+    {
+        private const string Head = @"{ ""version"": 1, ""damageTypes"": [ ""weapon"" ], ""heights"": { ""unitsPerLevel"": 3, ""body"": 6, ""aim"": 4 },
+            ""baseStats"": { ""hp"": 20, ""ap"": 3 }, ""innateAbilities"": [ ""move"" ], ""clock"": { ""turnMs"": 30000, ""lagGraceMs"": 1000, ""reconnectGraceMs"": 60000 }";
+
+        private const string Elements = @"""elements"": [ ""fire"", ""frost"", ""lightning"" ]";
+        private const string Series = @"""series"": { ""bestOf"": 3 }";
+        private const string Draft = @"""draft"": { ""offers"": { ""winner"": 3, ""loser"": 3 }, ""timeoutMs"": 20000 }";
+        private const string Boons = @"""boons"": { ""floors"": { ""hp"": 1, ""ap"": 1 }, ""minCost"": 1 }";
+
+        private static RulesDef With(params string[] blocks) => RulesDef.FromJson(Head + ", " + string.Join(", ", blocks) + " }");
+
+        [Fact]
+        public void Rules_MissingBoonsBlock_IsAnError()
+        {
+            var e = Assert.Throws<MapLoadException>(() => With(Elements, Series, Draft));
+            Assert.Contains("'boons'", e.Message);
+        }
+
+        [Fact]
+        public void Rules_MissingElementsSeriesOrDraft_IsAnError()
+        {
+            Assert.Contains("'elements'", Assert.Throws<MapLoadException>(() => With(Series, Draft, Boons)).Message);
+            Assert.Contains("'series'", Assert.Throws<MapLoadException>(() => With(Elements, Draft, Boons)).Message);
+            Assert.Contains("'draft'", Assert.Throws<MapLoadException>(() => With(Elements, Series, Boons)).Message);
+        }
+
+        [Fact]
+        public void Rules_FourBlocks_Parse()
+        {
+            var rules = With(Elements, Series, Draft, Boons);
+            Assert.Equal(new[] { "fire", "frost", "lightning" }, rules.Elements);
+            Assert.True(rules.IsElement("frost"));
+            Assert.False(rules.IsElement("acid"));
+            Assert.Equal(3, rules.Series.BestOf);
+            Assert.Equal(2, rules.Series.RoundsToWin);
+            Assert.Equal(3, rules.Draft.OffersWinner);
+            Assert.Equal(3, rules.Draft.OffersLoser);
+            Assert.Equal(20000, rules.Draft.TimeoutMs);
+            Assert.Equal(1, rules.Boons.HpFloor);
+            Assert.Equal(1, rules.Boons.ApFloor);
+            Assert.Equal(1, rules.Boons.MinCost);
+        }
+
+        [Fact]
+        public void Rules_SeriesBestOfMustBeOddAndPositive()
+        {
+            Assert.Throws<MapLoadException>(() => With(Elements, @"""series"": { ""bestOf"": 2 }", Draft, Boons));
+            Assert.Throws<MapLoadException>(() => With(Elements, @"""series"": { ""bestOf"": 0 }", Draft, Boons));
+            Assert.Equal(3, With(Elements, @"""series"": { ""bestOf"": 5 }", Draft, Boons).Series.RoundsToWin);
+            Assert.Throws<ArgumentOutOfRangeException>(() => new SeriesDef(4));
+        }
+
+        [Fact]
+        public void Rules_DraftAndBoonFloors_FailClosedOnBadNumbers()
+        {
+            Assert.Throws<MapLoadException>(() => With(Elements, Series, @"""draft"": { ""offers"": { ""winner"": -1, ""loser"": 3 }, ""timeoutMs"": 20000 }", Boons));
+            Assert.Throws<MapLoadException>(() => With(Elements, Series, @"""draft"": { ""offers"": { ""winner"": 3 }, ""timeoutMs"": 20000 }", Boons));
+            Assert.Throws<MapLoadException>(() => With(Elements, Series, Draft, @"""boons"": { ""floors"": { ""hp"": 0, ""ap"": 1 }, ""minCost"": 1 }"));
+            Assert.Throws<MapLoadException>(() => With(Elements, Series, Draft, @"""boons"": { ""floors"": { ""hp"": 1, ""ap"": 1 }, ""minCost"": -1 }"));
+            Assert.Throws<MapLoadException>(() => With(@"""elements"": [ ""fire"", ""fire"" ]", Series, Draft, Boons));
+            Assert.Throws<ArgumentOutOfRangeException>(() => new BoonRulesDef(0, 0, 0));
+            Assert.Throws<ArgumentOutOfRangeException>(() => new DraftDef(3, -1, 0));
+        }
+
+        [Fact]
+        public void Rules_HandBuilt_DefaultsTheFourBlocks()
+        {
+            var rules = new RulesDef(new List<string> { "weapon" }, null, new StatBlock(new[] { new KeyValuePair<string, int>("hp", 5), new KeyValuePair<string, int>("ap", 3) }),
+                new HeightsDef(3, 6, 4), new List<string> { "move" });
+            Assert.Empty(rules.Elements);
+            Assert.Equal(3, rules.Series.BestOf);
+            Assert.Equal(3, rules.Draft.OffersLoser);
+            Assert.Equal(1, rules.Boons.MinCost);
+        }
+
+        [Fact]
+        public void Rules_ShippedFile_HasTheFourBlocks()
+        {
+            var rules = RulesDef.FromJson(RepoData.Read("rules.json"));
+            Assert.Equal(new[] { "fire", "frost", "lightning" }, rules.Elements);
+            Assert.Equal(3, rules.Series.BestOf);
+            Assert.Equal(3, rules.Draft.OffersWinner);
+            Assert.Equal(3, rules.Draft.OffersLoser);
+            Assert.Equal(20000, rules.Draft.TimeoutMs);
+            Assert.Equal(1, rules.Boons.HpFloor);
+            Assert.Equal(1, rules.Boons.ApFloor);
+            Assert.Equal(1, rules.Boons.MinCost);
+        }
+    }
+
+    /// <summary>Elements and the multi-hit skeleton on an attack; elements, item kinds and immunity on a modifier (spec D part 1 §5.2, §5.3).</summary>
+    public class ElementAndImmunityParsingTests
+    {
+        private static AttackDef Attack(string attack) => (AttackDef)AbilityDef.FromJson(
+            @"{ ""version"": 1, ""id"": ""shot"", ""type"": ""attack"", ""category"": ""weapon"", ""attack"": " + attack + " }");
+
+        [Fact]
+        public void Attack_ElementParses_AndHitsDefaultsToOne()
+        {
+            var plain = Attack(@"{ ""damage"": 1, ""damageType"": ""weapon"", ""range"": 3, ""trajectory"": ""direct"", ""lineOfSight"": true }");
+            Assert.Empty(plain.Elements);
+            Assert.Equal(1, plain.Hits);
+
+            var fiery = Attack(@"{ ""damage"": 1, ""damageType"": ""weapon"", ""range"": 3, ""trajectory"": ""direct"", ""lineOfSight"": true, ""element"": ""fire"" }");
+            Assert.Equal(new[] { "fire" }, fiery.Elements);
+            Assert.True(fiery.HasElement("fire"));
+            Assert.False(fiery.HasElement("frost"));
+        }
+
+        [Fact]
+        public void Attack_HitsParses_AndFailsBelowOne()
+        {
+            Assert.Equal(3, Attack(@"{ ""damage"": 1, ""damageType"": ""weapon"", ""range"": 3, ""trajectory"": ""direct"", ""lineOfSight"": true, ""hits"": 3 }").Hits);
+            var e = Assert.Throws<MapLoadException>(() => Attack(@"{ ""damage"": 1, ""damageType"": ""weapon"", ""range"": 3, ""trajectory"": ""direct"", ""lineOfSight"": true, ""hits"": 0 }"));
+            Assert.Contains("hits must be at least 1", e.Message);
+        }
+
+        [Fact]
+        public void WithTrajectory_KeepsElementsAndHits()
+        {
+            var fiery = Attack(@"{ ""damage"": 1, ""damageType"": ""weapon"", ""range"": 3, ""trajectory"": ""direct"", ""lineOfSight"": true, ""element"": ""fire"", ""hits"": 2 }");
+            var lobbed = fiery.WithTrajectory(Trajectories.Arc, 2, false);
+            Assert.Equal(new[] { "fire" }, lobbed.Elements);
+            Assert.Equal(2, lobbed.Hits);
+        }
+
+        [Fact]
+        public void Attack_ShippedFireBolt_IsFire()
+        {
+            var bolt = (AttackDef)AbilityDef.FromJson(RepoData.Read("abilities/fire-bolt.json"));
+            Assert.Equal(new[] { "fire" }, bolt.Elements);
+            Assert.Equal(1, bolt.Hits);
+        }
+
+        [Fact]
+        public void Modifier_ElementsAndItemKindsParse()
+        {
+            var def = ModifierDef.FromJson(@"{ ""version"": 1, ""id"": ""x"", ""trigger"": ""dealDamage"", ""when"": { ""elements"": [ ""fire"", ""frost"" ], ""itemKinds"": [ ""bow"" ] }, ""effect"": { ""damage"": 2 } }");
+            Assert.Equal(new[] { "fire", "frost" }, def.Elements);
+            Assert.Equal(new[] { "bow" }, def.ItemKinds);
+            Assert.False(def.Nullify);
+            Assert.Equal(2, def.Damage);
+
+            Assert.Throws<MapLoadException>(() => ModifierDef.FromJson(@"{ ""version"": 1, ""id"": ""x"", ""trigger"": ""dealDamage"", ""when"": { ""elements"": [] }, ""effect"": { ""damage"": 2 } }"));
+            Assert.Throws<MapLoadException>(() => ModifierDef.FromJson(@"{ ""version"": 1, ""id"": ""x"", ""trigger"": ""dealDamage"", ""when"": { ""itemKinds"": [] }, ""effect"": { ""damage"": 2 } }"));
+        }
+
+        [Fact]
+        public void Modifier_NullifyParses_WithZeroDamage()
+        {
+            var immune = ModifierDef.FromJson(@"{ ""version"": 1, ""id"": ""x"", ""trigger"": ""takeDamage"", ""visibility"": ""hidden"", ""when"": { ""elements"": [ ""fire"" ] }, ""effect"": { ""nullify"": true } }");
+            Assert.True(immune.Nullify);
+            Assert.Equal(0, immune.Damage);
+            Assert.True(immune.IsHidden);
+        }
+
+        [Fact]
+        public void Modifier_NullifyAndDamage_AreExclusive()
+        {
+            var both = Assert.Throws<MapLoadException>(() => ModifierDef.FromJson(@"{ ""version"": 1, ""id"": ""x"", ""trigger"": ""takeDamage"", ""effect"": { ""nullify"": true, ""damage"": -1 } }"));
+            Assert.Contains("mutually exclusive", both.Message);
+            Assert.Throws<MapLoadException>(() => ModifierDef.FromJson(@"{ ""version"": 1, ""id"": ""x"", ""trigger"": ""takeDamage"", ""effect"": { ""nullify"": false } }"));
+            Assert.Throws<MapLoadException>(() => ModifierDef.FromJson(@"{ ""version"": 1, ""id"": ""x"", ""trigger"": ""takeDamage"", ""effect"": { } }"));
+            Assert.Throws<ArgumentException>(() => new ModifierDef("x", "x", ModifierTriggers.TakeDamage, -1, nullify: true));
+            Assert.Throws<ArgumentException>(() => new ModifierDef("x", "x", ModifierTriggers.TakeDamage, 0));
         }
     }
 }

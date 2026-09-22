@@ -70,21 +70,21 @@ namespace Mimas.Core.Tests
         public void RulesDef_FromJson_RequiresBaseStatsAndInnateAbilities()
         {
             Assert.Throws<MapLoadException>(() => RulesDef.FromJson(
-                @"{ ""version"": 1, ""damageTypes"": [ ""weapon"" ], ""heights"": { ""unitsPerLevel"": 3, ""body"": 6, ""aim"": 4 }, ""innateAbilities"": [ ""move"" ], ""clock"": { ""turnMs"": 30000, ""lagGraceMs"": 1000, ""reconnectGraceMs"": 60000 } }"));
+                @"{ ""version"": 1, ""damageTypes"": [ ""weapon"" ], ""heights"": { ""unitsPerLevel"": 3, ""body"": 6, ""aim"": 4 }, ""innateAbilities"": [ ""move"" ], ""clock"": { ""turnMs"": 30000, ""lagGraceMs"": 1000, ""reconnectGraceMs"": 60000 }, ""elements"": [], ""series"": { ""bestOf"": 3 }, ""draft"": { ""offers"": { ""winner"": 3, ""loser"": 3 }, ""timeoutMs"": 20000 }, ""boons"": { ""floors"": { ""hp"": 1, ""ap"": 1 }, ""minCost"": 1 } }"));
             Assert.Throws<MapLoadException>(() => RulesDef.FromJson(
-                @"{ ""version"": 1, ""damageTypes"": [ ""weapon"" ], ""heights"": { ""unitsPerLevel"": 3, ""body"": 6, ""aim"": 4 }, ""baseStats"": { ""hp"": 20, ""ap"": 3 }, ""clock"": { ""turnMs"": 30000, ""lagGraceMs"": 1000, ""reconnectGraceMs"": 60000 } }"));
+                @"{ ""version"": 1, ""damageTypes"": [ ""weapon"" ], ""heights"": { ""unitsPerLevel"": 3, ""body"": 6, ""aim"": 4 }, ""baseStats"": { ""hp"": 20, ""ap"": 3 }, ""clock"": { ""turnMs"": 30000, ""lagGraceMs"": 1000, ""reconnectGraceMs"": 60000 }, ""elements"": [], ""series"": { ""bestOf"": 3 }, ""draft"": { ""offers"": { ""winner"": 3, ""loser"": 3 }, ""timeoutMs"": 20000 }, ""boons"": { ""floors"": { ""hp"": 1, ""ap"": 1 }, ""minCost"": 1 } }"));
 
             var negative = Assert.Throws<MapLoadException>(() => RulesDef.FromJson(
                 @"{ ""version"": 1, ""damageTypes"": [ ""weapon"" ], ""heights"": { ""unitsPerLevel"": 3, ""body"": 6, ""aim"": 4 }, ""baseStats"": { ""hp"": 20, ""ap"": 3, ""power.weapon"": -1 },
-                    ""innateAbilities"": [ ""move"" ], ""clock"": { ""turnMs"": 30000, ""lagGraceMs"": 1000, ""reconnectGraceMs"": 60000 } }"));
+                    ""innateAbilities"": [ ""move"" ], ""clock"": { ""turnMs"": 30000, ""lagGraceMs"": 1000, ""reconnectGraceMs"": 60000 }, ""elements"": [], ""series"": { ""bestOf"": 3 }, ""draft"": { ""offers"": { ""winner"": 3, ""loser"": 3 }, ""timeoutMs"": 20000 }, ""boons"": { ""floors"": { ""hp"": 1, ""ap"": 1 }, ""minCost"": 1 } }"));
             Assert.Contains("rules.baseStats['power.weapon'] must not be negative.", negative.Message);
 
             Assert.Throws<MapLoadException>(() => RulesDef.FromJson(
                 @"{ ""version"": 1, ""damageTypes"": [ ""weapon"" ], ""heights"": { ""unitsPerLevel"": 3, ""body"": 6, ""aim"": 4 }, ""baseStats"": { ""hp"": 20, ""ap"": 3 },
-                    ""innateAbilities"": [ ""move"", ""move"" ], ""clock"": { ""turnMs"": 30000, ""lagGraceMs"": 1000, ""reconnectGraceMs"": 60000 } }"));
+                    ""innateAbilities"": [ ""move"", ""move"" ], ""clock"": { ""turnMs"": 30000, ""lagGraceMs"": 1000, ""reconnectGraceMs"": 60000 }, ""elements"": [], ""series"": { ""bestOf"": 3 }, ""draft"": { ""offers"": { ""winner"": 3, ""loser"": 3 }, ""timeoutMs"": 20000 }, ""boons"": { ""floors"": { ""hp"": 1, ""ap"": 1 }, ""minCost"": 1 } }"));
 
             var rules = RulesDef.FromJson(
-                @"{ ""version"": 1, ""damageTypes"": [ ""weapon"" ], ""heights"": { ""unitsPerLevel"": 3, ""body"": 6, ""aim"": 4 }, ""baseStats"": { ""hp"": 20, ""ap"": 3 }, ""innateAbilities"": [ ""move"" ], ""clock"": { ""turnMs"": 30000, ""lagGraceMs"": 1000, ""reconnectGraceMs"": 60000 } }");
+                @"{ ""version"": 1, ""damageTypes"": [ ""weapon"" ], ""heights"": { ""unitsPerLevel"": 3, ""body"": 6, ""aim"": 4 }, ""baseStats"": { ""hp"": 20, ""ap"": 3 }, ""innateAbilities"": [ ""move"" ], ""clock"": { ""turnMs"": 30000, ""lagGraceMs"": 1000, ""reconnectGraceMs"": 60000 }, ""elements"": [], ""series"": { ""bestOf"": 3 }, ""draft"": { ""offers"": { ""winner"": 3, ""loser"": 3 }, ""timeoutMs"": 20000 }, ""boons"": { ""floors"": { ""hp"": 1, ""ap"": 1 }, ""minCost"": 1 } }");
             Assert.Equal(20, rules.BaseStats.Hp);
             Assert.Equal(new[] { "move" }, rules.InnateAbilityIds);
             Assert.True(rules.IsInnateAbility("move"));

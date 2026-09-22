@@ -13,5 +13,9 @@
     "defense.spell": 0
   },
   "innateAbilities": ["move"],
-  "clock": { "turnMs": 30000, "lagGraceMs": 1000, "reconnectGraceMs": 60000 }
+  "clock": { "turnMs": 30000, "lagGraceMs": 1000, "reconnectGraceMs": 60000 },
+  "elements": ["fire", "frost", "lightning"],
+  "series": { "bestOf": 3 },
+  "draft": { "offers": { "winner": 3, "loser": 3 }, "timeoutMs": 20000 },
+  "boons": { "floors": { "hp": 1, "ap": 1 }, "minCost": 1 }
 }

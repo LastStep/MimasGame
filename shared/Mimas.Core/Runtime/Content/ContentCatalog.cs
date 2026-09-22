@@ -266,8 +266,14 @@ namespace Mimas.Core.Content
                 foreach (var ability in abilities)
                 {
                     var attack = ability as AttackDef;
-                    if (attack != null && !rules.IsDamageType(attack.DamageType))
+                    if (attack == null) continue;
+                    if (!rules.IsDamageType(attack.DamageType))
                         errors.Add(new ContentError(abilityFiles[ability.Id], $"attack '{ability.Id}' uses undeclared damage type '{attack.DamageType}' (rules.json damageTypes: {string.Join(", ", rules.DamageTypes)})."));
+                    foreach (string element in attack.Elements)
+                    {
+                        if (!rules.IsElement(element))
+                            errors.Add(new ContentError(abilityFiles[ability.Id], $"attack '{ability.Id}' carries undeclared element '{element}' (rules.json elements: {string.Join(", ", rules.Elements)})."));
+                    }
                 }
 
                 foreach (var item in items)
@@ -303,6 +309,11 @@ namespace Mimas.Core.Content
                     {
                         if (!rules.IsDamageType(type))
                             errors.Add(new ContentError(modifierFiles[modifier.Id], $"modifier '{modifier.Id}' conditions on undeclared damage type '{type}'."));
+                    }
+                    foreach (string element in modifier.Elements)
+                    {
+                        if (!rules.IsElement(element))
+                            errors.Add(new ContentError(modifierFiles[modifier.Id], $"modifier '{modifier.Id}' conditions on undeclared element '{element}' (rules.json elements: {string.Join(", ", rules.Elements)})."));
                     }
                 }
             }

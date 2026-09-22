@@ -15,9 +15,24 @@ namespace Mimas.Core.Data
     public sealed class AttackDef : AbilityDef
     {
         private readonly List<string> _tags;
+        private readonly List<string> _elements;
 
         /// <summary>Flat base damage before stats and modifiers. Never negative.</summary>
         public int Damage { get; }
+
+        /// <summary>
+        /// The elements this attack carries (design: #elements): the innate <c>attack.element</c> from the
+        /// file, plus whatever an Enchant added once the unit's overlay is applied. Sorted, unique, may be
+        /// empty. Riders, resistances and immunities match on <b>any</b> of them.
+        /// </summary>
+        public IReadOnlyList<string> Elements => _elements;
+
+        /// <summary>
+        /// How many times the single-target resolution repeats (<c>attack.hits</c>, default 1). <b>Skeleton</b>
+        /// (spec D part 1 §6.7, E5/S3): parsed and stored, and a unit whose resolved attack has more than one
+        /// throws <c>NotSupportedException</c> at build. No shipped file sets it.
+        /// </summary>
+        public int Hits { get; }
 
         /// <summary>Damage lane; picks <c>power.&lt;type&gt;</c> / <c>defense.&lt;type&gt;</c> and is a modifier condition.</summary>
         public string DamageType { get; }
@@ -44,7 +59,8 @@ namespace Mimas.Core.Data
             string id, string name, string category, int cost,
             int damage, string damageType, int range, int minRange = 1,
             string trajectory = Trajectories.Direct, bool lineOfSight = true, int apex = 0,
-            List<string> tags = null, string description = null, string icon = null)
+            List<string> tags = null, string description = null, string icon = null,
+            List<string> elements = null, int hits = 1)
             : base(id, name, TypeAttack, description, icon, category, cost)
         {
             if (damage < 0) throw new ArgumentOutOfRangeException(nameof(damage));
@@ -54,6 +70,7 @@ namespace Mimas.Core.Data
             if (!Trajectories.IsKnown(trajectory)) throw new ArgumentException("Unknown trajectory '" + trajectory + "'.", nameof(trajectory));
             if (apex < 0) throw new ArgumentOutOfRangeException(nameof(apex));
             if (apex > 0 && trajectory != Trajectories.Arc) throw new ArgumentException("Only an 'arc' has an apex.", nameof(apex));
+            if (hits < 1) throw new ArgumentOutOfRangeException(nameof(hits));
             Damage = damage;
             DamageType = damageType;
             Range = range;
@@ -61,6 +78,7 @@ namespace Mimas.Core.Data
             Trajectory = trajectory;
             Apex = apex;
             LineOfSight = lineOfSight;
+            Hits = hits;
             _tags = new List<string>();
             if (tags != null)
             {
@@ -68,9 +86,18 @@ namespace Mimas.Core.Data
                     if (!_tags.Contains(tag)) _tags.Add(tag);
             }
             _tags.Sort(string.CompareOrdinal);
+            _elements = new List<string>();
+            if (elements != null)
+            {
+                foreach (string element in elements)
+                    if (!string.IsNullOrEmpty(element) && !_elements.Contains(element)) _elements.Add(element);
+            }
+            _elements.Sort(string.CompareOrdinal);
         }
 
         public bool HasTag(string tag) => tag != null && _tags.Contains(tag);
+
+        public bool HasElement(string element) => element != null && _elements.Contains(element);
 
         /// <summary>
         /// True when a squared Euclidean centre distance (<see cref="Mimas.Core.Geometry.Hex.EuclideanSquared"/>)
@@ -85,7 +112,7 @@ namespace Mimas.Core.Data
         /// </summary>
         public AttackDef WithTrajectory(string trajectory, int apex, bool lineOfSight)
             => new AttackDef(Id, Name, Category, Cost, Damage, DamageType, Range, MinRange,
-                trajectory, lineOfSight, apex, new List<string>(_tags), Description, Icon);
+                trajectory, lineOfSight, apex, new List<string>(_tags), Description, Icon, new List<string>(_elements), Hits);
 
         public static AttackDef FromJson(string json)
         {
@@ -145,8 +172,15 @@ namespace Mimas.Core.Data
             }
             if (apex < 0) apex = 0;
 
+            // At most one innate element; the catalogue checks it against rules.elements at link time.
+            string element = MapJson.OptionalString(attack, "element", attackWhere);
+            List<string> elements = element != null ? new List<string> { element } : null;
+
+            int hits = MapJson.OptionalInt(attack, "hits", 1, attackWhere);
+            if (hits < 1) throw new MapLoadException($"{attackWhere}.hits must be at least 1 (got {hits}).");
+
             return new AttackDef(id, name, category, cost, damage, damageType, range, minRange,
-                trajectory, lineOfSight, apex, tags, description, icon);
+                trajectory, lineOfSight, apex, tags, description, icon, elements, hits);
         }
     }
 }

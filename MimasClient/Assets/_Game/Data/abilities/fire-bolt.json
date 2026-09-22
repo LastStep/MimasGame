@@ -13,6 +13,7 @@
     "damageType": "spell",
     "range": 3,
     "trajectory": "direct",
-    "lineOfSight": true
+    "lineOfSight": true,
+    "element": "fire"
   }
 }

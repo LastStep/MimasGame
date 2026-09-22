@@ -53,7 +53,8 @@ namespace Mimas.Core.Tests
                     { ""id"": ""forest"", ""walkable"": true, ""moveCost"": 2, ""modifiers"": [ ""forest-cover"" ] },
                     { ""id"": ""stone"", ""walkable"": false } ] }"),
                 new ContentFile("rules.json", @"{ ""version"": 1, ""damageTypes"": [ ""melee"", ""ranged"", ""magic"" ], ""globalModifiers"": [ ""high-ground"" ],
-                    ""heights"": { ""unitsPerLevel"": 3, ""body"": 6, ""aim"": 4 }, ""baseStats"": { ""hp"": 2, ""ap"": 3 }, ""innateAbilities"": [ ""move"" ], ""clock"": { ""turnMs"": 30000, ""lagGraceMs"": 1000, ""reconnectGraceMs"": 60000 } }"),
+                    ""heights"": { ""unitsPerLevel"": 3, ""body"": 6, ""aim"": 4 }, ""baseStats"": { ""hp"": 2, ""ap"": 3 }, ""innateAbilities"": [ ""move"" ], ""clock"": { ""turnMs"": 30000, ""lagGraceMs"": 1000, ""reconnectGraceMs"": 60000 },
+                    ""elements"": [ ""fire"", ""frost"", ""lightning"" ], ""series"": { ""bestOf"": 3 }, ""draft"": { ""offers"": { ""winner"": 3, ""loser"": 3 }, ""timeoutMs"": 20000 }, ""boons"": { ""floors"": { ""hp"": 1, ""ap"": 1 }, ""minCost"": 1 } }"),
                 new ContentFile("abilities/move.json", @"{ ""version"": 1, ""id"": ""move"", ""type"": ""movement"", ""movement"": { ""mode"": ""walk"", ""range"": 1 } }"),
                 new ContentFile("abilities/bow.json", @"{ ""version"": 1, ""id"": ""bow"", ""type"": ""attack"", ""category"": ""weapon"", ""cost"": 2,
                     ""attack"": { ""damage"": 5, ""damageType"": ""ranged"", ""range"": 3, ""trajectory"": ""direct"", ""lineOfSight"": true }, ""tags"": [ ""arrow"" ] }"),
@@ -81,6 +82,9 @@ namespace Mimas.Core.Tests
                     ""when"": { ""damageTypes"": [ ""ranged"", ""magic"" ] }, ""effect"": { ""damage"": -4 } }"),
                 new ContentFile("modifiers/flaming.json", @"{ ""version"": 1, ""id"": ""flaming"", ""trigger"": ""dealDamage"", ""visibility"": ""hidden"",
                     ""when"": { ""tags"": [ ""arrow"" ] }, ""effect"": { ""damage"": 1 } }"),
+                // bowyer: +1 on any attack a bow-kind item granted (spec D part 1 §5.3 itemKinds). Unattached until a test attaches it.
+                new ContentFile("modifiers/bowyer.json", @"{ ""version"": 1, ""id"": ""bowyer"", ""trigger"": ""dealDamage"",
+                    ""when"": { ""itemKinds"": [ ""bow"" ] }, ""effect"": { ""damage"": 1 } }"),
                 new ContentFile("props/pillar.json", @"{ ""version"": 1, ""id"": ""pillar"", ""name"": ""Stone Pillar"",
                     ""bodyHeight"": 6, ""aimHeight"": 3, ""stats"": { ""hp"": 10, ""defense.melee"": 0, ""defense.ranged"": 0 } }"),
                 new ContentFile("props/wall.json", @"{ ""version"": 1, ""id"": ""wall"", ""name"": ""Wall"", ""bodyHeight"": 6, ""aimHeight"": 3 }"),
@@ -128,7 +132,8 @@ namespace Mimas.Core.Tests
 
         /// <summary>A rules file whose only interesting part is its <c>baseStats</c> object.</summary>
         private static RulesDef Rules(string baseStats) => RulesDef.FromJson(
-            @"{ ""version"": 1, ""damageTypes"": [ ""melee"", ""magic"" ], ""heights"": { ""unitsPerLevel"": 3, ""body"": 6, ""aim"": 4 }, ""baseStats"": " + baseStats + @", ""innateAbilities"": [ ""move"" ], ""clock"": { ""turnMs"": 30000, ""lagGraceMs"": 1000, ""reconnectGraceMs"": 60000 } }");
+            @"{ ""version"": 1, ""damageTypes"": [ ""melee"", ""magic"" ], ""heights"": { ""unitsPerLevel"": 3, ""body"": 6, ""aim"": 4 }, ""baseStats"": " + baseStats + @", ""innateAbilities"": [ ""move"" ], ""clock"": { ""turnMs"": 30000, ""lagGraceMs"": 1000, ""reconnectGraceMs"": 60000 },
+                ""elements"": [ ""fire"", ""frost"", ""lightning"" ], ""series"": { ""bestOf"": 3 }, ""draft"": { ""offers"": { ""winner"": 3, ""loser"": 3 }, ""timeoutMs"": 20000 }, ""boons"": { ""floors"": { ""hp"": 1, ""ap"": 1 }, ""minCost"": 1 } }");
 
         [Fact]
         public void Catalogue_RejectsStatKeysAndAttacksWithUndeclaredDamageTypes()
@@ -336,6 +341,28 @@ namespace Mimas.Core.Tests
             Assert.False(DamageCalculator.Applies(catalog.Modifiers.Get("flaming"), strike, null, null));
             Assert.True(DamageCalculator.Applies(catalog.Modifiers.Get("ward"), bow, null, null));
             Assert.False(DamageCalculator.Applies(catalog.Modifiers.Get("ward"), strike, null, null));
+        }
+
+        /// <summary>An item-kind condition asks who granted the attack, not what it is: the same bow shot matches from a bow and never when innate (spec D part 1 §5.3).</summary>
+        [Fact]
+        public void Damage_ItemKindCondition_MatchesGrantingItem_NotInnate()
+        {
+            var catalog = CombatFixtures.Catalog();
+            var bowyer = catalog.Modifiers.Get("bowyer");
+            var bow = catalog.GetAttack("bow");
+            Assert.True(DamageCalculator.Applies(bowyer, bow, null, null, "bow"));
+            Assert.False(DamageCalculator.Applies(bowyer, bow, null, null, "club"));
+            Assert.False(DamageCalculator.Applies(bowyer, bow, null, null, null));
+            Assert.False(DamageCalculator.Applies(bowyer, bow, null, null));
+
+            // Through a match: the archer's bow comes from archer-bow (kind bow), so the line appears; the
+            // brute's jab comes from brute-club, so it does not.
+            var setup = CombatFixtures.Setup().WithModifier(0, "bowyer").WithModifier(1, "bowyer");
+            var state = CombatFixtures.Started(catalog, setup, new Hex(0, 0), new Hex(1, 0));
+            Assert.Equal(1, state.ResolveAttackFully(0, "bow", new Hex(1, 0)).FindModifier("bowyer").Amount);
+
+            state.Apply(new EndTurnCommand(0));
+            Assert.Null(state.ResolveAttackFully(1, "jab", new Hex(0, 0)).FindModifier("bowyer"));
         }
     }
 

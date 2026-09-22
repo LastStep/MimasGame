@@ -44,6 +44,20 @@
           "description": "The attack carries any of these tags.",
           "items": { "type": "string", "minLength": 1 }
         },
+        "elements": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "description": "The attack carries any of these elements (design: #elements). Update this enum when rules.elements changes.",
+          "items": { "enum": ["fire", "frost", "lightning"] }
+        },
+        "itemKinds": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "description": "The ability was granted by an item of any of these kinds (bow, gun, ...). An innate ability never matches.",
+          "items": { "type": "string", "minLength": 1 }
+        },
         "heightAdvantage": {
           "type": "boolean",
           "description": "The attacker's tile is higher than the target's."
@@ -52,15 +66,23 @@
     },
     "effect": {
       "type": "object",
-      "required": ["damage"],
+      "description": "Exactly one of damage (a flat amount) or nullify (immunity: the total becomes 0 after everything else).",
       "additionalProperties": false,
       "properties": {
         "damage": {
           "type": "integer",
           "not": { "const": 0 },
           "description": "Flat amount added to the damage. Must not be 0."
+        },
+        "nullify": {
+          "const": true,
+          "description": "Immunity (design: #damage rule 3). Mutually exclusive with damage."
         }
-      }
+      },
+      "oneOf": [
+        { "required": ["damage"], "not": { "required": ["nullify"] } },
+        { "required": ["nullify"], "not": { "required": ["damage"] } }
+      ]
     }
   }
 }

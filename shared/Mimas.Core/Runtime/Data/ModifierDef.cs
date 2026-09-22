@@ -39,6 +39,8 @@ namespace Mimas.Core.Data
     {
         private readonly List<string> _damageTypes;
         private readonly List<string> _tags;
+        private readonly List<string> _elements;
+        private readonly List<string> _itemKinds;
 
         public string Id { get; }
         public string Name { get; }
@@ -64,25 +66,45 @@ namespace Mimas.Core.Data
         /// <summary>Condition: the attacker's tile must be higher than the target's. Null = not checked.</summary>
         public bool? HeightAdvantage { get; }
 
-        /// <summary>Effect: flat amount added to damage (may be negative). Never 0.</summary>
+        /// <summary>Condition: the attack must carry at least one of these elements (design: #elements). Empty = any.</summary>
+        public IReadOnlyList<string> Elements => _elements;
+
+        /// <summary>
+        /// Condition: the ability was granted by an item of one of these kinds (a bow, a gun). An innate
+        /// ability has no item and never matches. Empty = any.
+        /// </summary>
+        public IReadOnlyList<string> ItemKinds => _itemKinds;
+
+        /// <summary>Effect: flat amount added to damage (may be negative). Never 0, except on a <see cref="Nullify"/> modifier, where it is 0.</summary>
         public int Damage { get; }
+
+        /// <summary>
+        /// Effect: immunity (design: #damage rule 3). When it applies, the total becomes 0 after everything
+        /// else. Mutually exclusive with <see cref="Damage"/>.
+        /// </summary>
+        public bool Nullify { get; }
 
         public ModifierDef(
             string id, string name, string trigger, int damage,
             string visibility = ModifierVisibility.Public,
             List<string> damageTypes = null, List<string> tags = null, bool? heightAdvantage = null,
-            string description = null, string icon = null)
+            string description = null, string icon = null,
+            List<string> elements = null, List<string> itemKinds = null, bool nullify = false)
         {
             Id = id ?? throw new ArgumentNullException(nameof(id));
             Name = name ?? id;
             if (!ModifierTriggers.IsKnown(trigger)) throw new ArgumentException("Unknown modifier trigger '" + trigger + "'.", nameof(trigger));
             if (!ModifierVisibility.IsKnown(visibility)) throw new ArgumentException("Unknown modifier visibility '" + visibility + "'.", nameof(visibility));
-            if (damage == 0) throw new ArgumentException("A modifier must change damage by a non-zero amount.", nameof(damage));
+            if (nullify && damage != 0) throw new ArgumentException("A nullify modifier has no damage amount.", nameof(damage));
+            if (!nullify && damage == 0) throw new ArgumentException("A modifier must change damage by a non-zero amount.", nameof(damage));
             Trigger = trigger;
             Visibility = visibility;
             Damage = damage;
+            Nullify = nullify;
             _damageTypes = damageTypes != null ? new List<string>(damageTypes) : new List<string>();
             _tags = tags != null ? new List<string>(tags) : new List<string>();
+            _elements = elements != null ? new List<string>(elements) : new List<string>();
+            _itemKinds = itemKinds != null ? new List<string>(itemKinds) : new List<string>();
             HeightAdvantage = heightAdvantage;
             Description = description;
             Icon = string.IsNullOrWhiteSpace(icon) ? null : icon;
@@ -121,6 +143,8 @@ namespace Mimas.Core.Data
 
             List<string> damageTypes = null;
             List<string> tags = null;
+            List<string> elements = null;
+            List<string> itemKinds = null;
             bool? heightAdvantage = null;
             var whenToken = root["when"];
             if (whenToken != null && whenToken.Type != JTokenType.Null)
@@ -138,12 +162,20 @@ namespace Mimas.Core.Data
                             tags = MapJson.RequireStringList(when, "tags", $"{where}.when");
                             if (tags.Count == 0) throw new MapLoadException($"{where}.when.tags must not be empty (omit it for any tag).");
                             break;
+                        case "elements":
+                            elements = MapJson.RequireStringList(when, "elements", $"{where}.when");
+                            if (elements.Count == 0) throw new MapLoadException($"{where}.when.elements must not be empty (omit it for any element).");
+                            break;
+                        case "itemKinds":
+                            itemKinds = MapJson.RequireStringList(when, "itemKinds", $"{where}.when");
+                            if (itemKinds.Count == 0) throw new MapLoadException($"{where}.when.itemKinds must not be empty (omit it for any item).");
+                            break;
                         case "heightAdvantage":
                             if (property.Value.Type != JTokenType.Boolean) throw new MapLoadException($"{where}.when.heightAdvantage must be a boolean.");
                             heightAdvantage = (bool)property.Value;
                             break;
                         default:
-                            throw new MapLoadException($"{where}.when has unknown condition '{property.Name}' (known: damageTypes, tags, heightAdvantage).");
+                            throw new MapLoadException($"{where}.when has unknown condition '{property.Name}' (known: damageTypes, tags, elements, itemKinds, heightAdvantage).");
                     }
                 }
             }
@@ -152,6 +184,8 @@ namespace Mimas.Core.Data
                 throw new MapLoadException($"{where} field 'effect' must be an object.");
             int damage = 0;
             bool hasDamage = false;
+            bool nullify = false;
+            bool hasNullify = false;
             foreach (var property in effect.Properties())
             {
                 switch (property.Name)
@@ -161,14 +195,23 @@ namespace Mimas.Core.Data
                         damage = (int)property.Value;
                         hasDamage = true;
                         break;
+                    case "nullify":
+                        if (property.Value.Type != JTokenType.Boolean) throw new MapLoadException($"{where}.effect.nullify must be a boolean.");
+                        nullify = (bool)property.Value;
+                        hasNullify = true;
+                        break;
                     default:
-                        throw new MapLoadException($"{where}.effect has unknown key '{property.Name}' (known: damage).");
+                        throw new MapLoadException($"{where}.effect has unknown key '{property.Name}' (known: damage, nullify).");
                 }
             }
-            if (!hasDamage) throw new MapLoadException($"{where}.effect must set 'damage'.");
-            if (damage == 0) throw new MapLoadException($"{where}.effect.damage must not be 0.");
+            // Immunity and a flat amount are two different effects; a file that sets both is asking for an
+            // ordering rule this design refuses to have (design: #modifiers rule 2).
+            if (hasNullify && hasDamage) throw new MapLoadException($"{where}.effect sets both 'damage' and 'nullify'; they are mutually exclusive.");
+            if (hasNullify && !nullify) throw new MapLoadException($"{where}.effect.nullify must be true when present (omit it for a flat amount).");
+            if (!nullify && !hasDamage) throw new MapLoadException($"{where}.effect must set 'damage' or 'nullify'.");
+            if (!nullify && damage == 0) throw new MapLoadException($"{where}.effect.damage must not be 0.");
 
-            return new ModifierDef(id, name, trigger, damage, visibility, damageTypes, tags, heightAdvantage, description, icon);
+            return new ModifierDef(id, name, trigger, damage, visibility, damageTypes, tags, heightAdvantage, description, icon, elements, itemKinds, nullify);
         }
     }
 }

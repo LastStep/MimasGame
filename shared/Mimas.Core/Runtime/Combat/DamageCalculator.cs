@@ -36,7 +36,7 @@ namespace Mimas.Core.Combat
             Tile attackerTile, targetTile;
             map.TryGet(attacker.Position, out attackerTile);
             map.TryGet(target.Position, out targetTile);
-            var situation = new Situation(attack, attackerTile, targetTile);
+            var situation = new Situation(attack, attackerTile, targetTile, SourceItemKindOf(attacker, attack));
 
             var lines = new List<DamageLine>();
             lines.Add(new DamageLine(DamageLineKind.Base, "base", DamageLineOwner.None, -1, attack.Damage, false));
@@ -64,12 +64,24 @@ namespace Mimas.Core.Combat
             return new DamageBreakdown(lines, unknown);
         }
 
-        /// <summary>Whether a modifier's conditions hold for this attack. Public so tests and tools can ask directly.</summary>
+        /// <summary>Whether a modifier's conditions hold for this attack, as if it were innate (no granting item). Public so tests and tools can ask directly.</summary>
         public static bool Applies(ModifierDef modifier, AttackDef attack, Tile attackerTile, Tile targetTile)
+            => Applies(modifier, attack, attackerTile, targetTile, null);
+
+        /// <summary>Whether a modifier's conditions hold for this attack when it was granted by an item of <paramref name="sourceItemKind"/> (null = innate).</summary>
+        public static bool Applies(ModifierDef modifier, AttackDef attack, Tile attackerTile, Tile targetTile, string sourceItemKind)
         {
             if (modifier == null) throw new ArgumentNullException(nameof(modifier));
             if (attack == null) throw new ArgumentNullException(nameof(attack));
-            return new Situation(attack, attackerTile, targetTile).Satisfies(modifier);
+            return new Situation(attack, attackerTile, targetTile, sourceItemKind).Satisfies(modifier);
+        }
+
+        /// <summary>The kind of the item that granted the attack to this unit, through the catalogue; null for an innate ability or an unknown item.</summary>
+        private string SourceItemKindOf(Unit attacker, AttackDef attack)
+        {
+            string itemId = attacker.AbilitySourceOf(attack.Id);
+            ItemDef item;
+            return itemId != null && _catalog.Items.TryGet(itemId, out item) ? item.Kind : null;
         }
 
         private int AddUnitModifiers(List<DamageLine> lines, IBody unit, DamageLineOwner owner, string trigger, Situation situation, Knowledge knowledge)
@@ -128,17 +140,24 @@ namespace Mimas.Core.Combat
             into.Sort((a, b) => string.CompareOrdinal(a.Id, b.Id));
         }
 
+        /// <summary>
+        /// The facts a condition can ask about: the (resolved) attack, whether the attacker stands higher,
+        /// and the kind of the item that granted the attack (null when innate). Every <c>when</c> key is one
+        /// check here; a condition that names a list matches on <b>any</b> entry.
+        /// </summary>
         private readonly struct Situation
         {
             private readonly AttackDef _attack;
             private readonly bool _heightAdvantage;
+            private readonly string _sourceItemKind;
 
-            public Situation(AttackDef attack, Tile attackerTile, Tile targetTile)
+            public Situation(AttackDef attack, Tile attackerTile, Tile targetTile, string sourceItemKind)
             {
                 _attack = attack;
                 int attackerHeight = attackerTile != null ? attackerTile.Height : 0;
                 int targetHeight = targetTile != null ? targetTile.Height : 0;
                 _heightAdvantage = attackerHeight > targetHeight;
+                _sourceItemKind = sourceItemKind;
             }
 
             public bool Satisfies(ModifierDef modifier)
@@ -156,6 +175,22 @@ namespace Mimas.Core.Combat
                     bool any = false;
                     for (int i = 0; i < modifier.Tags.Count; i++)
                         if (_attack.HasTag(modifier.Tags[i])) { any = true; break; }
+                    if (!any) return false;
+                }
+                if (modifier.Elements.Count > 0)
+                {
+                    bool any = false;
+                    for (int i = 0; i < modifier.Elements.Count; i++)
+                        if (_attack.HasElement(modifier.Elements[i])) { any = true; break; }
+                    if (!any) return false;
+                }
+                if (modifier.ItemKinds.Count > 0)
+                {
+                    // An innate ability has no item, so it never satisfies an item-kind condition.
+                    if (_sourceItemKind == null) return false;
+                    bool any = false;
+                    for (int i = 0; i < modifier.ItemKinds.Count; i++)
+                        if (modifier.ItemKinds[i] == _sourceItemKind) { any = true; break; }
                     if (!any) return false;
                 }
                 return true;
