@@ -26,6 +26,7 @@ MonoBehaviour:
   - abilities/long-leap.json
   - abilities/move.json
   - abilities/quick-shot.json
+  - abilities/storm-bolt.json
   - abilities/strike.json
   - abilities/teleport.json
   - abilities/wind-step.json
@@ -38,15 +39,24 @@ MonoBehaviour:
   - boons/athena-guard.json
   - boons/athena-plating.json
   - boons/berserker-blood.json
+  - boons/hanuman-heart.json
+  - boons/hera-resolve.json
   - boons/hermes-heels.json
+  - boons/hermes-sandals.json
   - boons/indra-mail.json
+  - boons/indra-storm.json
   - boons/indra-wrath.json
+  - boons/nike-jab.json
   - boons/odin-leap.json
   - boons/skadi-hide.json
   - boons/thor-charge.json
   - boons/thor-hammerfall.json
+  - boons/thor-might.json
   - boons/thor-vigour.json
+  - boons/tyr-edge.json
+  - boons/tyr-strike.json
   - boons/vayu-breath.json
+  - boons/vayu-haste.json
   - boons/vayu-wings.json
   - boons/ymir-hide.json
   - boons/zeus-bolt.json
@@ -93,6 +103,7 @@ MonoBehaviour:
   - {fileID: 4900000, guid: c21d033adf5ff7549b821ea7db240da3, type: 3}
   - {fileID: 4900000, guid: fe64dbe470c66bb4593d0fef73593d5a, type: 3}
   - {fileID: 4900000, guid: ad26926ddcbc2f444afb9129a160beb6, type: 3}
+  - {fileID: 4900000, guid: 643ae1c76a937b6488b3981fec1c80ab, type: 3}
   - {fileID: 4900000, guid: 741f23d2e4dcff84cba40dd8a7958afc, type: 3}
   - {fileID: 4900000, guid: 44e89ca4837e0f1429bd3ca58ba95561, type: 3}
   - {fileID: 4900000, guid: 8f01fa85963471640bd9f343499c5d0c, type: 3}
@@ -105,15 +116,24 @@ MonoBehaviour:
   - {fileID: 4900000, guid: 87ec60275c2883d49904c9c8aeda7fc4, type: 3}
   - {fileID: 4900000, guid: bc9fce83061a12140a9a4f4505195e1f, type: 3}
   - {fileID: 4900000, guid: 3f401bf76b12a8b4795e8c6933af23be, type: 3}
+  - {fileID: 4900000, guid: 66cc338df26b0b74fb4574b53cae760e, type: 3}
+  - {fileID: 4900000, guid: c73c242e7ec7deb46bd82cf841bfee0a, type: 3}
   - {fileID: 4900000, guid: c5e3e2b362b432748875036f8e1b781a, type: 3}
+  - {fileID: 4900000, guid: 35f676675149fcc408b8cf8924e9537e, type: 3}
   - {fileID: 4900000, guid: 1ce1d8e62fff126479e1ec2bf40f544f, type: 3}
+  - {fileID: 4900000, guid: 0b97c37fd0540cd439910187edbf14c9, type: 3}
   - {fileID: 4900000, guid: 6325dfc92b4cbe84c992c0b291cf9a5c, type: 3}
+  - {fileID: 4900000, guid: 728b5ea31afb1ed4c944659acd4d194d, type: 3}
   - {fileID: 4900000, guid: e539099a1a6e9db47913e4ad8befd5da, type: 3}
   - {fileID: 4900000, guid: 95dd8f6055027e44ebe24a4a0a11e347, type: 3}
   - {fileID: 4900000, guid: 2b6a86df430049c4c8d940b6e2ce321b, type: 3}
   - {fileID: 4900000, guid: 534c4d45095ba7e48867d922db15394f, type: 3}
+  - {fileID: 4900000, guid: c03c344617a7bb9409b2f1ce86e509db, type: 3}
   - {fileID: 4900000, guid: a75e11822b123b643b80b338c289bcff, type: 3}
+  - {fileID: 4900000, guid: 7623aa56e0b61004cae5628928ad6889, type: 3}
+  - {fileID: 4900000, guid: 77ff3706028019946bc8686042236263, type: 3}
   - {fileID: 4900000, guid: 3e1136980b27c334f9f07baf4fdeb60a, type: 3}
+  - {fileID: 4900000, guid: 30b45027a7ed05a498b991b16a3c23c6, type: 3}
   - {fileID: 4900000, guid: 1a5bc7021ab66584ea4935100eeb44d7, type: 3}
   - {fileID: 4900000, guid: 31c390819e0449541a305c260699a50c, type: 3}
   - {fileID: 4900000, guid: 9ab894541e430a640b9e62d65614be4f, type: 3}

@@ -1,0 +1,14 @@
+{
+  "$schema": "../../../../../tools/schemas/boon.schema.json",
+  "version": 1,
+  "id": "tyr-edge",
+  "name": "Tyr's Edge",
+  "kind": "enchant",
+  "lineage": "norse",
+  "description": "Tyr hones your weapon: every attack it grants hits 1 harder.",
+  "requires": { "slot": "weapon" },
+  "effects": [
+    { "type": "abilityOverride", "target": "weapon", "field": "damage", "amount": 1 }
+  ],
+  "icon": "tyr-edge"
+}

@@ -279,11 +279,11 @@ namespace Mimas.Core.Tests
             Assert.Equal(3, catalog.Lineages.Count);
             foreach (var lineage in catalog.Lineages.All)
             {
-                Assert.Equal(6, lineage.PoolIds.Count);
+                Assert.Equal(9, lineage.PoolIds.Count);                              // six from part 1, three more from part 2
                 var pool = lineage.PoolIds.Select(catalog.GetBoon).ToList();
-                Assert.Equal(2, pool.Count(b => b.IsBlessing));
-                Assert.Equal(2, pool.Count(b => b.IsEnchant));
-                Assert.Equal(2, pool.Count(b => b.IsSigil));
+                Assert.Equal(3, pool.Count(b => b.IsBlessing));
+                Assert.Equal(3, pool.Count(b => b.IsEnchant));
+                Assert.Equal(3, pool.Count(b => b.IsSigil));
                 Assert.All(pool, b => Assert.Equal(lineage.Id, b.LineageId));
                 Assert.DoesNotContain(lineage.StartingBlessingId, lineage.PoolIds);
                 Assert.True(catalog.GetBoon(lineage.StartingBlessingId).IsBlessing);
@@ -292,7 +292,7 @@ namespace Mimas.Core.Tests
                 foreach (var item in catalog.Items.All)
                     Assert.Contains(pool, b => !b.IsBlessing && b.IsApplicableTo(item.Slot, item.Kind, item.AbilityIds));
             }
-            Assert.Equal(21, catalog.Boons.Count);
+            Assert.Equal(30, catalog.Boons.Count);
             Assert.Equal(new[] { "athena-guard", "thor-vigour", "vayu-breath" },
                 new[] { "greek", "norse", "hindu" }.Select(id => catalog.GetLineage(id).StartingBlessingId));
         }
@@ -336,13 +336,17 @@ namespace Mimas.Core.Tests
             {
                 Assert.Contains("'", boon.Name);                             // "<God>'s <thing>" (q-lineage-names), or Berserker Blood
                 Assert.False(string.IsNullOrWhiteSpace(boon.Description));
-                Assert.False(boon.Stackable);
                 Assert.Equal(boon.Id, boon.Icon);
                 foreach (var effect in boon.Effects)
                     if (effect.Type == BoonEffectTypes.Modifier) Assert.True(catalog.Modifiers.Get(effect.Id).IsHidden, effect.Id);
             }
+            // Only the two shipped stackables may be drafted twice (spec D part 2 §5); everything else is once.
+            Assert.Equal(new[] { "hanuman-heart", "thor-might" },
+                catalog.Boons.All.Where(b => b.Stackable).Select(b => b.Id).OrderBy(id => id, System.StringComparer.Ordinal).ToArray());
             Assert.Equal(new[] { "crown-element" }, catalog.GetBoon("thor-charge").ExclusiveGroups);
             Assert.Equal(new[] { "crown-element" }, catalog.GetBoon("agni-crown").ExclusiveGroups);
+            Assert.Equal(new[] { "lightning" }, catalog.GetAttack("storm-bolt").Elements);
+            Assert.Empty(catalog.GetBoon("hermes-sandals").ExclusiveGroups);
             Assert.True(catalog.Modifiers.Get("skadi-hide").Nullify);
             Assert.True(catalog.Modifiers.Get("agni-warmth").Nullify);
             Assert.Equal(new[] { "lightning" }, catalog.GetAttack("zeus-bolt").Elements);

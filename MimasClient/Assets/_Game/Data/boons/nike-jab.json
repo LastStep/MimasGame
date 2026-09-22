@@ -1,0 +1,14 @@
+{
+  "$schema": "../../../../../tools/schemas/boon.schema.json",
+  "version": 1,
+  "id": "nike-jab",
+  "name": "Nike's Jab",
+  "kind": "sigil",
+  "lineage": "greek",
+  "description": "Your weapon learns Jab: a quick, cheap hit on anything within reach.",
+  "requires": { "slot": "weapon" },
+  "effects": [
+    { "type": "grantAbility", "target": "weapon", "ability": "jab" }
+  ],
+  "icon": "nike-jab"
+}

@@ -1,0 +1,12 @@
+{
+  "$schema": "../../../../../tools/schemas/ability.schema.json",
+  "version": 1,
+  "id": "storm-bolt",
+  "name": "Storm Bolt",
+  "type": "attack",
+  "category": "spell",
+  "icon": "storm-bolt",
+  "description": "A crack of lightning at any enemy you can see within four tiles.",
+  "cost": 2,
+  "attack": { "damage": 3, "damageType": "spell", "range": 4, "minRange": 1, "trajectory": "direct", "lineOfSight": true, "element": "lightning" }
+}

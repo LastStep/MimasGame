@@ -1,0 +1,14 @@
+{
+  "$schema": "../../../../../tools/schemas/boon.schema.json",
+  "version": 1,
+  "id": "vayu-haste",
+  "name": "Vayu's Haste",
+  "kind": "enchant",
+  "lineage": "hindu",
+  "description": "Vayu hurries your hands: every attack your weapon grants costs one less, never less than one.",
+  "requires": { "slot": "weapon" },
+  "effects": [
+    { "type": "abilityOverride", "target": "weapon", "field": "cost", "amount": -1 }
+  ],
+  "icon": "vayu-haste"
+}

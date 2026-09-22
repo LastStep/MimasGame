@@ -1,0 +1,14 @@
+{
+  "$schema": "../../../../../tools/schemas/boon.schema.json",
+  "version": 1,
+  "id": "indra-storm",
+  "name": "Indra's Storm",
+  "kind": "sigil",
+  "lineage": "hindu",
+  "description": "Your crown learns Storm Bolt: a crack of lightning at anything you can see within four tiles.",
+  "requires": { "slot": "crown" },
+  "effects": [
+    { "type": "grantAbility", "target": "crown", "ability": "storm-bolt" }
+  ],
+  "icon": "indra-storm"
+}

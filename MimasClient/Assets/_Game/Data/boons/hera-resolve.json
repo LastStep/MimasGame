@@ -1,0 +1,14 @@
+{
+  "$schema": "../../../../../tools/schemas/boon.schema.json",
+  "version": 1,
+  "id": "hera-resolve",
+  "name": "Hera's Resolve",
+  "kind": "blessing",
+  "lineage": "greek",
+  "description": "Hera steels you: one more action every turn, four fewer Health.",
+  "effects": [
+    { "type": "stat", "key": "ap", "amount": 1 },
+    { "type": "stat", "key": "hp", "amount": -4 }
+  ],
+  "icon": "hera-resolve"
+}

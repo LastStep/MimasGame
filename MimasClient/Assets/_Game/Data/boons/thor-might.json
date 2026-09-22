@@ -1,0 +1,14 @@
+{
+  "$schema": "../../../../../tools/schemas/boon.schema.json",
+  "version": 1,
+  "id": "thor-might",
+  "name": "Thor's Might",
+  "kind": "blessing",
+  "lineage": "norse",
+  "description": "Thor lends his arm: +1 Weapon power, and he will lend it again.",
+  "stackable": true,
+  "effects": [
+    { "type": "stat", "key": "power.weapon", "amount": 1 }
+  ],
+  "icon": "thor-might"
+}

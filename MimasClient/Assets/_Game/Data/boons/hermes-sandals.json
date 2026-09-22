@@ -1,0 +1,14 @@
+{
+  "$schema": "../../../../../tools/schemas/boon.schema.json",
+  "version": 1,
+  "id": "hermes-sandals",
+  "name": "Hermes' Sandals",
+  "kind": "enchant",
+  "lineage": "greek",
+  "description": "Hermes lends his sandals: every movement your boots grant reaches one tile further.",
+  "requires": { "slot": "boots" },
+  "effects": [
+    { "type": "abilityOverride", "target": "boots", "field": "range", "amount": 1 }
+  ],
+  "icon": "hermes-sandals"
+}

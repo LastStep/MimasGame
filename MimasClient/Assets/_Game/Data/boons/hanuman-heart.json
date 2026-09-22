@@ -1,0 +1,14 @@
+{
+  "$schema": "../../../../../tools/schemas/boon.schema.json",
+  "version": 1,
+  "id": "hanuman-heart",
+  "name": "Hanuman's Heart",
+  "kind": "blessing",
+  "lineage": "hindu",
+  "description": "Hanuman lends his heart: +3 Health, and he has more to give.",
+  "stackable": true,
+  "effects": [
+    { "type": "stat", "key": "hp", "amount": 3 }
+  ],
+  "icon": "hanuman-heart"
+}
