@@ -9,7 +9,7 @@ design_anchor: docs/design/index.html#boons
 created: 2026-09-21
 approved: 2026-09-21
 spec: docs/specs/2026-09-21-boons-groundwork.md
-spec_part2: docs/specs/2026-09-21-boons-in-game-outline.md
+spec_part2: docs/specs/2026-09-22-boons-in-game.md
 adrs: [ADR-034, ADR-035]
 tasks: [T-0009, T-0010]
 research:

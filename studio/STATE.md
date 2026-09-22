@@ -2,7 +2,7 @@
 project: mimas
 milestone: M2
 updated: 2026-09-22
-updated_by: fable — T-0009 built (boons groundwork in Core), at verify
+updated_by: fable — the part-2 boons spec is written and T-0010 is approved for Opus
 ---
 
 # Where Mimas stands
@@ -37,6 +37,13 @@ changed, no client file changed:
 **323 → 445 Core tests, 47 server tests untouched.** Ladder for T-0009: see `studio/runs/.ladder/T-0009.json`
 and the run report `R-2026-09-22-T-0009`.
 
+**22 Sep, later: the part-2 spec exists and is approved.** `docs/specs/2026-09-22-boons-in-game.md` is the
+work order for `T-0010`, written by Fable against the real Core after Rohan answered eight questions in one
+round (P1–P8, below), with a mock page for the draft screen (`artifacts/draft-screen-mocks.html`). **Opus
+executes it unattended**: the room hosts a `Session`, the lineage row in the room, the draft over the dimmed
+board, one `match.start` per round, boons in the examine panel, the reveal flyover, practice mode running a
+session, nine more boons. Run report of the spec session: `R-2026-09-22-T-0010`.
+
 ## The one thing to do next
 
 Two things, and they do not compete:
@@ -44,12 +51,10 @@ Two things, and they do not compete:
 1. **The M2 playtest, which only Rohan can do:** send the link to one person who is not Rohan, on another
    network, and play them — with a rematch. That one evening is M2-1, the step-4 evidence for M2-7, and
    M2-8 with a human on the other seat. Record it as `studio/playtests/<date>-<name>.md`.
-2. **A Fable session writes the part-2 spec** (`docs/specs/2026-09-21-boons-in-game-outline.md` → a full
-   spec, `T-0010`) against the real Core at `main`, asking the outline's §5 questions with 3–4 options
-   each; then Opus executes it. Part 2 is what a player sees: the lineage in the room, the draft screen,
-   the examine panel's boons, the reveal flyover, the online best-of-3. **The prep note for that session
-   is `studio/plans/2026-09-22-part2-spec-session-prep.md`**: what to read, the ten findings this build
-   made that the outline lacks, and the six questions to ask in one round.
+2. **An Opus session executes `T-0010`** from `docs/specs/2026-09-22-boons-in-game.md` — read its §0
+   first; it names every file, every trap and every fork's default. Ten commits in the order of its §12,
+   the Editor open for the client and data steps and closed for EditMode tests and the Web build. The
+   spec is the plan; the task is `approved`. "Pick up the next task" is enough to start.
 
 Then **verifiers**: T-0009 (spec §14 is the checklist), and the M2 set T-0008 (closes T-0005 and T-0006),
 T-0007, T-0002 — five tasks sit at `verify` and nothing in the ledger is ticked until someone in a fresh
@@ -78,7 +83,7 @@ M3's boons rows (M3-3, M3-4, M3-5, half of M3-6) are player-visible outcomes and
 | Task | What | Status | Who |
 |---|---|---|---|
 | **T-0009** | **Boons groundwork in Core** — definitions, the unit overlay, elements, reveal, draft, `Session` | **verify.** Nine commits, ladder run 22 Sep, run report `R-2026-09-22-T-0009` | verifier needed |
-| T-0010 | Boons in the game — online best-of-3 with the draft in the room, presentation | draft (outline only; Fable writes the full spec next, Opus builds) | Fable specs, Opus builds |
+| **T-0010** | **Boons in the game** — the room hosts the session, lineage row, draft over the board, presentation of boons and reveals, practice-mode session, nine boons | **approved** — spec `docs/specs/2026-09-22-boons-in-game.md`, ten commits planned | Opus builds |
 | T-0008 | Finish M2 in the browser — rematch, template, Copy code, blocker, origin check, three-engine smoke | verify — deployed and measured live 21 Sep | verifier needed |
 | T-0007 | Deploy | verify — live confirmed 21 Sep | verifier needed |
 | T-0002 | Execute the online slice | verify | verifier needed |
@@ -100,6 +105,21 @@ Nothing, except what waits on Rohan below.
 | Optional: should a room show the other seat's chosen preset before the match starts? | design `#q-online-room-loadout` | 17 Sep 2026 |
 | Optional: should a room hold your seat for a grace **between** matches? | Today a reload frees the seat. A design question, not a bug | 21 Sep 2026 |
 | Answer OQ-N03, N07, N11 on `docs/design/mechanics.xlsx` before anyone builds the board mechanics | jump/teleport crossing a beam; trap consumed on fire; lane and power for structure damage | 21 Sep 2026 |
+
+## Decided on 22 Sep: how boons reach the player (part 2, P1–P8; ADR-036 to be written by the build)
+
+| Decision | Chosen |
+|---|---|
+| P1 Where the draft happens | **Over the dimmed board, in the Arena scene** (mock option A); the next round reloads the Arena for its map |
+| P2 Where the series score lives | **In the turn panel**: `ROUND 2 · 0 – 1` above the turn owner |
+| P3 Wire shape | **Existing channels only**: session events inside `events`, a `session` block beside `view`, `draftPick` through `match.command`, one `match.start` per round; `series` and `round` are two fields |
+| P4 Reload during the draft | The draft clock keeps running; a resume shows the draft; the 60 s grace runs across it and forfeits the **session** |
+| P5 Play vs bot | The full best-of-3, the bot drafting offer 0 |
+| P6 The bot's lineage | Seeded random from the three (`BotLineageId` option to fix it); the two dev passives retire |
+| P7 Editor practice mode | Runs a `Session` too, inside a persistent `LocalSessionHost` |
+| P8 What Resign concedes | **The series**; a disconnect forfeit too. Core gains `SessionEndReason` |
+
+The mock Rohan chose from is `artifacts/draft-screen-mocks.html` (three draft layouts, three score placements).
 
 ## Decided on 22 Sep: how boons live in the code (ADR-034, ADR-035)
 

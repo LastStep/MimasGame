@@ -1,5 +1,8 @@
 # Spec D, part 2 (outline): Boons in the game — the online best-of-3 with a draft in the room, and the presentation of boons and reveals
 
+_**Superseded on 22 Sep 2026 by the full spec `docs/specs/2026-09-22-boons-in-game.md`**, which answers §5
+(eight questions, P1–P8) and is the work order for `T-0010`. Kept for the record of what was outlined._
+
 _Status: **outline, not a work order.** Written 21 Sep 2026 in the same session as part 1
 (`docs/specs/2026-09-21-boons-groundwork.md`). Fable turns it into a full spec **after part 1 lands**,
 checked against the real Core names at that commit; Opus executes that spec unattended (task `T-0010`,
