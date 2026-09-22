@@ -47,7 +47,9 @@ Two things, and they do not compete:
 2. **A Fable session writes the part-2 spec** (`docs/specs/2026-09-21-boons-in-game-outline.md` → a full
    spec, `T-0010`) against the real Core at `main`, asking the outline's §5 questions with 3–4 options
    each; then Opus executes it. Part 2 is what a player sees: the lineage in the room, the draft screen,
-   the examine panel's boons, the reveal flyover, the online best-of-3.
+   the examine panel's boons, the reveal flyover, the online best-of-3. **The prep note for that session
+   is `studio/plans/2026-09-22-part2-spec-session-prep.md`**: what to read, the ten findings this build
+   made that the outline lacks, and the six questions to ask in one round.
 
 Then **verifiers**: T-0009 (spec §14 is the checklist), and the M2 set T-0008 (closes T-0005 and T-0006),
 T-0007, T-0002 — five tasks sit at `verify` and nothing in the ledger is ticked until someone in a fresh
