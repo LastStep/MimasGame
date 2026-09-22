@@ -43,6 +43,48 @@
             <ui:Button name="banner-button" class="banner-button" text="Back to lobby" />
         </ui:VisualElement>
 
+        <!-- Left: examine panel for the clicked unit. -->
+        <ui:VisualElement name="examine" class="examine">
+            <ui:VisualElement class="examine-header">
+                <ui:VisualElement class="examine-titles" picking-mode="Ignore">
+                    <ui:Label name="examine-title" class="examine-title" text="Hero" />
+                    <ui:Label name="examine-subtitle" class="examine-subtitle" text="Your unit" />
+                </ui:VisualElement>
+                <ui:Button name="examine-close" class="examine-close" text="✕" />
+            </ui:VisualElement>
+            <!-- Gear, abilities, passives and now boons: taller than the screen on a full hero, so the body
+                 scrolls rather than spilling off both ends. -->
+            <ui:ScrollView name="examine-body" class="examine-body" mode="Vertical">
+                <ui:Label name="examine-stats" class="examine-stats" text="HP 20 / 20   ·   AP 3 / 3" />
+                <ui:Label name="examine-description" class="examine-description" text="" />
+                <ui:Label name="examine-items-caption" class="examine-caption" text="GEAR" />
+                <ui:VisualElement name="examine-items" class="examine-abilities" />
+                <ui:Label class="examine-caption" text="ABILITIES" />
+                <ui:VisualElement name="examine-abilities" class="examine-abilities" />
+                <ui:Label name="examine-modifiers-caption" class="examine-caption" text="PASSIVES" />
+                <ui:VisualElement name="examine-modifiers" class="examine-abilities" />
+                <!-- Yours by name, kind and god; theirs as one "?" row per boon they hold (#hidden-info rule 5). -->
+                <ui:Label name="examine-boons-caption" class="examine-caption" text="BOONS" />
+                <ui:VisualElement name="examine-boons" class="examine-abilities" />
+            </ui:ScrollView>
+        </ui:VisualElement>
+
+        <!-- Bottom centre: action points, then one section per category, filled at runtime from IMatchHudSource. -->
+        <ui:VisualElement name="tooltip" class="tooltip" picking-mode="Ignore">
+            <ui:Label name="tooltip-title" class="tooltip-title" text="Move" />
+            <ui:Label name="tooltip-detail" class="tooltip-detail" text="Lobbed · no sight needed · range 1-5" />
+            <ui:Label name="tooltip-body" class="tooltip-body" text="Walk to an adjacent tile." />
+        </ui:VisualElement>
+        <ui:VisualElement name="action-bar" class="action-bar" />
+
+        <!-- Bottom right: pass the turn early, and give it up entirely. -->
+        <ui:Button name="end-turn" class="end-turn">
+            <ui:Label name="end-turn-label" class="end-turn-label" text="END TURN" picking-mode="Ignore" />
+        </ui:Button>
+
+        <!-- Two clicks, because conceding by accident is the worst possible misclick. -->
+        <ui:Button name="resign" class="resign" text="RESIGN" />
+
         <!-- Between rounds: the draft over the dimmed board (P1). The scrim is what dims it — no shader
              change, and it darkens the heroes too. Three cards are built in code into draft-cards. -->
         <ui:VisualElement name="draft-panel" class="draft-panel">
@@ -61,44 +103,6 @@
                 </ui:VisualElement>
             </ui:VisualElement>
         </ui:VisualElement>
-
-        <!-- Left: examine panel for the clicked unit. -->
-        <ui:VisualElement name="examine" class="examine">
-            <ui:VisualElement class="examine-header">
-                <ui:VisualElement class="examine-titles" picking-mode="Ignore">
-                    <ui:Label name="examine-title" class="examine-title" text="Hero" />
-                    <ui:Label name="examine-subtitle" class="examine-subtitle" text="Your unit" />
-                </ui:VisualElement>
-                <ui:Button name="examine-close" class="examine-close" text="✕" />
-            </ui:VisualElement>
-            <ui:Label name="examine-stats" class="examine-stats" text="HP 20 / 20   ·   AP 3 / 3" />
-            <ui:Label name="examine-description" class="examine-description" text="" />
-            <ui:Label name="examine-items-caption" class="examine-caption" text="GEAR" />
-            <ui:VisualElement name="examine-items" class="examine-abilities" />
-            <ui:Label class="examine-caption" text="ABILITIES" />
-            <ui:VisualElement name="examine-abilities" class="examine-abilities" />
-            <ui:Label name="examine-modifiers-caption" class="examine-caption" text="PASSIVES" />
-            <ui:VisualElement name="examine-modifiers" class="examine-abilities" />
-            <!-- Yours by name, kind and god; theirs as one "?" row per boon they hold (#hidden-info rule 5). -->
-            <ui:Label name="examine-boons-caption" class="examine-caption" text="BOONS" />
-            <ui:VisualElement name="examine-boons" class="examine-abilities" />
-        </ui:VisualElement>
-
-        <!-- Bottom centre: action points, then one section per category, filled at runtime from IMatchHudSource. -->
-        <ui:VisualElement name="tooltip" class="tooltip" picking-mode="Ignore">
-            <ui:Label name="tooltip-title" class="tooltip-title" text="Move" />
-            <ui:Label name="tooltip-detail" class="tooltip-detail" text="Lobbed · no sight needed · range 1-5" />
-            <ui:Label name="tooltip-body" class="tooltip-body" text="Walk to an adjacent tile." />
-        </ui:VisualElement>
-        <ui:VisualElement name="action-bar" class="action-bar" />
-
-        <!-- Bottom right: pass the turn early, and give it up entirely. -->
-        <ui:Button name="end-turn" class="end-turn">
-            <ui:Label name="end-turn-label" class="end-turn-label" text="END TURN" picking-mode="Ignore" />
-        </ui:Button>
-
-        <!-- Two clicks, because conceding by accident is the worst possible misclick. -->
-        <ui:Button name="resign" class="resign" text="RESIGN" />
 
     </ui:VisualElement>
 </ui:UXML>

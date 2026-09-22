@@ -32,8 +32,11 @@ allows_assets:
   - 'MimasClient/Assets/_Game/Tests/EditMode/MirrorResolverTests.cs.meta'
   # Spec §7.7: the one scene edit, through the live Editor — LobbyView gets its ContentBootstrap.
   - 'MimasClient/Assets/_Game/Scenes/Lobby.unity'
-  # Spec §7.8: game-view captures land under Assets/_Shots (never under a Temp folder).
+  # Spec §7.8: game-view captures land under Assets/_Shots (never under a Temp folder). The folder's own
+  # .meta sits beside it rather than inside it, so it needs naming too (spec §0.6: declare what the spec
+  # did not foresee before committing it).
   - 'MimasClient/Assets/_Shots/**'
+  - 'MimasClient/Assets/_Shots.meta'
 # Rungs by number, as the runner wants them (studio/game.yaml): 0 asset safety, 1 core build, 2 core
 # tests, 5 server integration. The spec's §10 adds the Unity compile check, EditMode tests, the Web
 # build and the browser smoke as commands; the verifier is step 2 of "done", not a rung.

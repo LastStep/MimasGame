@@ -480,6 +480,7 @@
     top: 50%;
     translate: 0 -50%;
     width: 300px;
+    max-height: 88%;
     padding: 14px 16px 16px 16px;
     background-color: var(--hud-panel-solid);
     border-radius: 14px;
@@ -1114,4 +1115,15 @@
     letter-spacing: 2px;
     -unity-font-style: bold;
     -unity-text-align: middle-center;
+}
+
+/* The examine panel's body scrolls: gear, abilities, passives and boons together are taller than the
+   screen on a fully-drafted hero, and the boons are the newest thing on it. */
+.examine-body {
+    flex-grow: 1;
+    flex-shrink: 1;
+}
+
+.examine-body > .unity-scroll-view__content-viewport {
+    flex-grow: 1;
 }

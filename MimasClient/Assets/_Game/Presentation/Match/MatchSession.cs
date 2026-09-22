@@ -201,7 +201,11 @@ namespace Mimas.Client.Presentation
         private bool ProjectileInFlight => _projectiles != null && _projectiles.IsPlaying;
 
         /// <summary>The local player may arm an action or pick a target right now.</summary>
-        private bool CanAct => _ready && !Rules.IsOver && Rules.ActivePlayer == LocalPlayer && !IsPlaying;
+        /// <summary>
+        /// The local player may arm an action or pick a target right now. Rules is null between rounds and
+        /// before the first one has started, and there is nothing to act on then (ADR-036).
+        /// </summary>
+        private bool CanAct => _ready && Rules != null && !Rules.IsOver && Rules.ActivePlayer == LocalPlayer && !IsPlaying;
 
         public void SelectAction(int index)
         {
@@ -1796,7 +1800,7 @@ namespace Mimas.Client.Presentation
             // Nothing armed: clicks on a body open examine, anything else closes it. A prop is worth examining
             // too — "can I bring this down, and what does it block?" is a real question (design: #props).
             Unit clicked;
-            _examinedUnitId = Rules.Units.TryGetUnitAt(coord, out clicked) ? clicked.Id : None;
+            _examinedUnitId = Rules != null && Rules.Units.TryGetUnitAt(coord, out clicked) ? clicked.Id : None;
             _examinedPropId = _examinedUnitId == None && hover.Prop != null ? hover.Prop.Id : None;
             RefreshView();
             RaiseStateChanged();
