@@ -25,6 +25,15 @@ namespace Mimas.Core.Match
         InsufficientAp,
         IllegalMove,
         IllegalTarget,
+
+        /// <summary>A draft pick outside a draft, a round command during a draft, or anything before the session started (Mimas.Core.Session).</summary>
+        WrongPhase,
+
+        /// <summary>The player already picked in this draft.</summary>
+        AlreadyPicked,
+
+        /// <summary>The offer index is outside the player's offer list.</summary>
+        BadOffer,
     }
 
     /// <summary>Outcome of <see cref="MatchState.Validate"/>. Carries the finer reason for moves and targets so UI and bots can explain.</summary>
