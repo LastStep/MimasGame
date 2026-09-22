@@ -260,6 +260,9 @@ namespace Mimas.Core.Match
                     if (u.Abilities[a].Revealed) state._revealed.Add(view.Viewer, u.Id, u.Abilities[a].Id);
                 for (int m = 0; m < u.Modifiers.Count; m++)
                     if (u.Modifiers[m].Revealed) state._revealed.Add(view.Viewer, u.Id, u.Modifiers[m].Id);
+                for (int b = 0; b < u.Boons.Count; b++)
+                    if (u.Boons[b].Revealed) state._revealed.Add(view.Viewer, u.Id, BoonKey + u.Boons[b].Id);
+                if (u.LineageId != null) state._revealed.Add(view.Viewer, u.Id, LineageKey + u.LineageId);
             }
 
             state.ActivePlayer = view.ActivePlayer;
@@ -281,16 +284,109 @@ namespace Mimas.Core.Match
             RefuseOnMirror("Start");
             if (TurnNumber != 0) throw new InvalidOperationException("The match has already started.");
             var events = new List<MatchEvent>();
+            RevealStatBoonsAtStart(events);
             BeginTurn(ActivePlayer, events);
             return events;
         }
 
         // ---- IRevealedKnowledge ---------------------------------------------------------------------
 
+        /// <summary>
+        /// Boon and lineage reveals live in the same set as ability and modifier reveals, under these prefixes:
+        /// shipped content gives a boon and its modifier the same id on purpose (spec §5.8), and one namespace
+        /// would let a modifier's reveal swallow the boon's event.
+        /// </summary>
+        private const string BoonKey = "boon:";
+        private const string LineageKey = "lineage:";
+
         public bool Knows(int viewer, int unitId, string id) => _revealed.Contains(viewer, unitId, id);
 
-        /// <summary>Everything each player has been shown, in the order it was learned: what a session exports at a round's end and imports into the next.</summary>
+        public bool KnowsBoon(int viewer, int unitId, string boonId) => _revealed.Contains(viewer, unitId, BoonKey + boonId);
+
+        public bool KnowsLineage(int viewer, int unitId, string lineageId) => _revealed.Contains(viewer, unitId, LineageKey + lineageId);
+
+        /// <summary>Everything each player has been shown, in the order it was learned: what a session exports at a round's end and imports into the next. Opaque strings; hand them back to <see cref="MatchSetup.WithRevealed"/> unchanged.</summary>
         public IReadOnlyList<RevealedEntry> RevealedEntries => _revealed.Entries;
+
+        // ---- reveal (spec D part 1 §6.5; design #hidden-info) ---------------------------------------
+
+        /// <summary>
+        /// The opponent learns a boon: the boon's event, then — the first time for that lineage — the lineage's.
+        /// Revealing a boon reveals its whole definition, so the modifiers it attaches and the abilities it
+        /// grants become known too, silently (the boon event carries the definition). Idempotent. Callers
+        /// append their own event after, so reveal events precede what needed them (rule 2).
+        /// </summary>
+        private void RevealBoon(Unit unit, string boonId, List<MatchEvent> events)
+        {
+            int other = 1 - unit.Owner;
+            if (!_revealed.Add(other, unit.Id, BoonKey + boonId)) return;
+            events.Add(new BoonRevealedEvent(unit.Id, boonId, other));
+
+            BoonDef boon;
+            if (Catalog.Boons.TryGet(boonId, out boon))
+            {
+                for (int i = 0; i < boon.Effects.Count; i++)
+                {
+                    BoonEffect effect = boon.Effects[i];
+                    if (effect.Type == BoonEffectTypes.Modifier) _revealed.Add(other, unit.Id, effect.Id);
+                    else if (effect.Type == BoonEffectTypes.GrantAbility) _revealed.Add(other, unit.Id, effect.Ability);
+                }
+            }
+
+            if (unit.LineageId != null && _revealed.Add(other, unit.Id, LineageKey + unit.LineageId))
+                events.Add(new LineageRevealedEvent(unit.Id, unit.LineageId, other));
+        }
+
+        /// <summary>D12: a Health or AP Blessing is public from round start, because the bar shows it.</summary>
+        private void RevealStatBoonsAtStart(List<MatchEvent> events)
+        {
+            for (int u = 0; u < Units.All.Count; u++)
+            {
+                Unit unit = Units.All[u];
+                IReadOnlyList<StatContribution> stats = unit.Overlay.StatContributions;
+                for (int i = 0; i < stats.Count; i++)
+                    if (stats[i].Key == StatBlock.HpKey || stats[i].Key == StatBlock.ApKey) RevealBoon(unit, stats[i].BoonId, events);
+            }
+        }
+
+        /// <summary>
+        /// D11, the observation rule: before an action is applied, compare the ability as the opponent knows
+        /// it with the ability as it is. (a) If the known version could not reach the target or destination,
+        /// every boon overriding an aiming or movement field of this ability is revealed. (b) If the cost
+        /// differs, the boons overriding cost. (c) If the real attack carries an element or tag the known one
+        /// does not, the boons that added them. (d) A damage override is a breakdown line and reveals itself.
+        /// </summary>
+        private void RevealObserved(Unit unit, string abilityId, AbilityDef actual, Hex target, bool isMove, List<MatchEvent> events)
+        {
+            if (unit.Overlay.IsEmpty) return;
+            int other = 1 - unit.Owner;
+            AbilityDef known;
+            ResolveAbilityKnownTo(other, unit, abilityId, out known);
+            if (ReferenceEquals(known, actual)) return;
+
+            bool refused;
+            if (isMove) refused = !_resolvers.Validate(MoveContext(unit, (MovementDef)known), target).Ok;
+            else refused = !AttackTargeting.Check(Map, Bodies, Catalog.Rules.Heights, Trajectories, unit, (AttackDef)known, target).Ok;
+
+            unit.Overlay.OverridesFor(abilityId, _overrideScratch);
+            for (int i = 0; i < _overrideScratch.Count; i++)
+            {
+                AbilityOverride o = _overrideScratch[i];
+                if (refused && AbilityFields.IsAiming(o.Field)) RevealBoon(unit, o.BoonId, events);
+                if (known.Cost != actual.Cost && o.Field == AbilityFields.Cost) RevealBoon(unit, o.BoonId, events);
+            }
+
+            var knownAttack = known as AttackDef;
+            if (knownAttack != null)
+            {
+                unit.Overlay.AddedElementsFor(abilityId, _additionScratch);
+                for (int i = 0; i < _additionScratch.Count; i++)
+                    if (!knownAttack.HasElement(_additionScratch[i].Value)) RevealBoon(unit, _additionScratch[i].BoonId, events);
+                unit.Overlay.AddedTagsFor(abilityId, _additionScratch);
+                for (int i = 0; i < _additionScratch.Count; i++)
+                    if (!knownAttack.HasTag(_additionScratch[i].Value)) RevealBoon(unit, _additionScratch[i].BoonId, events);
+            }
+        }
 
         // ---- the one ability resolver (spec D part 1 §6.3, ADR-034) --------------------------------
 
@@ -399,7 +495,7 @@ namespace Mimas.Core.Match
 
         /// <summary>Full resolution (viewer -1), the owner, or a viewer the boon has been revealed to.</summary>
         private bool BoonKnownTo(int viewer, Unit unit, string boonId)
-            => viewer < 0 || unit.Owner == viewer || _revealed.Contains(viewer, unit.Id, boonId);
+            => viewer < 0 || unit.Owner == viewer || KnowsBoon(viewer, unit.Id, boonId);
 
         // ---- validation ----------------------------------------------------------------------------
 
@@ -504,11 +600,13 @@ namespace Mimas.Core.Match
             ResolveAbility(unit, move.AbilityId, out ability);
             var movement = (MovementDef)ability;
 
+            RevealAbility(unit, movement.Id, events);
+            RevealObserved(unit, movement.Id, movement, move.Destination, true, events);
+
             unit.SpendAp(movement.Cost);
             unit.MoveTo(result.Plan.Destination);
             ActedThisTurn = true;
 
-            RevealAbility(unit, movement.Id, events);
             events.Add(new UnitMovedEvent(unit.Id, movement.Id, result.Plan));
             events.Add(new ApSpentEvent(unit.Id, movement.Id, movement.Cost, unit.Ap));
         }
@@ -518,25 +616,33 @@ namespace Mimas.Core.Match
             Unit attacker; IBody victim; AttackDef def;
             ValidateAttack(attack, out attacker, out def, out victim);
 
+            RevealAbility(attacker, def.Id, events);
+            RevealObserved(attacker, def.Id, def, attack.Target, false, events);
+
             attacker.SpendAp(def.Cost);
             ActedThisTurn = true;
-            RevealAbility(attacker, def.Id, events);
 
             DamageBreakdown breakdown = _damage.Compute(Map, attacker, victim, def, Knowledge.Full);
 
-            // Any hidden line that changed the number is now known to the other side. A boon's line (a stat
-            // or a damage override) and the boon behind a modifier line are picked up in §6.5.
+            // Any hidden line that changed the number is now known to the other side: a modifier (and the
+            // boon behind it, if any), an immunity the same way, or a boon's own stat or damage line.
             for (int i = 0; i < breakdown.Lines.Count; i++)
             {
                 DamageLine line = breakdown.Lines[i];
                 if (!line.Hidden || line.Amount == 0) continue;
-                if (line.Kind != DamageLineKind.Modifier && line.Kind != DamageLineKind.Nullify) continue;
                 IBody body;
                 // Props carry no hidden modifiers; the guard keeps the reveal honest if one ever does.
                 if (!Bodies.TryGetBody(line.OwnerUnitId, out body) || !(body is Unit owner)) continue;
                 int other = 1 - owner.Owner;
+                if (line.Kind == DamageLineKind.BoonStat)
+                {
+                    RevealBoon(owner, line.Id, events);
+                    continue;
+                }
                 if (_revealed.Add(other, owner.Id, line.Id))
                     events.Add(new ModifierRevealedEvent(owner.Id, line.Id, other));
+                string boonId = owner.BoonOfModifier(line.Id);
+                if (boonId != null) RevealBoon(owner, boonId, events);
             }
 
             int lost = victim.TakeDamage(breakdown.Total);
@@ -597,6 +703,9 @@ namespace Mimas.Core.Match
             int other = 1 - unit.Owner;
             if (_revealed.Add(other, unit.Id, abilityId))
                 events.Add(new AbilityRevealedEvent(unit.Id, abilityId, other));
+            // A Sigil's ability is the Sigil: using it in front of the opponent reveals the boon (R5).
+            string boonId = unit.BoonOfAbility(abilityId);
+            if (boonId != null) RevealBoon(unit, boonId, events);
         }
 
         private void CheckElimination(List<MatchEvent> events)
@@ -758,8 +867,11 @@ namespace Mimas.Core.Match
             DamageBreakdown breakdown = _damage.Compute(Map, attacker, target, attack, Knowledge.For(viewer, this));
             if (!IsMirror) return breakdown;
 
+            // A mirror holds neither the hidden modifiers nor the hidden boons it was never sent; the truth
+            // counts one unknown for each, so put both counts back.
             var victimUnit = target as Unit;
-            return breakdown.WithUnknown(attacker.HiddenModifierCount + (victimUnit != null ? victimUnit.HiddenModifierCount : 0));
+            return breakdown.WithUnknown(attacker.HiddenModifierCount + attacker.HiddenBoonCount
+                + (victimUnit != null ? victimUnit.HiddenModifierCount + victimUnit.HiddenBoonCount : 0));
         }
 
         /// <summary>The same arithmetic with full knowledge: for tests and the server only. A mirror has no full knowledge to give.</summary>

@@ -121,6 +121,40 @@ namespace Mimas.Core.Match
         }
     }
 
+    /// <summary>
+    /// A boon became known to <see cref="ToPlayer"/> (design: #boons rule 3, spec D part 1 §6.5): its stat or
+    /// modifier changed a result, its Sigil's ability was used, or an observation contradicted what the
+    /// opponent knew. Revealing a boon reveals its whole definition. Precedes the event that needed it.
+    /// </summary>
+    public sealed class BoonRevealedEvent : MatchEvent
+    {
+        public int UnitId { get; }
+        public string BoonId { get; }
+        public int ToPlayer { get; }
+
+        public BoonRevealedEvent(int unitId, string boonId, int toPlayer)
+        {
+            UnitId = unitId;
+            BoonId = boonId ?? throw new ArgumentNullException(nameof(boonId));
+            ToPlayer = toPlayer;
+        }
+    }
+
+    /// <summary>The first boon of a lineage was revealed to <see cref="ToPlayer"/>, so the lineage is known (design: #lineage rule 3). Follows the <see cref="BoonRevealedEvent"/> that caused it.</summary>
+    public sealed class LineageRevealedEvent : MatchEvent
+    {
+        public int UnitId { get; }
+        public string LineageId { get; }
+        public int ToPlayer { get; }
+
+        public LineageRevealedEvent(int unitId, string lineageId, int toPlayer)
+        {
+            UnitId = unitId;
+            LineageId = lineageId ?? throw new ArgumentNullException(nameof(lineageId));
+            ToPlayer = toPlayer;
+        }
+    }
+
     /// <summary>A prop ran out of hit points and was removed; its tile is enterable again (design: #props).</summary>
     public sealed class PropDestroyedEvent : MatchEvent
     {

@@ -522,7 +522,7 @@ namespace Mimas.Core.Tests
             var preview = state.PreviewAttack(0, 0, "zap", BruteAt);
             Assert.False(preview.Nullified);
             Assert.True(preview.Total > 0);
-            Assert.Equal(1, preview.UnknownCount);
+            Assert.Equal(2, preview.UnknownCount);                 // the hidden boon and the hidden modifier it attaches: two things the viewer cannot see
 
             // The actual result reveals it; the next preview knows.
             var events = state.Apply(new AttackCommand(0, 0, "zap", BruteAt));

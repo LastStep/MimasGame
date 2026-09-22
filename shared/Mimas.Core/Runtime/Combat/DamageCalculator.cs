@@ -44,18 +44,22 @@ namespace Mimas.Core.Combat
             var situation = new Situation(attack, attackerTile, targetTile, SourceItemKindOf(attacker, attack));
 
             var lines = new List<DamageLine>();
-            int unknown = 0;
             lines.Add(new DamageLine(DamageLineKind.Base, "base", DamageLineOwner.None, -1, attack.Damage, false));
+
+            // Every boon the viewer has not been shown is one unknown, whatever it does — exactly as a hidden
+            // modifier counts whether or not it applies — so a mirror, which does not hold hidden boons at
+            // all, can add the same count back (ADR-026).
+            int unknown = HiddenBoons(attacker, knowledge) + HiddenBoons(target as Unit, knowledge);
 
             string powerKey = StatBlock.PowerKey(attack.DamageType);
             int power = attacker.PublicStats.Get(powerKey);
             if (power != 0) lines.Add(new DamageLine(DamageLineKind.Power, powerKey, DamageLineOwner.Attacker, attacker.Id, power, false));
-            unknown += AddBoonStats(lines, attacker, DamageLineOwner.Attacker, powerKey, 1, knowledge);
+            AddBoonStats(lines, attacker, DamageLineOwner.Attacker, powerKey, 1, knowledge);
 
             string defenseKey = StatBlock.DefenseKey(attack.DamageType);
             int defense = target.PublicStats.Get(defenseKey);
             if (defense != 0) lines.Add(new DamageLine(DamageLineKind.Defense, defenseKey, DamageLineOwner.Target, target.Id, -defense, false));
-            unknown += AddBoonStats(lines, target, DamageLineOwner.Target, defenseKey, -1, knowledge);
+            AddBoonStats(lines, target, DamageLineOwner.Target, defenseKey, -1, knowledge);
 
             // An Enchant's damage override on this attack: a line, never a change to the base (spec §6.5 (d)).
             attacker.Overlay.OverridesFor(attack.Id, _overrideScratch);
@@ -63,7 +67,7 @@ namespace Mimas.Core.Combat
             {
                 AbilityOverride o = _overrideScratch[i];
                 if (o.Field != AbilityFields.Damage) continue;
-                if (!knowledge.CanSee(attacker.Owner, attacker.Id, o.BoonId)) { unknown++; continue; }
+                if (!knowledge.CanSeeBoon(attacker.Owner, attacker.Id, o.BoonId)) continue;
                 lines.Add(new DamageLine(DamageLineKind.BoonStat, o.BoonId, DamageLineOwner.Attacker, attacker.Id, o.Amount, true));
             }
 
@@ -91,18 +95,26 @@ namespace Mimas.Core.Combat
             return new DamageBreakdown(lines, unknown);
         }
 
-        /// <summary>One hidden line per boon contribution to <paramref name="key"/>, or an unknown when the viewer cannot see that boon.</summary>
-        private static int AddBoonStats(List<DamageLine> lines, IBody body, DamageLineOwner owner, string key, int sign, Knowledge knowledge)
+        /// <summary>One hidden line per boon contribution to <paramref name="key"/> the viewer can see.</summary>
+        private static void AddBoonStats(List<DamageLine> lines, IBody body, DamageLineOwner owner, string key, int sign, Knowledge knowledge)
         {
-            int unknown = 0;
             IReadOnlyList<StatContribution> contributions = body.BoonStatContributions(key);
             for (int i = 0; i < contributions.Count; i++)
             {
                 StatContribution c = contributions[i];
-                if (!knowledge.CanSee(body.Owner, body.Id, c.BoonId)) { unknown++; continue; }
+                if (!knowledge.CanSeeBoon(body.Owner, body.Id, c.BoonId)) continue;
                 lines.Add(new DamageLine(DamageLineKind.BoonStat, c.BoonId, owner, body.Id, sign * c.Amount, true));
             }
-            return unknown;
+        }
+
+        /// <summary>How many of a unit's boons the viewer has not been shown. 0 for a prop or full knowledge.</summary>
+        private static int HiddenBoons(Unit unit, Knowledge knowledge)
+        {
+            if (unit == null || knowledge.IsFull) return 0;
+            int hidden = 0;
+            for (int i = 0; i < unit.BoonIds.Count; i++)
+                if (!knowledge.CanSeeBoon(unit.Owner, unit.Id, unit.BoonIds[i])) hidden++;
+            return hidden;
         }
 
         /// <summary>The first immunity that applied, in the fixed evaluation order.</summary>

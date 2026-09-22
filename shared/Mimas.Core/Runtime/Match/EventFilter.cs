@@ -26,6 +26,10 @@ namespace Mimas.Core.Match
                     return ability.ToPlayer == viewer ? e : null;
                 case ModifierRevealedEvent modifier:
                     return modifier.ToPlayer == viewer ? e : null;
+                case BoonRevealedEvent boon:
+                    return boon.ToPlayer == viewer ? e : null;
+                case LineageRevealedEvent lineage:
+                    return lineage.ToPlayer == viewer ? e : null;
                 case AttackResolvedEvent attack:
                     return new AttackResolvedEvent(attack.AttackerId, attack.TargetId, attack.AbilityId,
                         Trim(attack.Breakdown, viewer, state), attack.Damage, attack.TargetHpAfter, attack.TargetIsProp);
@@ -57,9 +61,11 @@ namespace Mimas.Core.Match
                 if (line.Hidden)
                 {
                     // Only a unit can own a hidden line; a prop's defence is public like the prop itself.
+                    // A boon's line is keyed by the boon, a modifier's or an immunity's by the modifier.
                     Unit owner;
                     bool visible = state.Units.TryGet(line.OwnerUnitId, out owner)
-                        && (owner.Owner == viewer || state.Knows(viewer, owner.Id, line.Id));
+                        && (owner.Owner == viewer
+                            || (line.Kind == DamageLineKind.BoonStat ? state.KnowsBoon(viewer, owner.Id, line.Id) : state.Knows(viewer, owner.Id, line.Id)));
                     if (!visible)
                     {
                         unknown++;

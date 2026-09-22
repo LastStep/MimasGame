@@ -362,10 +362,16 @@ namespace Mimas.Core.Units
 
         /// <summary>
         /// The mirror's unit (ADR-026): built from the public half of a <see cref="UnitView"/> — its gear, which
-        /// fixes every stat exactly as the truth computes it — and then stripped of everything the viewer was
-        /// not shown. What is left is what that player is entitled to reason with, and
-        /// <see cref="HiddenAbilitySlots"/> / <see cref="HiddenModifierSlots"/> remember where the gaps were so
-        /// the view can be reproduced with its "?" rows intact.
+        /// fixes every public stat exactly as the truth computes it — plus the boons the viewer has been shown,
+        /// and then stripped of everything else. What is left is what that player is entitled to reason with,
+        /// and <see cref="HiddenAbilitySlots"/> / <see cref="HiddenModifierSlots"/> / <see cref="HiddenBoonSlots"/>
+        /// remember where the gaps were so the view can be reproduced with its "?" rows intact.
+        /// <para>
+        /// The ability list is aligned with the view: innate and item abilities come first in both and a hidden
+        /// one is simply cut from the built list; a Sigil's ability follows, and a hidden one is a "?" the built
+        /// list never had. Maximum health and action points must agree with the view, because every hp and AP
+        /// Blessing is revealed at round start (D12); a mismatch is a bug, not a hidden value.
+        /// </para>
         /// </summary>
         public static Unit FromView(UnitView view, Content.ContentCatalog catalog)
         {
@@ -377,26 +383,65 @@ namespace Mimas.Core.Units
             var items = new List<ItemDef>(ItemSlots.All.Length);
             for (int i = 0; i < ItemSlots.All.Length; i++) items.Add(catalog.GetItemForSlot(ItemSlots.All[i], view.ItemIds[i]));
 
-            var unit = new Unit(view.Id, view.Owner, view.Position, catalog.Rules, items);
+            var boons = new List<BoonDef>();
+            for (int i = 0; i < view.Boons.Count; i++)
+                if (view.Boons[i].Revealed) boons.Add(catalog.GetBoon(view.Boons[i].Id));
 
-            // The view lists abilities in grant order, which is exactly the order the constructor just
-            // produced, so position i of the view is position i of this list.
-            if (view.Abilities.Count != unit._abilityIds.Count)
-                throw new ArgumentException($"Unit {view.Id}'s view lists {view.Abilities.Count} abilities; its gear grants {unit._abilityIds.Count}.", nameof(view));
-            for (int i = view.Abilities.Count - 1; i >= 0; i--)
+            var unit = new Unit(view.Id, view.Owner, view.Position, catalog.Rules, items, view.LineageId, boons);
+
+            // Abilities: the built list is innate + items + revealed grants; the view is innate + items + every grant.
+            int gearCount = unit._abilityIds.Count - unit.Overlay.Grants.Count;
+            var keptIds = new List<string>(unit._abilityIds.Count);
+            var keptSources = new List<string>(unit._abilityIds.Count);
+            int next = 0;
+            for (int i = 0; i < view.Abilities.Count; i++)
             {
-                if (view.Abilities[i].Revealed) continue;
-                unit._hiddenAbilitySlots.Insert(0, new HiddenSlot(i, view.Abilities[i].SourceItemId));
-                unit._abilityIds.RemoveAt(i);
-                unit._abilitySources.RemoveAt(i);
+                KnownEntry entry = view.Abilities[i];
+                if (entry.Revealed)
+                {
+                    if (next >= unit._abilityIds.Count || unit._abilityIds[next] != entry.Id)
+                        throw new ArgumentException($"Unit {view.Id}'s view lists ability '{entry.Id}' at {i}, which its gear and revealed boons do not grant there.", nameof(view));
+                    keptIds.Add(unit._abilityIds[next]);
+                    keptSources.Add(unit._abilitySources[next]);
+                    next++;
+                    continue;
+                }
+                unit._hiddenAbilitySlots.Add(new HiddenSlot(i, entry.SourceItemId));
+                if (i < gearCount) next++;                       // a hidden gear ability: cut it from the built list
             }
+            if (next != unit._abilityIds.Count)
+                throw new ArgumentException($"Unit {view.Id}'s view lists {view.Abilities.Count} abilities; its gear and revealed boons grant {unit._abilityIds.Count}.", nameof(view));
+            unit._abilityIds.Clear();
+            unit._abilityIds.AddRange(keptIds);
+            unit._abilitySources.Clear();
+            unit._abilitySources.AddRange(keptSources);
 
+            // Modifiers: the built list holds the revealed boons' modifiers, in boon order, at the front of the
+            // view's list; a revealed entry that is not the next built one came from elsewhere (a setup knob).
+            int builtModifiers = unit._modifierIds.Count;
+            int nextModifier = 0;
             for (int i = 0; i < view.Modifiers.Count; i++)
             {
                 KnownEntry entry = view.Modifiers[i];
-                if (entry.Revealed) unit.AddModifier(entry.Id, null);
-                else unit._hiddenModifierSlots.Add(new HiddenSlot(i, null));
+                if (!entry.Revealed)
+                {
+                    unit._hiddenModifierSlots.Add(new HiddenSlot(i, null));
+                    continue;
+                }
+                if (nextModifier < builtModifiers && unit._modifierIds[nextModifier] == entry.Id) { nextModifier++; continue; }
+                unit.AddModifier(entry.Id, null);
             }
+            if (nextModifier != builtModifiers)
+                throw new ArgumentException($"Unit {view.Id}'s view does not list every modifier its revealed boons attach.", nameof(view));
+
+            // Boons: the built list is exactly the revealed entries, in order.
+            for (int i = 0; i < view.Boons.Count; i++)
+                if (!view.Boons[i].Revealed) unit._hiddenBoonSlots.Add(new HiddenSlot(i, null));
+
+            if (unit.MaxHp != view.MaxHp)
+                throw new ArgumentException($"Unit {view.Id}'s view says max hp {view.MaxHp}; gear and revealed boons give {unit.MaxHp}. Every hp Blessing is revealed at round start, so this is a bug.", nameof(view));
+            if (unit.ApPerTurn != view.ApPerTurn)
+                throw new ArgumentException($"Unit {view.Id}'s view says {view.ApPerTurn} ap per turn; gear and revealed boons give {unit.ApPerTurn}. Every AP Blessing is revealed at round start, so this is a bug.", nameof(view));
 
             unit.Restore(view.Hp, view.Ap);
             return unit;

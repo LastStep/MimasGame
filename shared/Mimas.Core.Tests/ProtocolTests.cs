@@ -187,6 +187,54 @@ namespace Mimas.Core.Tests
             Assert.Equal(view.Viewer, back.Viewer);
         }
 
+        /// <summary>The view's two new fields (spec D part 1 §6.6): the lineage once revealed, the boons as id-or-null in grant order.</summary>
+        [Fact]
+        public void Wire_View_RoundTripsLineageAndBoons()
+        {
+            var catalog = CombatFixtures.Catalog();
+            var state = CombatFixtures.StartedWith(catalog, CombatFixtures.ArcherWith("trial-vigour", "trial-might", "trial-jab"), CombatFixtures.BruteWith(),
+                new Hex(-1, 1), new Hex(0, 0));
+
+            PlayerView view = state.ViewFor(1);
+            JObject encoded = Wire.View(view);
+            PlayerView back = Wire.ReadView(encoded);
+            Assert.Equal(Json(encoded), Json(Wire.View(back)));
+
+            UnitView enemy = back.Units.Single(u => u.Owner == 0);
+            Assert.Equal("trial", enemy.LineageId);                                  // Vigour revealed at round start, and the lineage with it
+            Assert.Equal(new[] { "trial-vigour", null, null }, enemy.Boons.Select(b => b.Id));
+            Assert.Equal(2, enemy.UnrevealedBoonCount);
+            Assert.Contains("\"lineage\":\"trial\",\"boons\":[{\"id\":\"trial-vigour\"},{\"id\":null},{\"id\":null}]", Json(encoded));
+
+            // A unit with no lineage encodes it as null and reads it back as null.
+            UnitView brute = Wire.ReadView(Wire.View(state.ViewFor(0))).Units.Single(u => u.Owner == 1);
+            Assert.Null(brute.LineageId);
+            Assert.Empty(brute.Boons);
+            Assert.Contains("\"lineage\":null,\"boons\":[]", Json(Wire.View(state.ViewFor(0))));
+
+            // An old frame without the fields is malformed, not silently boon-less.
+            encoded["units"][0].Children<JProperty>().First(p => p.Name == "boons").Remove();
+            Assert.Throws<WireException>(() => Wire.ReadView(encoded));
+        }
+
+        [Fact]
+        public void Wire_BoonAndLineageEvents_RoundTrip()
+        {
+            var boon = new BoonRevealedEvent(0, "trial-jab", 1);
+            var back = Assert.IsType<BoonRevealedEvent>(Wire.ReadEvent(Wire.Event(boon)));
+            Assert.Equal("boonRevealed", Wire.Event(boon).Value<string>("type"));
+            Assert.Equal(boon.UnitId, back.UnitId);
+            Assert.Equal(boon.BoonId, back.BoonId);
+            Assert.Equal(boon.ToPlayer, back.ToPlayer);
+
+            var lineage = new LineageRevealedEvent(1, "trial", 0);
+            var lineageBack = Assert.IsType<LineageRevealedEvent>(Wire.ReadEvent(Wire.Event(lineage)));
+            Assert.Equal("lineageRevealed", Wire.Event(lineage).Value<string>("type"));
+            Assert.Equal(lineage.UnitId, lineageBack.UnitId);
+            Assert.Equal(lineage.LineageId, lineageBack.LineageId);
+            Assert.Equal(lineage.ToPlayer, lineageBack.ToPlayer);
+        }
+
         // ---- malformed frames -------------------------------------------------------------------------
 
         [Fact]

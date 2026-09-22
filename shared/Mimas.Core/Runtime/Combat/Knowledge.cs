@@ -7,6 +7,9 @@ namespace Mimas.Core.Combat
     {
         /// <summary>True when <paramref name="viewer"/> has seen <paramref name="id"/> (an ability or modifier) on unit <paramref name="unitId"/>.</summary>
         bool Knows(int viewer, int unitId, string id);
+
+        /// <summary>True when <paramref name="viewer"/> has been shown the boon on unit <paramref name="unitId"/>. Boon ids are kept apart from ability and modifier ids: shipped content shares names between a boon and its modifier on purpose.</summary>
+        bool KnowsBoon(int viewer, int unitId, string boonId);
     }
 
     /// <summary>
@@ -38,12 +41,20 @@ namespace Mimas.Core.Combat
             return new Knowledge(viewer, revealed);
         }
 
-        /// <summary>Whether the viewer can see a hidden thing carried by a unit owned by <paramref name="ownerPlayer"/>.</summary>
+        /// <summary>Whether the viewer can see a hidden thing (an ability or a modifier) carried by a unit owned by <paramref name="ownerPlayer"/>.</summary>
         public bool CanSee(int ownerPlayer, int unitId, string id)
         {
             if (IsFull) return true;
             if (ownerPlayer == Viewer) return true;
             return _revealed.Knows(Viewer, unitId, id);
+        }
+
+        /// <summary>Whether the viewer has been shown a boon carried by a unit owned by <paramref name="ownerPlayer"/>.</summary>
+        public bool CanSeeBoon(int ownerPlayer, int unitId, string boonId)
+        {
+            if (IsFull) return true;
+            if (ownerPlayer == Viewer) return true;
+            return _revealed.KnowsBoon(Viewer, unitId, boonId);
         }
     }
 }

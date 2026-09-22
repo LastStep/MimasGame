@@ -32,11 +32,12 @@ namespace Mimas.Core.Match
         }
     }
 
-    /// <summary>A unit as one player sees it. Position, gear and numbers are public; abilities and hidden modifiers are not.</summary>
+    /// <summary>A unit as one player sees it. Position, gear and numbers are public; abilities, hidden modifiers, the lineage and the boons are not.</summary>
     public sealed class UnitView
     {
         private readonly List<KnownEntry> _abilities;
         private readonly List<KnownEntry> _modifiers;
+        private readonly List<KnownEntry> _boons;
 
         public int Id { get; }
         public int Owner { get; }
@@ -65,8 +66,15 @@ namespace Mimas.Core.Match
         /// <summary>Modifiers in grant order; hidden, unrevealed entries have a null id.</summary>
         public IReadOnlyList<KnownEntry> Modifiers => _modifiers;
 
+        /// <summary>The lineage: always for the viewer's own unit; for an enemy, once revealed, else null (design: #lineage rule 3).</summary>
+        public string LineageId { get; }
+
+        /// <summary>Boons in grant order; hidden entries have a null id, so the <em>count</em> of picks is public and their identity is not (design: #draft rule 5).</summary>
+        public IReadOnlyList<KnownEntry> Boons => _boons;
+
         public UnitView(int id, int owner, IReadOnlyList<string> itemIds, Hex position, int hp, int maxHp, int ap, int apPerTurn, bool isMine,
-            List<KnownEntry> abilities, List<KnownEntry> modifiers, int bodyHeight = 0, int aimHeight = 0)
+            List<KnownEntry> abilities, List<KnownEntry> modifiers, int bodyHeight = 0, int aimHeight = 0,
+            string lineageId = null, List<KnownEntry> boons = null)
         {
             BodyHeight = bodyHeight;
             AimHeight = aimHeight;
@@ -81,6 +89,18 @@ namespace Mimas.Core.Match
             IsMine = isMine;
             _abilities = abilities ?? new List<KnownEntry>();
             _modifiers = modifiers ?? new List<KnownEntry>();
+            LineageId = lineageId;
+            _boons = boons ?? new List<KnownEntry>();
+        }
+
+        public int UnrevealedBoonCount
+        {
+            get
+            {
+                int n = 0;
+                for (int i = 0; i < _boons.Count; i++) if (!_boons[i].Revealed) n++;
+                return n;
+            }
         }
 
         public int UnrevealedModifierCount
@@ -239,8 +259,25 @@ namespace Mimas.Core.Match
                     modifiers.Add(new KnownEntry(known ? id : null));
                 }
 
+                int boonTotal = unit.BoonIds.Count + unit.HiddenBoonCount;
+                var boons = new List<KnownEntry>(boonTotal);
+                for (int b = 0, next = 0, gap = 0; b < boonTotal; b++)
+                {
+                    if (gap < unit.HiddenBoonSlots.Count && unit.HiddenBoonSlots[gap].Index == b)
+                    {
+                        boons.Add(new KnownEntry(null));
+                        gap++;
+                        continue;
+                    }
+                    string id = unit.BoonIds[next++];
+                    bool known = mine || state.KnowsBoon(viewer, unit.Id, id);
+                    boons.Add(new KnownEntry(known ? id : null));
+                }
+
+                string lineage = unit.LineageId != null && (mine || state.KnowsLineage(viewer, unit.Id, unit.LineageId)) ? unit.LineageId : null;
+
                 units.Add(new UnitView(unit.Id, unit.Owner, unit.ItemIds, unit.Position, unit.Hp, unit.MaxHp, unit.Ap, unit.ApPerTurn, mine,
-                    abilities, modifiers, unit.BodyHeight, unit.AimHeight));
+                    abilities, modifiers, unit.BodyHeight, unit.AimHeight, lineage, boons));
             }
 
             var props = new List<PropView>(state.Props.Count);

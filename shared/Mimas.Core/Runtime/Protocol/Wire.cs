@@ -137,6 +137,10 @@ namespace Mimas.Core.Protocol
                     return new JObject { ["type"] = "abilityRevealed", ["unitId"] = x.UnitId, ["abilityId"] = x.AbilityId, ["toPlayer"] = x.ToPlayer };
                 case ModifierRevealedEvent x:
                     return new JObject { ["type"] = "modifierRevealed", ["unitId"] = x.UnitId, ["modifierId"] = x.ModifierId, ["toPlayer"] = x.ToPlayer };
+                case BoonRevealedEvent x:
+                    return new JObject { ["type"] = "boonRevealed", ["unitId"] = x.UnitId, ["boonId"] = x.BoonId, ["toPlayer"] = x.ToPlayer };
+                case LineageRevealedEvent x:
+                    return new JObject { ["type"] = "lineageRevealed", ["unitId"] = x.UnitId, ["lineageId"] = x.LineageId, ["toPlayer"] = x.ToPlayer };
                 case PropDestroyedEvent x:
                     return new JObject { ["type"] = "propDestroyed", ["propId"] = x.PropId };
                 case UnitDiedEvent x:
@@ -175,6 +179,10 @@ namespace Mimas.Core.Protocol
                     return new AbilityRevealedEvent(Int(o, "unitId", type), Str(o, "abilityId", type), Int(o, "toPlayer", type));
                 case "modifierRevealed":
                     return new ModifierRevealedEvent(Int(o, "unitId", type), Str(o, "modifierId", type), Int(o, "toPlayer", type));
+                case "boonRevealed":
+                    return new BoonRevealedEvent(Int(o, "unitId", type), Str(o, "boonId", type), Int(o, "toPlayer", type));
+                case "lineageRevealed":
+                    return new LineageRevealedEvent(Int(o, "unitId", type), Str(o, "lineageId", type), Int(o, "toPlayer", type));
                 case "propDestroyed":
                     return new PropDestroyedEvent(Int(o, "propId", type));
                 case "unitDied":
@@ -304,6 +312,10 @@ namespace Mimas.Core.Protocol
                 for (int m = 0; m < u.Modifiers.Count; m++)
                     modifiers.Add(new JObject { ["id"] = u.Modifiers[m].Id });
 
+                var boons = new JArray();
+                for (int b = 0; b < u.Boons.Count; b++)
+                    boons.Add(new JObject { ["id"] = u.Boons[b].Id });
+
                 var uo = new JObject { ["id"] = u.Id, ["owner"] = u.Owner };
                 uo["items"] = items;
                 uo["pos"] = Hex(u.Position);
@@ -316,6 +328,8 @@ namespace Mimas.Core.Protocol
                 uo["mine"] = u.IsMine;
                 uo["abilities"] = abilities;
                 uo["modifiers"] = modifiers;
+                uo["lineage"] = u.LineageId;
+                uo["boons"] = boons;
                 units.Add(uo);
             }
 
@@ -385,9 +399,20 @@ namespace Mimas.Core.Protocol
                     modifiers.Add(new KnownEntry(NullableStr(entry, "id", "modifier")));
                 }
 
+                var boonArr = Require(u, "boons", "unit") as JArray;
+                if (boonArr == null) throw new WireException("unit.boons must be an array.");
+                var boons = new List<KnownEntry>(boonArr.Count);
+                for (int b = 0; b < boonArr.Count; b++)
+                {
+                    var entry = boonArr[b] as JObject;
+                    if (entry == null) throw new WireException($"unit.boons[{b}] must be an object.");
+                    boons.Add(new KnownEntry(NullableStr(entry, "id", "boon")));
+                }
+
                 units.Add(new UnitView(Int(u, "id", "unit"), Int(u, "owner", "unit"), items, ReadHex(Require(u, "pos", "unit")),
                     Int(u, "hp", "unit"), Int(u, "maxHp", "unit"), Int(u, "ap", "unit"), Int(u, "apPerTurn", "unit"), Bool(u, "mine", "unit"),
-                    abilities, modifiers, Int(u, "body", "unit"), Int(u, "aim", "unit")));
+                    abilities, modifiers, Int(u, "body", "unit"), Int(u, "aim", "unit"),
+                    NullableStr(u, "lineage", "unit"), boons));
             }
 
             var propArr = Require(o, "props", "view") as JArray;
