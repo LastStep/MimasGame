@@ -15,18 +15,18 @@ namespace Mimas.Client.Presentation
     public sealed class MatchSettings : ScriptableObject
     {
         [Header("Board")]
-        [Tooltip("maps/*.json id. Leave empty to keep whatever the BoardView has set.")]
+        [Tooltip("Unused since part 2 of boons: a practice session plays the map ladder, round by round (design #round rule 3).")]
         public string MapId = "arena-4";
 
         [Header("Sides (items/*.json ids)")]
         public LoadoutSettings PlayerLoadout = new LoadoutSettings();
         public LoadoutSettings OpponentLoadout = new LoadoutSettings { Weapon = "flintlock", Boots = "blink-boots" };
 
-        [Tooltip("modifiers/*.json ids the player's unit starts with (stand-in for boons until the draft exists).")]
-        public string[] PlayerModifierIds = new string[0];
+        [Tooltip("lineages/*.json id you pray to in practice. Its starting Blessing comes with it.")]
+        public string PlayerLineage = "hindu";
 
-        [Tooltip("modifiers/*.json ids the opponent's unit starts with. Hidden ones (ward-of-feathers, stone-skin) exercise the reveal path.")]
-        public string[] OpponentModifierIds = { "ward-of-feathers", "stone-skin" };
+        [Tooltip("lineages/*.json id the bot prays to in practice.")]
+        public string OpponentLineage = "norse";
 
         [Header("Match")]
         [Tooltip("Seed for the match RNG and the bot. Same seed + same commands = same game.")]

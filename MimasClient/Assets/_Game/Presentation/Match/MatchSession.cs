@@ -360,10 +360,10 @@ namespace Mimas.Client.Presentation
                 }
                 else
                 {
-                    string mapId = _settings != null && !string.IsNullOrEmpty(_settings.MapId) ? _settings.MapId : "arena-4";
-                    _driver = new LocalMatchDriver(_catalog, _settings, mapId, () => IsPlaying);
-                    Debug.Log("[MatchSession] local practice: " + _settings.PlayerLoadout.Weapon + " vs "
-                        + _settings.OpponentLoadout.Weapon + " on " + mapId + ", seed " + _settings.Seed + ".");
+                    _driver = new LocalMatchDriver(_catalog, _settings, () => IsPlaying);
+                    Debug.Log("[MatchSession] local practice: " + _settings.PlayerLoadout.Weapon + " (" + _settings.PlayerLineage + ") vs "
+                        + _settings.OpponentLoadout.Weapon + " (" + _settings.OpponentLineage + "), round "
+                        + Mathf.Max(1, _driver.Session.Round) + " on " + _driver.Session.MapId + ", seed " + _settings.Seed + ".");
                 }
             }
             catch (Exception e) when (e is ArgumentException || e is KeyNotFoundException)
