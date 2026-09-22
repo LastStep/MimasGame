@@ -172,6 +172,12 @@ namespace Mimas.Core.Session
                     if (pick != null || Round == 0) return CommandResult.Reject(CommandRejectReason.WrongPhase);
                     return LastMatch.Validate(command);
                 default:
+                    // A resign in a draft concedes the series (design: #session rule 7; decided 22 Sep 2026, P8),
+                    // so it is legal between rounds as well as inside one. A disconnect forfeit is the same command.
+                    var quit = command as ResignCommand;
+                    if (quit != null) return quit.Player >= 0 && quit.Player < MatchSetup.PlayerCount
+                        ? CommandResult.Accepted
+                        : CommandResult.Reject(CommandRejectReason.WrongPhase);
                     if (pick == null) return CommandResult.Reject(CommandRejectReason.WrongPhase);
                     if (pick.Player >= MatchSetup.PlayerCount) return CommandResult.Reject(CommandRejectReason.WrongPhase);
                     if (_offers[pick.Player].Count == 0) return CommandResult.Accepted;      // a pick of nothing (§13)
@@ -196,6 +202,18 @@ namespace Mimas.Core.Session
                 MatchEndedEvent ended = null;
                 for (int i = 0; i < events.Count; i++) if (events[i] is MatchEndedEvent e) ended = e;
                 if (ended != null) EndRound(ended, events);
+                return events;
+            }
+
+            var quitting = command as ResignCommand;
+            if (quitting != null)
+            {
+                // No round is scored: the draft is not a round. The score stands as the last round left it.
+                Phase = SessionPhase.Over;
+                Winner = 1 - quitting.Player;
+                for (int p = 0; p < MatchSetup.PlayerCount; p++) { _offers[p].Clear(); _picked[p] = false; }
+                events.Add(new SessionEndedEvent(Winner, _score[0], _score[1],
+                    quitting.Reason == ResignReason.Disconnect ? SessionEndReason.Forfeit : SessionEndReason.Resign));
                 return events;
             }
 
@@ -228,11 +246,22 @@ namespace Mimas.Core.Session
             ImportRevealed(LastMatch.RevealedEntries);
             events.Add(new RoundEndedEvent(Round, ended.Winner, ended.Reason, _score[0], _score[1]));
 
+            // Conceding a round concedes the series, whatever the score (design: #session rule 7; P8). The
+            // round is scored first — it did end, and the RoundEndedEvent says how.
+            if (ended.Reason == MatchEndReason.Resign || ended.Reason == MatchEndReason.Forfeit)
+            {
+                Phase = SessionPhase.Over;
+                Winner = ended.Winner;
+                events.Add(new SessionEndedEvent(Winner, _score[0], _score[1],
+                    ended.Reason == MatchEndReason.Forfeit ? SessionEndReason.Forfeit : SessionEndReason.Resign));
+                return;
+            }
+
             if (_score[ended.Winner] >= RoundsToWin)
             {
                 Phase = SessionPhase.Over;
                 Winner = ended.Winner;
-                events.Add(new SessionEndedEvent(Winner, _score[0], _score[1]));
+                events.Add(new SessionEndedEvent(Winner, _score[0], _score[1], SessionEndReason.Score));
                 return;
             }
 

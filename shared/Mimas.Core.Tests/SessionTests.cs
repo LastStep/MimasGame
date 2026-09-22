@@ -10,6 +10,7 @@ using Mimas.Core.Geometry;
 using Mimas.Core.Match;
 using Mimas.Core.Protocol;
 using Mimas.Core.Session;
+using Mimas.Core.Units;
 using Newtonsoft.Json;
 using Xunit;
 
@@ -36,7 +37,34 @@ namespace Mimas.Core.Tests
             return session;
         }
 
-        /// <summary>The player who is not on turn resigns, so the round's winner is the active player.</summary>
+        /// <summary>
+        /// Ends the round by elimination, the only way to reach a draft since P8: a resign concedes the whole
+        /// series. The loser's hero is worn down to one hit with <see cref="Unit.TakeDamage"/> (no command, no
+        /// events) and the winner lands the last one, so the round ends inside one <see cref="Session.Apply"/>.
+        /// </summary>
+        private static List<MatchEvent> EliminateRound(Session session, int loser)
+        {
+            int winner = 1 - loser;
+            MatchState round = session.Match;
+            round.Units.Get(0).MoveTo(new Hex(-1, 1));              // the archer, adjacent to the brute
+            round.Units.Get(1).MoveTo(new Hex(0, 0));
+            Unit victim = round.Units.Get(loser);
+            victim.TakeDamage(victim.Hp - 1);
+            if (round.ActivePlayer != winner) session.Apply(new EndTurnCommand(loser));
+            return new List<MatchEvent>(session.Apply(new AttackCommand(winner, winner,
+                winner == 0 ? "bow" : "strike", loser == 0 ? new Hex(-1, 1) : new Hex(0, 0))));
+        }
+
+        /// <summary>Picks any offer but the fixture's crippling trade Blessing (ap −5), so the hero can still act next round.</summary>
+        private static void PickSafely(Session session, int player)
+        {
+            IReadOnlyList<string> offers = session.OffersOf(player);
+            int index = 0;
+            for (int i = 0; i < offers.Count; i++) if (offers[i] != "trial-trade") { index = i; break; }
+            session.Apply(new DraftPickCommand(player, index));
+        }
+
+        /// <summary>The player who is not on turn resigns, so the round's winner is the active player — and, since P8, the session's.</summary>
         private static List<MatchEvent> ResignRound(Session session, int loser) => new List<MatchEvent>(session.Apply(new ResignCommand(loser)));
 
         private static string Log(MatchEvent e) => e is SessionEvent ? e.ToString() : Wire.Event(e).ToString(Formatting.None);
@@ -107,8 +135,8 @@ namespace Mimas.Core.Tests
             List<MatchEvent> events;
             var session = Started(catalog, 3, out events);
             int first = session.Match.ActivePlayer;
-            int loser = first;                                                      // the first mover concedes
-            ResignRound(session, loser);
+            int loser = first;                                                      // the first mover goes down
+            EliminateRound(session, loser);
             Assert.Equal(loser, session.LastRoundLoser);
             Assert.Equal(SessionPhase.Draft, session.Phase);
 
@@ -126,11 +154,11 @@ namespace Mimas.Core.Tests
             var catalog = CombatFixtures.Catalog();
             List<MatchEvent> events;
             var session = Started(catalog, 5, out events);
-            ResignRound(session, 1);                                                // P0 takes round 1
+            EliminateRound(session, 1);                                             // P0 takes round 1
             session.Apply(new DraftPickCommand(0, 0));
             session.Apply(new DraftPickCommand(1, 0));
             Assert.Equal("props-3", session.Match.MapData.Id);
-            ResignRound(session, 0);                                                // P1 takes round 2: 1-1
+            EliminateRound(session, 0);                                             // P1 takes round 2: 1-1
             Assert.Equal(1, session.Score(0));
             Assert.Equal(1, session.Score(1));
             session.Apply(new DraftPickCommand(0, 0));
@@ -146,19 +174,19 @@ namespace Mimas.Core.Tests
             var catalog = CombatFixtures.Catalog();
             List<MatchEvent> events;
             var session = Started(catalog, 7, out events);
-            var ended = ResignRound(session, 1);
+            var ended = EliminateRound(session, 1);
 
-            Assert.Equal(new[] { typeof(MatchEndedEvent), typeof(RoundEndedEvent), typeof(DraftStartedEvent) }, ended.Select(e => e.GetType()));
-            var round = (RoundEndedEvent)ended[1];
+            Assert.Equal(new[] { typeof(MatchEndedEvent), typeof(RoundEndedEvent), typeof(DraftStartedEvent) }, ended.Skip(ended.Count - 3).Select(e => e.GetType()));
+            var round = (RoundEndedEvent)ended[ended.Count - 2];
             Assert.Equal(1, round.Round);
             Assert.Equal(0, round.Winner);
-            Assert.Equal(MatchEndReason.Resign, round.Reason);
+            Assert.Equal(MatchEndReason.Elimination, round.Reason);
             Assert.Equal(1, round.Score0);
             Assert.Equal(0, round.Score1);
             Assert.Equal(1, session.Score(0));
             Assert.Equal(0, session.Score(1));
 
-            var draft = (DraftStartedEvent)ended[2];
+            var draft = (DraftStartedEvent)ended[ended.Count - 1];
             Assert.Equal(3, draft.Offers0.Count);                                   // rules.draft.offers.winner
             Assert.Equal(3, draft.Offers1.Count);                                   // rules.draft.offers.loser
             Assert.Equal(draft.Offers0, session.OffersOf(0));
@@ -187,7 +215,7 @@ namespace Mimas.Core.Tests
             var catalog = CombatFixtures.Catalog();
             List<MatchEvent> events;
             var session = Started(catalog, 7, out events);
-            ResignRound(session, 1);
+            EliminateRound(session, 1);
             string chosen = session.OffersOf(0)[1];
 
             var picked = session.Apply(new DraftPickCommand(0, 1));
@@ -215,7 +243,7 @@ namespace Mimas.Core.Tests
             var catalog = CombatFixtures.Catalog();
             List<MatchEvent> events;
             var session = Started(catalog, 7, out events);
-            ResignRound(session, 1);
+            EliminateRound(session, 1);
             string first = session.OffersOf(1)[0];
             var picked = session.Apply(new DraftPickCommand(1, 0, DraftPickReason.Timeout));
             var e = Assert.IsType<DraftPickedEvent>(Assert.Single(picked));
@@ -231,7 +259,7 @@ namespace Mimas.Core.Tests
             var catalog = CombatFixtures.Catalog();
             List<MatchEvent> events;
             var session = Started(catalog, 7, out events);
-            ResignRound(session, 1);
+            EliminateRound(session, 1);
             session.Apply(new DraftPickCommand(1, 0));
             var both = session.Apply(new DraftPickCommand(0, 0));
             Assert.Equal(typeof(DraftPickedEvent), both[0].GetType());
@@ -248,16 +276,17 @@ namespace Mimas.Core.Tests
             var catalog = CombatFixtures.Catalog();
             List<MatchEvent> events;
             var session = Started(catalog, 7, out events);
-            ResignRound(session, 1);
+            EliminateRound(session, 1);
             session.Apply(new DraftPickCommand(0, 0));
             session.Apply(new DraftPickCommand(1, 0));
-            var ended = ResignRound(session, 1);
+            var ended = EliminateRound(session, 1);
 
-            Assert.Equal(new[] { typeof(MatchEndedEvent), typeof(RoundEndedEvent), typeof(SessionEndedEvent) }, ended.Select(e => e.GetType()));
-            var over = (SessionEndedEvent)ended[2];
+            Assert.Equal(new[] { typeof(MatchEndedEvent), typeof(RoundEndedEvent), typeof(SessionEndedEvent) }, ended.Skip(ended.Count - 3).Select(e => e.GetType()));
+            var over = (SessionEndedEvent)ended[ended.Count - 1];
             Assert.Equal(0, over.Winner);
             Assert.Equal(2, over.Score0);
             Assert.Equal(0, over.Score1);
+            Assert.Equal(SessionEndReason.Score, over.Reason);                      // the series was won, not conceded
             Assert.True(session.IsOver);
             Assert.Equal(0, session.Winner);
             Assert.Equal(SessionPhase.Over, session.Phase);
@@ -269,26 +298,79 @@ namespace Mimas.Core.Tests
             Assert.Empty(legal);
         }
 
+        /// <summary>Resign concedes the series, not the round (design: #session rule 7; decided 22 Sep 2026, P8).</summary>
         [Fact]
-        public void Session_ResignInRoundOne_CountsAsRoundLoss()
+        public void Session_ResignInRound_EndsTheSessionWithResign()
         {
             var catalog = CombatFixtures.Catalog();
             List<MatchEvent> events;
             var session = Started(catalog, 9, out events);
             var ended = ResignRound(session, 0);
+
+            // The round is scored first — it did end, and the RoundEndedEvent says how — and then the series stops.
             var round = ended.OfType<RoundEndedEvent>().Single();
             Assert.Equal(1, round.Winner);
             Assert.Equal(MatchEndReason.Resign, round.Reason);
+            Assert.Equal(0, round.Score0);
+            Assert.Equal(1, round.Score1);
             Assert.Equal(0, session.LastRoundLoser);
-            Assert.False(session.IsOver);
 
-            // A forfeit the same way.
-            session.Apply(new DraftPickCommand(0, 0));
-            session.Apply(new DraftPickCommand(1, 0));
-            var forfeit = session.Apply(new ResignCommand(0, ResignReason.Disconnect)).OfType<RoundEndedEvent>().Single();
-            Assert.Equal(MatchEndReason.Forfeit, forfeit.Reason);
+            var over = ended.OfType<SessionEndedEvent>().Single();
+            Assert.Equal(1, over.Winner);
+            Assert.Equal(SessionEndReason.Resign, over.Reason);
+            Assert.Equal(0, over.Score0);
+            Assert.Equal(1, over.Score1);
+            Assert.Equal("session over: P1 wins 0-1 by Resign", over.ToString());
             Assert.True(session.IsOver);
             Assert.Equal(1, session.Winner);
+            Assert.Equal(SessionPhase.Over, session.Phase);
+            Assert.DoesNotContain(ended, e => e is DraftStartedEvent);              // no draft: the series is over
+        }
+
+        [Fact]
+        public void Session_ForfeitInRound_EndsTheSessionWithForfeit()
+        {
+            var catalog = CombatFixtures.Catalog();
+            List<MatchEvent> events;
+            var session = Started(catalog, 9, out events);
+            var ended = new List<MatchEvent>(session.Apply(new ResignCommand(0, ResignReason.Disconnect)));
+
+            Assert.Equal(MatchEndReason.Forfeit, ended.OfType<RoundEndedEvent>().Single().Reason);
+            var over = ended.OfType<SessionEndedEvent>().Single();
+            Assert.Equal(SessionEndReason.Forfeit, over.Reason);
+            Assert.Equal(1, over.Winner);
+            Assert.True(session.IsOver);
+        }
+
+        /// <summary>A resign between rounds ends the series too, and scores nothing: a draft is not a round.</summary>
+        [Fact]
+        public void Session_ResignInDraft_EndsTheSessionWithoutScoring()
+        {
+            var catalog = CombatFixtures.Catalog();
+            List<MatchEvent> events;
+            var session = Started(catalog, 7, out events);
+            EliminateRound(session, 1);                                             // P0 leads 1-0, the draft is open
+            Assert.Equal(SessionPhase.Draft, session.Phase);
+            Assert.True(session.Validate(new ResignCommand(0)).Ok);
+            Assert.Equal(CommandRejectReason.WrongPhase, session.Validate(new EndTurnCommand(0)).Reason);
+
+            var ended = new List<MatchEvent>(session.Apply(new ResignCommand(0)));
+            var over = Assert.IsType<SessionEndedEvent>(Assert.Single(ended));      // no round ended: none was running
+            Assert.Equal(1, over.Winner);
+            Assert.Equal(SessionEndReason.Resign, over.Reason);
+            Assert.Equal(1, over.Score0);                                           // the score stands where round 1 left it
+            Assert.Equal(0, over.Score1);
+            Assert.True(session.IsOver);
+            Assert.Equal(1, session.Winner);
+            Assert.Empty(session.OffersOf(0));
+            Assert.Equal(CommandRejectReason.MatchOver, session.Validate(new ResignCommand(1)).Reason);
+
+            // A disconnect past the grace is the same command with the other reason.
+            var second = Started(catalog, 7, out events);
+            EliminateRound(second, 1);
+            var forfeit = Assert.IsType<SessionEndedEvent>(Assert.Single(second.Apply(new ResignCommand(1, ResignReason.Disconnect))));
+            Assert.Equal(SessionEndReason.Forfeit, forfeit.Reason);
+            Assert.Equal(0, forfeit.Winner);
         }
 
         [Fact]
@@ -301,9 +383,9 @@ namespace Mimas.Core.Tests
             Assert.Throws<InvalidOperationException>(() => session.Apply(new DraftPickCommand(0, 0)));
             Assert.True(session.Validate(new EndTurnCommand(session.Match.ActivePlayer)).Ok);
 
-            ResignRound(session, 1);
+            EliminateRound(session, 1);
             Assert.Equal(CommandRejectReason.WrongPhase, session.Validate(new EndTurnCommand(0)).Reason);
-            Assert.Equal(CommandRejectReason.WrongPhase, session.Validate(new ResignCommand(0)).Reason);
+            Assert.True(session.Validate(new ResignCommand(0)).Ok);                 // a resign in a draft concedes the series (P8)
             var into = new List<MatchEvent>();
             CommandResult result;
             Assert.False(session.TryApply(new EndTurnCommand(0), into, out result));
@@ -328,7 +410,7 @@ namespace Mimas.Core.Tests
             Assert.Contains(shot.OfType<BoonRevealedEvent>(), e => e.BoonId == "trial-might");
             Assert.True(round1.KnowsBoon(1, 0, "trial-might"));
 
-            ResignRound(session, 0);
+            EliminateRound(session, 0);
             Assert.Contains(session.RevealedEntries, r => r.Viewer == 1 && r.UnitId == 0 && r.Id.EndsWith("trial-might"));
             session.Apply(new DraftPickCommand(0, 0));
             session.Apply(new DraftPickCommand(1, 0));
@@ -356,7 +438,7 @@ namespace Mimas.Core.Tests
             var catalog = CombatFixtures.Catalog();
             List<MatchEvent> events;
             var session = Started(catalog, 7, out events);
-            var ended = ResignRound(session, 1);
+            var ended = EliminateRound(session, 1);
 
             var for0 = new List<MatchEvent>();
             var for1 = new List<MatchEvent>();
@@ -365,10 +447,9 @@ namespace Mimas.Core.Tests
             var draft0 = for0.OfType<DraftStartedEvent>().Single();
             var draft1 = for1.OfType<DraftStartedEvent>().Single();
             Assert.Equal(session.OffersOf(0), draft0.Offers0);
-            Assert.Empty(draft0.Offers1);
-            Assert.Empty(draft1.Offers0);
+            Assert.Null(draft0.Offers1);                                            // not "empty": the field is absent, not zero offers
+            Assert.Null(draft1.Offers0);
             Assert.Equal(session.OffersOf(1), draft1.Offers1);
-            Assert.Equal(3, for0.Count);
 
             var picked = session.Apply(new DraftPickCommand(0, 1));
             for0.Clear(); for1.Clear();
@@ -406,7 +487,7 @@ namespace Mimas.Core.Tests
             var catalog = CombatFixtures.Catalog();
             List<MatchEvent> events;
             var session = Started(catalog, 7, out events);
-            ResignRound(session, 1);
+            EliminateRound(session, 1);
             session.Apply(new DraftPickCommand(1, 0));
 
             var view0 = SessionView.For(session, 0);
@@ -432,9 +513,9 @@ namespace Mimas.Core.Tests
             var catalog = ContentCatalog.Load(files);
             List<MatchEvent> events;
             var session = Started(catalog, 7, out events);
-            var ended = ResignRound(session, 1);
+            var ended = EliminateRound(session, 1);
             var draft = ended.OfType<DraftStartedEvent>().Single();
-            Assert.Empty(draft.Offers1);
+            Assert.Empty(draft.Offers1);                                            // genuinely offered nothing, so an empty list, not null
             Assert.Equal(3, draft.Offers0.Count);
             Assert.True(session.HasPicked(1));
             Assert.False(session.HasPicked(0));
@@ -447,10 +528,84 @@ namespace Mimas.Core.Tests
                 ? new ContentFile(f.Path, f.Text.Replace(@"""winner"": 3, ""loser"": 3", @"""winner"": 0, ""loser"": 0"))
                 : f).ToList();
             var noDraft = Started(ContentCatalog.Load(none), 7, out events);
-            var straight = ResignRound(noDraft, 1);
-            Assert.Equal(new[] { typeof(MatchEndedEvent), typeof(RoundEndedEvent), typeof(DraftStartedEvent), typeof(RoundStartedEvent) }, straight.Take(4).Select(e => e.GetType()));
+            var straight = EliminateRound(noDraft, 1);
+            int end = straight.FindIndex(e => e is MatchEndedEvent);
+            Assert.Equal(new[] { typeof(MatchEndedEvent), typeof(RoundEndedEvent), typeof(DraftStartedEvent), typeof(RoundStartedEvent) },
+                straight.Skip(end).Take(4).Select(e => e.GetType()));
             Assert.Equal(2, noDraft.Round);
             Assert.Equal(SessionPhase.Round, noDraft.Phase);
+        }
+
+        [Fact]
+        public void SessionView_NextMapId_WrapsTheLadder()
+        {
+            var catalog = CombatFixtures.Catalog();
+            List<MatchEvent> events;
+            var session = Started(catalog, 5, out events);
+
+            // Round 1 on field-3: the board shows field-3, the next round is props-3.
+            var round1 = SessionView.For(session, 0);
+            Assert.Equal("field-3", round1.MapId);
+            Assert.Equal("props-3", round1.NextMapId);
+            Assert.Equal(2, round1.RoundsToWin);
+
+            // In the draft there is no round: the board shows the map the next one will play.
+            EliminateRound(session, 1);
+            var draft = SessionView.For(session, 0);
+            Assert.Equal(SessionPhase.Draft, draft.Phase);
+            Assert.Equal("props-3", draft.MapId);
+            Assert.Equal("props-3", draft.NextMapId);
+
+            PickSafely(session, 0);
+            PickSafely(session, 1);
+            var round2 = SessionView.For(session, 0);
+            Assert.Equal("props-3", round2.MapId);
+            Assert.Equal("field-3", round2.NextMapId);                              // (2 mod 2) = 0: the ladder wraps
+
+            // Over: there is no next map.
+            EliminateRound(session, 1);
+            var over = SessionView.For(session, 0);
+            Assert.True(over.IsOver);
+            Assert.Null(over.NextMapId);
+            Assert.Null(over.MapId);
+        }
+
+        [Fact]
+        public void SessionView_Create_RoundTripsFor()
+        {
+            var catalog = CombatFixtures.Catalog();
+            List<MatchEvent> events;
+            var session = Started(catalog, 7, out events);
+            EliminateRound(session, 1);
+            session.Apply(new DraftPickCommand(1, 0));
+
+            SessionView original = SessionView.For(session, 0);
+            SessionView copy = SessionView.Create(original.Viewer, original.Round, original.Phase, original.Score0, original.Score1,
+                original.RoundsToWin, original.IsOver, original.Winner, original.MapId, original.NextMapId, original.MyBuild,
+                original.OpponentLineageId, new List<KnownEntry>(original.OpponentBoons), new List<string>(original.MyOffers),
+                original.IHavePicked, original.OpponentHasPicked, original.Match);
+
+            Assert.Equal(original.Viewer, copy.Viewer);
+            Assert.Equal(original.Round, copy.Round);
+            Assert.Equal(original.Phase, copy.Phase);
+            Assert.Equal(original.Score0, copy.Score0);
+            Assert.Equal(original.Score1, copy.Score1);
+            Assert.Equal(original.RoundsToWin, copy.RoundsToWin);
+            Assert.Equal(original.IsOver, copy.IsOver);
+            Assert.Equal(original.Winner, copy.Winner);
+            Assert.Equal(original.MapId, copy.MapId);
+            Assert.Equal(original.NextMapId, copy.NextMapId);
+            Assert.Equal(original.MyBuild, copy.MyBuild);
+            Assert.Equal(original.OpponentLineageId, copy.OpponentLineageId);
+            Assert.Equal(original.MyOffers, copy.MyOffers);
+            Assert.Equal(original.IHavePicked, copy.IHavePicked);
+            Assert.True(copy.OpponentHasPicked);
+            Assert.Null(copy.Match);
+
+            Assert.Throws<ArgumentOutOfRangeException>(() => SessionView.Create(2, 1, SessionPhase.Round, 0, 0, 2, false, -1, "field-3", "props-3",
+                session.BuildOf(0), null, null, null, false, false, null));
+            Assert.Throws<ArgumentNullException>(() => SessionView.Create(0, 1, SessionPhase.Round, 0, 0, 2, false, -1, "field-3", "props-3",
+                null, null, null, null, false, false, null));
         }
 
         // ---- bots and the golden replay ---------------------------------------------------------------------
@@ -463,7 +618,7 @@ namespace Mimas.Core.Tests
             var session = Started(catalog, 7, out events);
             var bot = new RandomBot(3);
             Assert.Null(bot.ChooseDraft(session, 0));                                // not in a draft
-            ResignRound(session, 1);
+            EliminateRound(session, 1);
             var pick = Assert.IsType<DraftPickCommand>(bot.ChooseDraft(session, 1));
             Assert.Equal(1, pick.Player);
             Assert.Equal(0, pick.OfferIndex);

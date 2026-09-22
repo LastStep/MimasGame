@@ -5,7 +5,7 @@ project: mimas
 feature: F-boons
 milestone: M3
 lane: full
-status: approved
+status: running
 owner: builder
 model: opus
 worktree:

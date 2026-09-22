@@ -21,6 +21,16 @@ namespace Mimas.Core.Session
         public int Score1 { get; }
         public bool IsOver { get; }
         public int Winner { get; }
+
+        /// <summary><c>bestOf / 2 + 1</c>: how many rounds the score line is counting towards.</summary>
+        public int RoundsToWin { get; }
+
+        /// <summary>The map the board shows: the running round's, or — between rounds — the next round's. Null once the session is over.</summary>
+        public string MapId { get; }
+
+        /// <summary>The map the next round will play, null when the session is over. What a reconnect during a draft builds its dimmed board from.</summary>
+        public string NextMapId { get; }
+
         public PlayerBuild MyBuild { get; }
 
         /// <summary>The opponent's lineage once revealed, else null.</summary>
@@ -38,7 +48,8 @@ namespace Mimas.Core.Session
         /// <summary>The round's view, or null between rounds and after the end.</summary>
         public PlayerView Match { get; }
 
-        private SessionView(int viewer, int round, SessionPhase phase, int score0, int score1, bool isOver, int winner, PlayerBuild myBuild,
+        private SessionView(int viewer, int round, SessionPhase phase, int score0, int score1, int roundsToWin, bool isOver, int winner,
+            string mapId, string nextMapId, PlayerBuild myBuild,
             string opponentLineageId, List<KnownEntry> opponentBoons, List<string> myOffers, bool iHavePicked, bool opponentHasPicked, PlayerView match)
         {
             Viewer = viewer;
@@ -46,8 +57,11 @@ namespace Mimas.Core.Session
             Phase = phase;
             Score0 = score0;
             Score1 = score1;
+            RoundsToWin = roundsToWin;
             IsOver = isOver;
             Winner = winner;
+            MapId = mapId;
+            NextMapId = nextMapId;
             MyBuild = myBuild;
             OpponentLineageId = opponentLineageId;
             _opponentBoons = opponentBoons;
@@ -74,9 +88,28 @@ namespace Mimas.Core.Session
             }
             string lineage = knowledge != null && knowledge.KnowsLineage(viewer, opponent, theirs.LineageId) ? theirs.LineageId : null;
 
-            return new SessionView(viewer, session.Round, session.Phase, session.Score(0), session.Score(1), session.IsOver, session.Winner,
-                session.BuildOf(viewer), lineage, boons, new List<string>(session.OffersOf(viewer)),
+            // Round n plays ladder position ((n − 1) mod count) + 1, so round n + 1 plays index n mod count (D17).
+            string nextMapId = session.IsOver ? null : session.Ladder[session.Round % session.Ladder.Count];
+            string mapId = session.Match != null ? session.Match.MapData.Id : nextMapId;
+
+            return new SessionView(viewer, session.Round, session.Phase, session.Score(0), session.Score(1), session.RoundsToWin, session.IsOver, session.Winner,
+                mapId, nextMapId, session.BuildOf(viewer), lineage, boons, new List<string>(session.OffersOf(viewer)),
                 session.HasPicked(viewer), session.HasPicked(opponent), session.Match != null ? session.Match.ViewFor(viewer) : null);
+        }
+
+        /// <summary>
+        /// A session view assembled from parts — the twin of <see cref="PlayerView.Create"/>, and what
+        /// <c>Wire.ReadSession</c> calls. A client never builds one any other way;
+        /// <see cref="For"/> is the only path from a live <see cref="Session"/>.
+        /// </summary>
+        public static SessionView Create(int viewer, int round, SessionPhase phase, int score0, int score1, int roundsToWin, bool isOver, int winner,
+            string mapId, string nextMapId, PlayerBuild myBuild, string opponentLineageId, List<KnownEntry> opponentBoons,
+            List<string> myOffers, bool iHavePicked, bool opponentHasPicked, PlayerView match)
+        {
+            if (viewer < 0 || viewer >= MatchSetup.PlayerCount) throw new ArgumentOutOfRangeException(nameof(viewer));
+            if (myBuild == null) throw new ArgumentNullException(nameof(myBuild));
+            return new SessionView(viewer, round, phase, score0, score1, roundsToWin, isOver, winner, mapId, nextMapId, myBuild,
+                opponentLineageId, opponentBoons ?? new List<KnownEntry>(), myOffers ?? new List<string>(), iHavePicked, opponentHasPicked, match);
         }
     }
 }
