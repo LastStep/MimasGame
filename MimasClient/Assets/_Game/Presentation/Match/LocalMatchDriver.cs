@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Mimas.Core.Bots;
 using Mimas.Core.Content;
 using Mimas.Core.Match;
+using Mimas.Core.Session;
 using UnityEngine;
 
 namespace Mimas.Client.Presentation
@@ -57,6 +58,13 @@ namespace Mimas.Client.Presentation
         public event Action<IReadOnlyList<MatchEvent>> EventsArrived;
         public event Action Resynced;
         public event Action StatusChanged;
+        public event Action NextRound;
+
+        /// <summary>Practice plays one round until part 2's session host lands in the next commit.</summary>
+        public SessionView Session { get { return null; } }
+
+        /// <summary>There is no draft in a single practice round.</summary>
+        public bool SubmitDraftPick(int offerIndex) { return false; }
 
         /// <param name="isPlaying">
         /// Whether the board is mid-animation. The local clock waits for it and the bot waits for it, because
@@ -159,6 +167,7 @@ namespace Mimas.Client.Presentation
             EventsArrived = null;
             Resynced = null;
             StatusChanged = null;
+            NextRound = null;
             Ready = false;
         }
 

@@ -4,6 +4,7 @@ using Mimas.Client.Net;
 using Mimas.Core.Content;
 using Mimas.Core.Match;
 using Mimas.Core.Protocol;
+using Mimas.Core.Session;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
 
@@ -33,6 +34,8 @@ namespace Mimas.Client.Presentation
 
         private MatchState _rules;
         private PlayerView _view;
+        private SessionView _session;
+        private int _round;
         private int _seq = -1;
 
         // The clock is anchored on every message and counted down locally between them, so the rope is
@@ -49,7 +52,10 @@ namespace Mimas.Client.Presentation
         public int LocalPlayer { get; private set; }
         public MatchState Rules { get { return _rules; } }
         public PlayerView View { get { return _view; } }
-        public bool Ready { get { return _rules != null; } }
+        public SessionView Session { get { return _session; } }
+
+        /// <summary>There is a session. Between rounds that is still true, and Rules and View are null.</summary>
+        public bool Ready { get { return _session != null; } }
         public string OpponentName { get; private set; }
         public string OpponentStatus { get { return _opponentStatus; } }
         public float TurnSecondsTotal { get { return _turnTotal; } }
@@ -69,12 +75,14 @@ namespace Mimas.Client.Presentation
         public event Action<IReadOnlyList<MatchEvent>> EventsArrived;
         public event Action Resynced;
         public event Action StatusChanged;
+        public event Action NextRound;
 
         public OnlineMatchDriver(ContentCatalog catalog, NetClient net, JObject matchStart)
         {
             _catalog = catalog;
             _net = net;
             _matchId = matchStart.Value<int>("matchId");
+            _round = matchStart.Value<int>("round");
             LocalPlayer = matchStart.Value<int>("youAre");
             OpponentName = matchStart.Value<string>("opponentName") ?? "Opponent";
 
@@ -99,13 +107,33 @@ namespace Mimas.Client.Presentation
         {
             if (!Ready) return false;
 
-            // Asked of the mirror, which is the same rules code the server runs: a click the rules would
-            // refuse is refused here, at once, and never becomes a round trip.
-            CommandResult check = _rules.Validate(command);
-            if (!check.Ok)
+            // A draft pick is checked against the session block, which is all a seat knows about its own
+            // offers; everything else is asked of the mirror, which is the same rules code the server runs,
+            // so a click the rules would refuse is refused here, at once, and never becomes a round trip.
+            var pick = command as DraftPickCommand;
+            if (pick != null)
             {
-                Debug.Log("[OnlineMatchDriver] " + command + " refused locally: " + check);
-                return false;
+                if (_session.Phase != SessionPhase.Draft || _session.IHavePicked
+                    || pick.OfferIndex < 0 || pick.OfferIndex >= _session.MyOffers.Count)
+                {
+                    Debug.Log("[OnlineMatchDriver] " + command + " refused locally: not a pick this seat may make now");
+                    return false;
+                }
+            }
+            else if (command is ResignCommand)
+            {
+                // Conceding is legal in a draft too (P8), where there is no mirror to ask.
+                if (!CanResign) return false;
+            }
+            else
+            {
+                if (_rules == null) return false;
+                CommandResult check = _rules.Validate(command);
+                if (!check.Ok)
+                {
+                    Debug.Log("[OnlineMatchDriver] " + command + " refused locally: " + check);
+                    return false;
+                }
             }
 
             return _net.Send(Messages.MatchCommand, new JObject
@@ -113,6 +141,11 @@ namespace Mimas.Client.Presentation
                 ["matchId"] = _matchId,
                 ["command"] = Wire.Command(command),
             });
+        }
+
+        public bool SubmitDraftPick(int offerIndex)
+        {
+            return Submit(new DraftPickCommand(LocalPlayer, offerIndex));
         }
 
         public void Resign()
@@ -151,6 +184,7 @@ namespace Mimas.Client.Presentation
             EventsArrived = null;
             Resynced = null;
             StatusChanged = null;
+            NextRound = null;
         }
 
         // ---- the server speaks --------------------------------------------------------------------------
@@ -197,8 +231,19 @@ namespace Mimas.Client.Presentation
 
                 case Messages.MatchStart:
                 {
-                    // A second match.start for the same match is a reconnect: the whole board, as it now is.
                     if (p.Value<int>("matchId") != _matchId) return;
+
+                    // A match.start for a round this driver is not showing is the next round of the series:
+                    // the presenter reloads the Arena and the fresh scene consumes the start that is waiting
+                    // in NetClient.PendingMatch, exactly as it does for the first one (ADR-036).
+                    if (p.Value<int>("round") != _round)
+                    {
+                        Action next = NextRound;
+                        if (next != null) next();
+                        return;
+                    }
+
+                    // A second match.start for the same round is a reconnect: the whole board, as it now is.
                     _seq = p.Value<int>("seq");
                     Adopt(p);
                     SetStatus(null);
@@ -249,7 +294,7 @@ namespace Mimas.Client.Presentation
             SetStatus(LostStatus);
         }
 
-        /// <summary>Replaces the mirror and the clock from whatever the server just sent.</summary>
+        /// <summary>Replaces the mirror, the session and the clock from whatever the server just sent.</summary>
         private void Adopt(JObject p)
         {
             var view = p["view"] as JObject;
@@ -258,6 +303,19 @@ namespace Mimas.Client.Presentation
                 _view = Wire.ReadView(view);
                 _rules = MatchState.FromView(_catalog, _view);
                 if (_view.IsOver) _matchOver = true;
+            }
+            else if (p["view"] != null)
+            {
+                // An explicit null: there is no round, so there is no board to answer questions about.
+                _view = null;
+                _rules = null;
+            }
+
+            var session = p["session"] as JObject;
+            if (session != null)
+            {
+                _session = Wire.ReadSession(session, _view);
+                if (_session.IsOver) _matchOver = true;
             }
 
             var clock = p["clock"] as JObject;

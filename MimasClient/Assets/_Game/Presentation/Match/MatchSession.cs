@@ -294,6 +294,7 @@ namespace Mimas.Client.Presentation
             _driver.EventsArrived -= HandleEventsArrived;
             _driver.Resynced -= HandleResynced;
             _driver.StatusChanged -= HandleStatusChanged;
+            _driver.NextRound -= HandleNextRound;
             _driver.Dispose();
             _driver = null;
         }
@@ -371,24 +372,35 @@ namespace Mimas.Client.Presentation
                 return;
             }
 
-            if (!_board.IsBuilt) _board.Build(_driver.Rules.MapData.Id);
+            // The map comes from the session, not from the round: between rounds there is no round, and the
+            // board still has to be built — dimmed, with the draft over it (ADR-036).
+            string boardMapId = _driver.Session != null ? _driver.Session.MapId
+                : _driver.Rules != null ? _driver.Rules.MapData.Id : null;
+            if (boardMapId == null)
+            {
+                Debug.LogError("[MatchSession] The driver named no map to build.", this);
+                return;
+            }
+            if (!_board.IsBuilt) _board.Build(boardMapId);
             if (!_board.IsBuilt || _board.MapData == null)
             {
-                Debug.LogError("[MatchSession] The board could not be built for map '" + _driver.Rules.MapData.Id + "'.", this);
+                Debug.LogError("[MatchSession] The board could not be built for map '" + boardMapId + "'.", this);
                 return;
             }
 
             _driver.EventsArrived += HandleEventsArrived;
             _driver.Resynced += HandleResynced;
             _driver.StatusChanged += HandleStatusChanged;
+            _driver.NextRound += HandleNextRound;
 
             _unitViews.Clear();
             _propViews.Clear();
             _hudUnits.Clear();
             _hudUnitsById.Clear();
             // Which prefab plays which side is decided by ownership, not by seat number: online you may be
-            // seat 1, and your hero should still be the one that looks like yours.
-            for (int i = 0; i < View.Units.Count; i++)
+            // seat 1, and your hero should still be the one that looks like yours. Between rounds there are
+            // no units to spawn: the board is built and dimmed, and the draft is drawn over it.
+            for (int i = 0; View != null && i < View.Units.Count; i++)
             {
                 Mimas.Core.Match.UnitView unit = View.Units[i];
                 UnitView view = unit.IsMine ? _unit : _opponent;
@@ -545,6 +557,15 @@ namespace Mimas.Client.Presentation
             _pauseUntil = 0f;
             Disarm();
 
+            // Between rounds there is no board to snap: the session block is all there is, and the draft
+            // overlay is drawn from it.
+            if (View == null)
+            {
+                RefreshView();
+                RaiseStateChanged();
+                return;
+            }
+
             for (int i = 0; i < View.Units.Count; i++)
             {
                 Mimas.Core.Match.UnitView unit = View.Units[i];
@@ -585,6 +606,17 @@ namespace Mimas.Client.Presentation
             FaceNearestEnemies();
             RaiseStateChanged();
             Debug.Log("[MatchSession] resynced: turn " + View.TurnNumber + ", active player " + View.ActivePlayer);
+        }
+
+        /// <summary>
+        /// A later round of the series began. Reloading the Arena is the same path a match start already
+        /// takes: the fresh scene consumes the start waiting in <c>NetClient.PendingMatch</c> and builds the
+        /// new round's board. Nothing on a finished round is worth waiting for (ADR-036).
+        /// </summary>
+        private void HandleNextRound()
+        {
+            Debug.Log("[MatchSession] next round: reloading the Arena");
+            SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
         }
 
         private void HandleStatusChanged()
