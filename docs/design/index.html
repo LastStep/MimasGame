@@ -288,7 +288,7 @@ figure{margin:12px 0} figure svg{width:100%; height:auto; display:block} figcapt
 <!-- ============================================================ -->
 <div class="grp-title" data-group="Loop">Loop</div>
 
-<section class="concept" id="session" data-design="decided" data-impl="partial" data-title="Session">
+<section class="concept" id="session" data-design="decided" data-impl="implemented" data-title="Session">
 <header><h2>Session</h2></header>
 <p class="lead">A session is one matchmade encounter between two players. It is a best-of-X series of <a href="#round">rounds</a>, each on the next map of the <a href="#maps">ladder</a>, with a <a href="#draft">draft</a> between rounds. The build (gear, lineage, boons) carries forward for the whole session.</p>
 <h3>Rules</h3>
@@ -299,9 +299,9 @@ figure{margin:12px 0} figure svg{width:100%; height:auto; display:block} figcapt
   <li>The session ends when one player has won the majority of rounds: <b>best of 3</b>, in data as <code>rules.series.bestOf</code> (odd), so first to <code>bestOf / 2 + 1</code> (decided 21 Sep 2026; the count does not depend on the time control). See <a href="#win-conditions">Win conditions</a>.</li>
   <li>After every round except the last, both players <a href="#draft">draft</a> one boon.</li>
   <li>Everything learned through <a href="#hidden-info">reveals</a> stays revealed for the rest of the session.</li>
-  <li>A player who leaves and does not reconnect within the grace period forfeits the session (see <a href="#online">Online</a>).</li>
+  <li>A player who <b>resigns</b>, or who leaves and does not reconnect within the grace period, forfeits the <b>session</b> (decided 22 Sep 2026, P8) — not the round. A resign inside a round scores that round first and then ends the series; a resign between rounds scores nothing. See <a href="#online">Online</a>.</li>
 </ol>
-<div class="drift-note"><b>Partial.</b> <code>Mimas.Core.Session.Session</code> since 22 Sep 2026 (T-0009, ADR-035): a pure state machine that owns the builds, the score, the ladder, the session-long revealed sets and the draft, constructs one <code>MatchState</code> per round from its own seeded RNG, and replays from one seed. It plays a whole best-of-3 in a test. <b>The server hosts it in part 2</b> (T-0010); online today the room still plays one round at a time with a rematch (<a href="#online">rule 9</a>) and no score.</div>
+<div class="drift-note"><b>Implemented.</b> <code>Mimas.Core.Session.Session</code> since 22 Sep 2026 (T-0009, ADR-035): a pure state machine that owns the builds, the score, the ladder, the session-long revealed sets and the draft, constructs one <code>MatchState</code> per round from its own seeded RNG, and replays from one seed. <b>The server has hosted it since part 2</b> (T-0010, ADR-036): one session per <code>Playing</code> room, one whole best-of-3 per Ready; resign and forfeit end it with a reason.</div>
 <h3>Depends on</h3>
 <ul><li><a href="#round">Round</a>, <a href="#draft">Draft</a>, <a href="#maps">Maps</a>, <a href="#character-select">Character select</a></li></ul>
 <p class="src">Source: pillars 3 and 6; ADR-018 (revealed sets in state); ADR-035; 21 Sep 2026 question rounds (D13, D17).</p>
@@ -325,7 +325,7 @@ figure{margin:12px 0} figure svg{width:100%; height:auto; display:block} figcapt
 <p class="src">Source: design v0.1 win conditions; ADR-015.</p>
 </section>
 
-<section class="concept" id="character-select" data-design="decided" data-impl="not-started" data-title="Character select">
+<section class="concept" id="character-select" data-design="decided" data-impl="partial" data-title="Character select">
 <header><h2>Character select</h2></header>
 <p class="lead">Before round 1, each player builds their hero in two steps, in this order: <b>1. pick gear</b> (one item for each of weapon, armour, crown, boots), <b>2. pick a divine lineage</b> to pray to. Simultaneous, private, on a timer.</p>
 <h3>Rules</h3>
@@ -342,10 +342,11 @@ figure{margin:12px 0} figure svg{width:100%; height:auto; display:block} figcapt
 <li id="q-select-catalogue">Is the whole item catalogue always available, or is there any unlock or ban/pick phase?</li>
 <li id="q-select-presets">Are presets stored per account (needs accounts, M5) or per browser?</li>
 </ul></div>
-<p class="src">Source: notebook 16 Sep 2026 ("choose your gear… then pick a divine lineage").</p>
+<div class="drift-note"><b>Launch shape</b> (22 Sep 2026, T-0010): there is no character-select screen yet. Step 1 is the room's preset dropdown and step 2 is a <b>lineage row of three buttons under it</b>, each naming its god, its line and the Blessing it starts you with; Ready needs both, and the other seat never sees either. The full screen, presets per account and the 60 s selection timer are later. The bot's lineage is drawn at random from the three (<a href="#bots">P6</a>).</div>
+<p class="src">Source: notebook 16 Sep 2026 ("choose your gear… then pick a divine lineage"); 22 Sep 2026 question round (P1).</p>
 </section>
 
-<section class="concept" id="draft" data-design="decided" data-impl="partial" data-title="Draft (between rounds)">
+<section class="concept" id="draft" data-design="decided" data-impl="implemented" data-title="Draft (between rounds)">
 <header><h2>Draft (between rounds)</h2></header>
 <p class="lead">After every round except the last, each player is offered <b>three</b> <a href="#boons">boons</a> from their <a href="#lineage">lineage</a>'s pool and keeps <b>one</b>. The pick is private and simultaneous.</p>
 <h3>Rules</h3>
@@ -357,8 +358,9 @@ figure{margin:12px 0} figure svg{width:100%; height:auto; display:block} figcapt
   <li>Draft timer: <code>rules.draft.timeoutMs</code>, 20 s at launch. Timeout picks the first offer, as a command the host submits (Core never reads a clock).</li>
   <li>The pick is <a href="#hidden-info">hidden</a>. The opponent sees only that a pick was made.</li>
   <li>Picks apply immediately and last for the session. <b>No tiers, no rarity, no reroll, no cap at best of 3</b> (decided 21 Sep 2026, D18): later, not at launch.</li>
+  <li><b>Where it happens</b> (decided 22 Sep 2026, P1): <b>over the dimmed board, in the Arena</b>. The round's result shrinks to a headline, the board goes dark behind a scrim, and three cards drop in with kind, name, god, what the boon does and the item of yours it lands on. A click selects, Confirm keeps it, or the timer keeps the first. A green dot says the opponent has picked. The next round reloads the board for its own map; a reload mid-draft comes back into the draft with the seconds that are left.</li>
 </ol>
-<div class="drift-note"><b>Partial.</b> <code>Mimas.Core.Session.Draft</code> (22 Sep 2026): <code>IsApplicable</code>, <code>IsEligible</code> and <code>Offer</code> as the rules above, pure and seeded; the <code>Session</code> runs it between rounds and takes <code>DraftPickCommand</code>s. No draft screen, no wire message: part 2.</div>
+<div class="drift-note"><b>Implemented in part 2</b> (T-0010, ADR-036): the overlay with its three cards and its timer, the server's timeout pick, the bot's pick, and the pick as a <code>draftPick</code> command on the existing wire. <code>Mimas.Core.Session.Draft</code> (22 Sep 2026) is the rules above, pure and seeded.</div>
 <div class="open-q"><h3>Open questions</h3><ul>
 <li id="q-draft-tiers">Tiers / rarity (TFT silver/gold/prismatic), and whether the tier depends on the round number. <b>Later, not at launch</b> (21 Sep 2026); the data has no tier field yet.</li>
 <li id="q-draft-reroll">A reroll. <b>Later, not at launch</b> (21 Sep 2026).</li>
@@ -787,7 +789,7 @@ r=+4        . . . , .</code></pre>
 <!-- ============================================================ -->
 <div class="grp-title" data-group="Divine">Divine</div>
 
-<section class="concept" id="lineage" data-design="decided" data-impl="partial" data-title="Divine lineage">
+<section class="concept" id="lineage" data-design="decided" data-impl="implemented" data-title="Divine lineage">
 <header><h2>Divine lineage</h2></header>
 <p class="lead">At character select, after picking gear, the player chooses the divine lineage they pray to. Launch lineages: <b>Greek</b>, <b>Norse</b>, <b>Hindu</b>. A lineage grants one fixed <b>starting Blessing</b> immediately and defines the <b>pool of boons</b> offered in every <a href="#draft">draft</a>. Lineages shape a build; they do not lock a playstyle.</p>
 <ol>
@@ -802,16 +804,17 @@ r=+4        . . . , .</code></pre>
 <h3>Data (<code>lineages/*.json</code>)</h3>
 <pre><code>{ "version": 1, "id": "hindu", "name": "Hindu", "description": "Pray to Agni, Vayu and Indra.",
   "startingBlessing": "vayu-breath",
-  "pool": ["agni-warmth", "indra-wrath", "agni-crown", "indra-mail", "agni-spark", "vayu-wings"],
+  "pool": ["agni-warmth", "indra-wrath", "hanuman-heart", "agni-crown", "indra-mail", "vayu-haste",
+           "agni-spark", "vayu-wings", "indra-storm"],
   "icon": "hindu" }</code></pre>
-<div class="drift-note"><b>Partial.</b> Three lineages with six boons each ship and load (22 Sep 2026); the lineage row in the room, the choice at select and the bot picking one are part 2.</div>
+<div class="drift-note"><b>Implemented.</b> Three lineages with <b>nine pool boons each</b>, three of every kind (22 Sep 2026, T-0010). You choose in the <b>lineage row under the preset in the room</b>, and the choice is remembered; the bot draws one at random from the three with a seed the room takes at creation (<a href="#bots">P6</a>); the god shows on a hero's nameplate and in the examine panel once revealed.</div>
 <div class="open-q"><h3>Open questions</h3><ul>
 <li id="q-lineage-mirror">Mirror matches (both Greek): fine, or any special rule? Proposed: fine.</li>
 </ul></div>
 <p class="src">Source: notebook page 1 (Divine Blessing); round-1 answers; 21 Sep 2026 question rounds (D15, D16).</p>
 </section>
 
-<section class="concept" id="boons" data-design="decided" data-impl="partial" data-title="Boons">
+<section class="concept" id="boons" data-design="decided" data-impl="implemented" data-title="Boons">
 <header><h2>Boons</h2></header>
 <p class="lead"><b>Boon</b> is the umbrella term for anything a lineage grants. Three kinds: a <a href="#blessing">Blessing</a> (a passive on the character), an <a href="#enchant">Enchant</a> (a change to one equipped item), a <a href="#sigil">Sigil</a> (a new active ability on one equipped item). Boons are drafted between rounds and last the session.</p>
 <table>
@@ -844,7 +847,7 @@ r=+4        . . . , .</code></pre>
 
 { "version": 1, "id": "thor-vigour", "name": "Thor's Vigour", "kind": "blessing", "lineage": "norse",
   "effects": [ { "type": "stat", "key": "hp", "amount": 4 } ] }</code></pre>
-<div class="drift-note"><b>Partial.</b> The whole system exists in <code>Mimas.Core</code> since 22 Sep 2026 (T-0009; ADR-034): <code>boons/</code> and <code>lineages/</code> load and link with every rule above, a unit is gear + lineage + boons through one overlay, every ability is read through <code>MatchState.ResolveAbility</code>, the reveal rules fire, the draft and the session play a best-of-3 in a test, and three lineages with six boons each ship. What a player sees — the lineage in the room, the draft screen, the examine panel, the reveal flyover — is part 2 (T-0010). The capability matrix in the spec (part 1 §3) is the checklist of what works, what is a skeleton and what is a design question first.</div>
+<div class="drift-note"><b>Implemented.</b> The system is in <code>Mimas.Core</code> since 22 Sep 2026 (T-0009; ADR-034): <code>boons/</code> and <code>lineages/</code> load and link with every rule above, a unit is gear + lineage + boons through one overlay, every ability is read through <code>MatchState.ResolveAbility</code> — on the client too, since part 2 — and the reveal rules fire. <b>A player sees them since part 2</b> (T-0010, ADR-036): the lineage row in the room, the draft over the dimmed board, the boons in the examine panel, the reveal flyover and the nameplate tag, the changed number on the action bar. Three lineages with nine pool boons each ship; the numbers are placeholders for Rohan to tune. The capability matrix in the spec (part 1 §3) is the checklist of what works, what is a skeleton and what is a design question first.</div>
 <h3>Depends on</h3><ul><li><a href="#lineage">Lineage</a>, <a href="#draft">Draft</a>, <a href="#equipment">Equipment</a>, <a href="#modifiers">Modifiers</a>, <a href="#hidden-info">Hidden information</a></li></ul>
 <p class="src">Source: notebook page 2; round-1 and round-2 naming answers (Boon umbrella; Blessing / Enchant / Sigil); 21 Sep 2026 question rounds (D6–D9, D16, D18); ADR-034.</p>
 </section>
@@ -891,7 +894,7 @@ r=+4        . . . , .</code></pre>
 <!-- ============================================================ -->
 <div class="grp-title" data-group="Information">Information</div>
 
-<section class="concept" id="hidden-info" data-design="decided" data-impl="partial" data-title="Hidden information and reveal">
+<section class="concept" id="hidden-info" data-design="decided" data-impl="implemented" data-title="Hidden information and reveal">
 <header><h2>Hidden information and reveal</h2></header>
 <p class="note"><b>The client mirror shipped 17 Sep 2026</b> (ADR-026): the client rebuilds a knowledge-limited <code>MatchState</code> from the <code>PlayerView</code> on every message and asks it every preview question, so it can only ever reason with what the server chose to send, and a hidden entry keeps its "?" slot rather than quietly becoming a certainty. A test sweeps a whole match to check no hidden damage line ever arrives before its reveal.</p>
 <p class="lead">The server holds the truth; each client only ever receives a <code>PlayerView</code>. What the opponent knows at the start of round 1 and what becomes known over the session:</p>
@@ -925,7 +928,7 @@ r=+4        . . . , .</code></pre>
   </li>
   <li>Revealing a boon reveals its <b>whole definition</b>: the modifier it attaches and the ability it grants become known with it, and the first boon of a lineage reveals the lineage.</li>
 </ol>
-<div class="drift-note"><b>Partial.</b> Ability, modifier, boon (all six rules of the spec's §6.5), lineage and enchant-observation reveals exist in Core, and the session carries the revealed sets from round to round (22 Sep 2026). The reveal flyover and the examine panel's boon list are part 2.</div>
+<div class="drift-note"><b>Implemented.</b> Hidden abilities, modifiers, boons and the lineage, their reveal rules, and the "?" rows are in code and on the wire (22 Sep 2026, T-0009 and T-0010). A player sees it as: one <code>?</code> row per boon the enemy holds in the examine panel, <code>Unknown lineage</code> under their name until a reveal, a <code>Revealed: Agni's Crown</code> flyover with <code>Hindu · Enchant</code> under it, and the god on their nameplate afterwards. The draft is hidden both ways: your own three offers are the only offers any message of yours carries, and the opponent's pick is only ever "a pick was made".</div>
 <p class="src">Source: pillar 8; ADR-010, ADR-017, ADR-018, ADR-034; round-2 answer "gear visible, everything else hidden"; 21 Sep 2026 question rounds (D11, D12).</p>
 </section>
 
@@ -942,8 +945,8 @@ r=+4        . . . , .</code></pre>
 <section class="concept" id="bots" data-design="proposed" data-impl="partial" data-title="Bots">
 <header><h2>Bots</h2></header>
 <p class="lead">Bots exist for practice, balance simulation and filling a queue. <code>RandomBot</code> picks uniformly over legal commands. A <mark>greedy bot</mark> (maximise expected damage, avoid death) is the next step for balance runs.</p>
-<p>Decided 17 Sep 2026, <b>shipped the same day</b>: <b>Play vs bot runs on the server.</b> The lobby button opens a room with the bot in seat 1 through the same wire as a human match, so one client code path serves both; the bot never resigns and never times out. The bot wears the flintlock / blink preset and carries the two hidden passives the local practice bot has, so reveals happen online too. The client-side practice mode stays as an Editor fallback — opening the Arena scene directly still plays a whole local game.</p>
-<div class="open-q"><h3>Open questions</h3><ul><li id="q-bots-draft">Bots must also pick gear, lineage and drafts once those exist.</li></ul></div>
+<p>Decided 17 Sep 2026, <b>shipped the same day</b>: <b>Play vs bot runs on the server.</b> The lobby button opens a room with the bot in seat 1 through the same wire as a human match, so one client code path serves both; the bot never resigns and never times out. The bot wears the flintlock / blink preset. The client-side practice mode stays as an Editor fallback — opening the Arena scene directly still plays a whole local game.</p>
+<p>Decided 22 Sep 2026: <b>the bot prays to a lineage drawn at random from the three</b> with a seed the room takes at creation (so every lineage gets seen and a log line names it), <b>drafts the first offer</b> after its usual think delay, and <b>plays the full best-of-3</b> (P5, P6). Its lineage's starting Blessing is what makes reveals happen online; the two dev passives it used to carry (<code>ward-of-feathers</code>, <code>stone-skin</code>) retired with part 2, and a test that wants a known reveal fixes the lineage through <code>Mimas:BotLineageId</code>.</p>
 </section>
 
 <section class="concept" id="online" data-design="decided" data-impl="implemented" data-title="Online: matchmaking, ratings, accounts">
@@ -959,7 +962,8 @@ r=+4        . . . , .</code></pre>
   <li><b>Resign</b> is a command, legal at any time while the match runs, never chosen by a bot. A forfeit is the same command submitted by the server with reason <code>disconnect</code>, so a replay of the command list reproduces the match.</li>
   <li><b>Client mirror</b>: the client rebuilds a knowledge-limited <code>MatchState</code> from the <code>PlayerView</code> attached to every server message and asks it every preview question; it never applies commands (ADR-026, see <a href="#hidden-info">Hidden information</a>).</li>
   <li><b>Lobby</b> is its own scene; see <a href="#presentation">Presentation</a>.</li>
-  <li><b>Rematch</b> (decided 21 Sep 2026): the room outlives the match. After the result both seats are back in the same room, same code, Ready reset, gear editable; both pressing Ready starts the next match. A seat whose connection is gone at the result is freed, so a friend can rejoin by code; a room with no human closes. No session score, no offer/accept: the room is the offer.</li>
+  <li><b>Rematch</b> (decided 21 Sep 2026): the room outlives the match. After the result both seats are back in the same room, same code, Ready reset, gear and lineage editable; both pressing Ready starts the next <b>series</b>. Within a series the rounds follow each other with the <a href="#draft">draft</a> between them, and the room goes back to Waiting only when the series ends. A seat whose connection is gone at the result is freed, so a friend can rejoin by code; a room with no human closes. No offer/accept: the room is the offer.</li>
+  <li><b>The session on the wire</b> (decided 22 Sep 2026, P3): session events travel in the same event list as a round's, a <code>session</code> block sits beside the view on every match message, a draft pick is a command, and every round begins with a <code>match.start</code> (ADR-036). Between rounds there is no view and the board the client already has is dimmed under the draft.</li>
 </ol>
 <h3>Later (proposed)</h3>
 <ul>
@@ -984,9 +988,13 @@ r=+4        . . . , .</code></pre>
   <li>Attack preview: ghosted hp delta on the target's bar plus a line-item tooltip with a "?" row for unrevealed modifiers.</li>
   <li>Feedback: damage flyover; when actual differs from preview, a second line names the revealed modifier whose icon then stays on the unit.</li>
   <li>Nothing is armed by default; clicking a unit with nothing armed opens examine.</li>
+  <li><b>Series line in the turn panel</b> (decided 22 Sep 2026, P2): one line above the turn owner, <code>ROUND 2 · 0 – 1</code>, your own score first. A round opens with its own card naming the map and who moves first, and clears itself after a beat; a round's result gets a banner with no way out of it, because the series goes on. Only the series result offers Back to room.</li>
+  <li><b>Draft overlay over the dimmed board</b> (P1): see <a href="#draft">Draft</a>. The mock it was chosen from is <code>artifacts/draft-screen-mocks.html</code>.</li>
+  <li>An ability whose cost, range or damage a boon changed shows the changed number with a small mark; an attack's detail line leads with the elements it carries.</li>
 </ul>
 <h4 id="examine">Examine</h4>
-<p>Inspect any unit, tile or item: for enemies, items are shown by name with their innate stats, abilities as "?" until revealed, revealed boons listed with their lineage. For tiles: terrain, height, modifiers.</p>
+<p>Inspect any unit, tile or item: for enemies, items are shown by name with their innate stats, abilities as "?" until revealed. For tiles: terrain, height, modifiers.</p>
+<p><b>Boons</b> (22 Sep 2026): your own are listed under the gear and passives with their kind and their god, and your lineage sits under your name. The enemy's are one <code>?</code> row per boon they hold — the count is public, the identity is not — under <code>Unknown lineage</code>, each becoming a name and a god as reveals happen.</p>
 <h4 id="audio-vfx">Audio and VFX</h4>
 <p>FMOD music that stays out of the way; distinct SFX per ability category and per element; VFX via Shuriken and Shader Graph (no VFX Graph on WebGL2).</p>
 <h4>Art direction</h4>
@@ -1005,13 +1013,13 @@ r=+4        . . . , .</code></pre>
 <p class="small">Props render as code-built <b>hex prisms the size of the hex they block</b>, with a hit-mark band at their aim height, and the projectile as a flat sphere, until there is art. They were narrower boxes until 21 Sep 2026, which made a shot look legal past a pillar the rules block with the whole hex column. Implemented 16 Sep 2026; ADR-025.</p>
 <h3>Lobby (decided 17 Sep 2026)</h3>
 <ul>
-  <li>The lobby is its own scene and the first thing that loads: a name, <b>Play vs bot</b>, <b>Create room</b>, <b>Join room</b>, a status line and the last result. All three lead to a <b>room</b>, which shows its four-letter code large, a <b>Copy link</b> button and a <b>Copy code</b> button beside it (the link is for a chat window, the code is for a phone call), both seats and their readiness, a loadout preset and Ready. It is the future home of <a href="#character-select">character select</a> and the <a href="#draft">draft</a>.</li>
+  <li>The lobby is its own scene and the first thing that loads: a name, <b>Play vs bot</b>, <b>Create room</b>, <b>Join room</b>, a status line and the last result. All three lead to a <b>room</b>, which shows its four-letter code large, a <b>Copy link</b> button and a <b>Copy code</b> button beside it (the link is for a chat window, the code is for a phone call), both seats and their readiness, a loadout preset, <b>a lineage row of three buttons under it</b> (22 Sep 2026: each names its god, its line and the Blessing it starts you with; the one you pick is remembered and the other seat never sees it) and Ready. The <a href="#draft">draft</a> is <em>not</em> here — it happens over the board in the Arena (P1) — and the full <a href="#character-select">character select</a> screen is still later.</li>
   <li>The connection lives on a persistent object that survives scene loads. The arena scene loads when the server starts the match, behind a loading line, and the lobby returns to the <em>room</em> after the result banner — same code, both seats, Ready reset (rule 9 of <a href="#online">Online</a>).</li>
   <li>In a match: a resign button (two clicks), an opponent status line with the reconnect countdown, and a result detail ("by elimination", "by resignation", "opponent left").</li>
   <li>Presets are client data (four at launch from the shipped items); the loadout is chosen in the room and the opponent sees the gear at match start as the <a href="#hidden-info">hidden-info</a> table says — not before (<a href="#q-online-room-loadout">open question</a>).</li>
 </ul>
 <p class="small">Implemented 17-21 Sep 2026, including Copy code and the return to the room after a result; ADR-028, ADR-032; specs <code>docs/specs/2026-09-17-online-slice.md</code> and <code>docs/specs/2026-09-21-m2-browser-finish.md</code>.</p>
-<div class="open-q"><h3>Open questions</h3><ul><li id="q-pres-select">Character select and draft screens are not mocked yet (follow the research-then-options workflow).</li></ul></div>
+<div class="open-q"><h3>Open questions</h3><ul><li id="q-pres-select">Character select is not mocked yet (follow the research-then-options workflow). <b>The draft screen was decided on 22 Sep 2026</b>: cards over the dimmed board, option A of <code>artifacts/draft-screen-mocks.html</code>.</li></ul></div>
 <p class="src">Source: pillars 9-13; ADR-015, ADR-019.</p>
 </section>
 
@@ -1124,6 +1132,14 @@ r=+4        . . . , .</code></pre>
 <tr><td>2026-09-16</td><td>Loadout slice shipped: items replace classes, two lanes, base stats, innate walk, examine shows gear.</td></tr>
 <tr><td>2026-09-16</td><td>v0.2.1. Loadout question round: base stats, boots, two abilities per weapon/crown, no negative stats, launch catalogue, bow/gun ranges, "?" ability slots. Five open questions closed, two added. Spec written for the next session.</td></tr>
 <tr><td>2026-09-16</td><td>v0.2. First HTML edition. Migrated design.md v0.1 (pillars, win conditions, resolved questions). Added from the notebook: character = gear + lineage + boons, four equipment slots, stats (Health / Strength / Magic / Armour per lane), two damage lanes + elements, lineages (Greek, Norse, Hindu), boon kinds Blessing / Enchant / Sigil, draft rules, hidden-information table, character select flow. Marked classes superseded and recorded drift against the M1 code.</td></tr>
+<tr><td>2026-09-22</td><td><b>Where the draft happens</b> (P1): over the dimmed board in the Arena, cards with kind, name, god, effect and the item they attach to; a click and Confirm, or the timeout. The next round reloads the board for its own map; a reload mid-draft comes back into the draft</td><td><a href="#draft">Draft</a>, <a href="#presentation">Presentation</a></td><td>036</td></tr>
+<tr><td>2026-09-22</td><td><b>Where the series score lives</b> (P2): a line in the turn panel above the turn owner, <code>ROUND 2 · 0 – 1</code>, your own score first</td><td><a href="#presentation">Presentation</a></td><td>036</td></tr>
+<tr><td>2026-09-22</td><td><b>The session rides the wire that exists</b> (P3): session events inside <code>events</code>, a <code>session</code> block beside <code>view</code>, <code>draftPick</code> through <code>match.command</code>, one <code>match.start</code> per round; <code>series</code> and <code>round</code> are two fields</td><td><a href="#online">Online</a></td><td>036</td></tr>
+<tr><td>2026-09-22</td><td><b>A reload or drop during the draft</b> (P4): the draft clock keeps running and a resume shows the draft with the seconds left; the 60&nbsp;s reconnect grace runs across it and its expiry forfeits the <em>session</em></td><td><a href="#draft">Draft</a>, <a href="#session">Session</a></td><td>036</td></tr>
+<tr><td>2026-09-22</td><td><b>Play vs bot is the full best-of-3</b> (P5), with the bot drafting after its think delay</td><td><a href="#bots">Bots</a></td><td>036</td></tr>
+<tr><td>2026-09-22</td><td><b>The bot's lineage is drawn at random</b> from the three with the room's own seed (P6); its two dev passives retire</td><td><a href="#bots">Bots</a></td><td>036</td></tr>
+<tr><td>2026-09-22</td><td><b>Editor practice mode runs a session too</b> (P7), inside a persistent host that survives the scene reload between rounds</td><td><a href="#session">Session</a></td><td>036</td></tr>
+<tr><td>2026-09-22</td><td><b>Resign concedes the series</b> (P8), not the round; a disconnect past the grace does the same. Core gains a session end reason</td><td><a href="#session">Session</a>, <a href="#online">Online</a></td><td>036</td></tr>
 </table>
 </section>
 

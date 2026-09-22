@@ -122,6 +122,11 @@ When it is done it prints the certificate's expiry date, says nginx is running, 
 
 ## 3. Deploy (every time)
 
+**What changed since 21 Sep** (T-0010, the boons the player can see): the content is thirty boons and one
+more ability, so `/health`'s content hash changes; the wire gained the session (`room.loadout` now
+**requires** a `lineage`, and every match message carries a `session` block), so an old browser tab left
+open on the site cannot start a match against the new server and must reload.
+
 From the repo root, **in Git Bash** (see §0 — `bash` in PowerShell is the WSL launcher):
 
 ```bash

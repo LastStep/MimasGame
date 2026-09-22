@@ -53,7 +53,8 @@ until revealed) and `boons` (an array of `{ id }` in grant order, `id` `null` wh
 types joined the twelve: `boonRevealed { unitId, boonId, toPlayer }` and `lineageRevealed { unitId,
 lineageId, toPlayer }`, routed to `toPlayer` only. Damage lines gained two kinds, `boonStat` (a Blessing's
 stat or an Enchant's damage override, `id` = the boon) and `nullify` (an immunity, `id` = the modifier).
-The session's own events and view (`Mimas.Core.Session`) are **not** on the wire yet: part 2 encodes them.
+The session's own five events, its view and the draft pick joined them in part 2 (ADR-036); see
+**The session on the wire** below.
 
 ### How two players meet
 
@@ -72,8 +73,11 @@ that is the only thing that forgets its code. After a result both seats keep the
 starts the next match — there is no rematch offer and no session score, because the room *is* the offer.
 A seat whose socket is gone at the result is **freed** rather than held: the reconnect grace is something
 a match owes a player, and there is no match. So a friend who dropped can rejoin by code, and a different
-friend can take the seat. `matchId` is the room's id and is reused across rounds; `round` in `match.start`
-counts them, 1 for the first. Closing the tab in a waiting room frees the seat as it always did.
+friend can take the seat. `matchId` is the room's id and is reused across series; **`series`** in
+`match.start` counts them, 1 for the first, and `round` counts the rounds inside one (ADR-036 supersedes
+ADR-032's meaning of `round`). Both pressing Ready starts the next **series**; within one, the rounds
+follow each other with a draft between them and the room goes back to `Waiting` only when the series
+ends. Closing the tab in a waiting room frees the seat as it always did.
 
 ### Client → Server
 
@@ -84,9 +88,9 @@ counts them, 1 for the first. Closing the tab in a waiting room frees the seat a
 | `room.create` | `{}` | `room.state`; you are seat 0 |
 | `room.join` | `{ code }` | `room.state` to both seats |
 | `bot.play` | `{}` | `room.state` with seat 1 = `Random Bot`, already ready |
-| `room.loadout` | `{ loadout: { weapon, crown, boots, armour }, ready }` | `room.state` to both; `match.start` when both seats are ready |
+| `room.loadout` | `{ loadout: { weapon, crown, boots, armour }, lineage, ready }` | `room.state` to both; `match.start` when both seats are ready. A missing or unknown `lineage` is `bad_loadout` and nothing is stored |
 | `room.leave` | `{}` | `room.left` to you, `room.state` to the other seat |
-| `match.command` | `{ matchId, command }` | `match.events` to both seats, or `match.rejected` to the sender |
+| `match.command` | `{ matchId, command }` | `match.events` to both seats, or `match.rejected` to the sender. `command` may be `{ type: "draftPick", player, offerIndex, reason }` between rounds |
 | `match.resync` | `{ matchId }` | `match.view` |
 | `pong` | `{ t }` | updates the connection's round-trip estimate |
 
@@ -97,10 +101,10 @@ counts them, 1 for the first. Closing the tab in a waiting room frees the seat a
 | `auth.ok` | `{ playerId, token, name, room? }` — `room` is the four-letter code, present only when the resumed player is seated in a room that is waiting |
 | `room.state` | `{ code, youAre, seats: [ { name, ready, bot, present } … ] }`, always two entries |
 | `room.left` | `{}` |
-| `match.start` | `{ matchId, round, seq, mapId, youAre, opponentName, view, clock, events }` (`events` = the filtered start events, normally one `turnStarted`; empty on a reconnect. `round` is 1 for the first match in a room, 2 for the rematch, …) |
-| `match.events` | `{ matchId, seq, events, view, clock }` |
-| `match.rejected` | `{ matchId, reason, view, clock }` |
-| `match.view` | `{ matchId, seq, view, clock }` |
+| `match.start` | `{ matchId, series, round, seq, mapId, youAre, opponentName, view, session, clock, events }` — `series` counts the best-of-3s played in the room, 1 for the first; `round` the round inside one. `events` = the filtered batch that started the round (a `roundStarted` and a `turnStarted` at least, plus the preceding `draftPicked` from round 2), empty on a reconnect. `view` is `null` in a draft; `mapId` is then the next round's map |
+| `match.events` | `{ matchId, seq, events, view, session, clock }` — `view` `null` between rounds |
+| `match.rejected` | `{ matchId, reason, view, session, clock }` |
+| `match.view` | `{ matchId, seq, view, session, clock }` |
 | `opponent.status` | `{ matchId, connected, graceMs }` |
 | `ping` | `{ t }` |
 | `error` | `{ code, message }` |
@@ -112,9 +116,45 @@ Error codes: `unauthenticated`, `unknown_type`, `bad_json`, `bad_token`, `in_mat
 for dropping a batch that was in flight when a socket died — not for gap replay, because a reconnect
 always brings a full view.
 
-A seat's chosen loadout is **not** sent to the other seat before the match starts. Items are public once
+A seat's chosen **lineage** is never sent to the other seat at all — not in `room.state`, not in a view
+until something reveals it (`#lineage` rule 3). A seat's chosen loadout is **not** sent to the other seat
+before the match starts. Items are public once
 it begins (they are in every `PlayerView`), but showing a preset during selection would invent a
 counter-pick rule the design page does not have — open question `q-online-room-loadout`.
+
+### The session on the wire (ADR-036)
+
+A room hosts one **session** — a best-of-3 with a draft between its rounds — for the whole of its
+`Playing` phase. It rides the channels that already existed rather than six new message types:
+
+- **The five session events travel in `events`,** beside a round's own: `roundStarted`, `roundEnded`,
+  `draftStarted`, `draftPicked`, `sessionEnded`. One filter (`SessionEventFilter.ForPlayer`), one codec.
+- **A `session` block sits beside `view`** on `match.start`, `match.events`, `match.rejected` and
+  `match.view`:
+
+  ```json
+  { "viewer": 0, "round": 2, "phase": "draft", "score": [1, 0], "roundsToWin": 2,
+    "isOver": false, "winner": -1, "mapId": "arena-4", "nextMapId": "arena-4",
+    "myBuild": { "loadout": { … }, "lineage": "hindu", "boons": ["vayu-breath", "agni-crown"] },
+    "opponentLineage": null, "opponentBoons": [ { "id": null }, { "id": "thor-vigour" } ],
+    "myOffers": ["agni-warmth", "agni-crown", "vayu-wings"], "iHavePicked": false, "opponentHasPicked": true }
+  ```
+
+  `phase` is `round` / `draft` / `over`. `winner` is `-1` while it runs. A view is only ever attached
+  while `phase` is `round`; a session in any other phase carrying one is a malformed frame.
+- **A draft pick is a command**, `{ type: "draftPick", player, offerIndex, reason }` through
+  `match.command`, with `reason` `player` or `timeout`. The server submits the timeout on a seat's behalf
+  when the draft deadline passes, exactly as it submits a turn timeout.
+- **Every round begins with its own `match.start`.** The split rule is one line on the server: a batch
+  containing a `roundStarted` goes out as `match.start`, everything else as `match.events`. The client's
+  rule is as short — a `match.start` whose `round` is not the one on screen reloads the Arena, and the
+  fresh scene consumes the start that is waiting for it, which is the path a first match start already
+  took.
+- **The draft is a state of the board, not a screen of its own.** Between rounds `view` is `null`, the
+  client's mirror is null with it, and the board it already has is dimmed with the cards over it. A
+  reload lands back in the draft with the seconds that are left.
+- **Resign and forfeit end the series**, not the round (`#session` rule 7, P8). A resign in a draft
+  scores nothing; a resign in a round scores that round first and then stops.
 
 ## Hidden information
 
@@ -124,7 +164,8 @@ seat. One place in the code does both (`Room.Broadcast`), which is the guarantee
 than a promise; `TwoHumans_MirrorPlayersPlayToTheEnd` asserts every view a player ever received was
 their own.
 
-- Own units: everything, including `lineage` and every boon id.
+- Own units: everything, including `lineage` and every boon id. The `session` block adds your own offers
+  in a draft, your build, and whether each seat has picked.
 - Enemy units: position, gear, hit points, action points, heights — and **revealed** abilities,
   modifiers and boons only, plus the `lineage` once it is revealed (else `null`). A hidden entry keeps its
   slot with a `null` id, so the opponent can see *that* there is
@@ -136,7 +177,13 @@ their own.
   or AP Blessing (`boonRevealed`); the lineage with the first boon of it (`lineageRevealed`). Reveals are per
   viewer and persist for the session.
 - A hidden line never appears in a damage breakdown the viewer has not earned:
-  `HiddenInfo_NoHiddenLineLeaksBeforeReveal` scans a whole match to check it.
+  `HiddenInfo_NoHiddenLineLeaksBeforeReveal` scans a whole round to check it.
+- **The draft is hidden both ways.** `session.myOffers` only ever lists that seat's three;
+  `draftStarted` carries the other seat's `offers` as an explicit `null`, which is not the same as an
+  empty list; the opponent's `draftPicked` says a pick was made and never which
+  (`boonId: null`); and `session.opponentBoons` keeps one entry per boon they hold with a `null` id until
+  a reveal names it, so the count is public and the identity is not.
+  `HiddenInfo_SessionBlockNeverCarriesTheOtherSeatsOffersOrPick` sweeps every message of a whole series.
 
 ### The client mirror (ADR-026)
 
@@ -162,6 +209,9 @@ both sides read them:
 
 - Every server message carries `clock { activePlayer, turnMs, remainingMs }`. The client counts down from
   receipt and re-anchors on every message, so the rope is smooth and the server's number always wins.
+- **In a draft it is the same shape in a second mode:** `activePlayer: -1`, `turnMs` =
+  `rules.draft.timeoutMs`, and one deadline for both seats rather than a turn each. It has no lag grace —
+  nobody is racing a move — and its expiry makes the server keep offer 0 for whoever has not chosen.
 - The server ends a turn at `deadline + min(rtt, lagGraceMs)` by submitting
   `EndTurnCommand(reason: timeout)`. The allowance exists so a command that left the client before the
   deadline is never refused for arriving after it — the player did everything right and the network did not.
@@ -177,9 +227,8 @@ move, so replaying a match's command list reproduces it exactly, with no clock a
 
 Time controls with banks and increments (`timecontrols.json` stays loaded and unused; design:
 `#time-controls`), a matchmaking queue and ratings (M5), accounts and any database (M5), spectating,
-chat, move buffering across a reconnect, and the best-of-3 **on the server**: `Mimas.Core.Session` exists
-and plays a whole series in a test (T-0009, 22 Sep 2026), but the room still hosts one `MatchState` at a
-time and no draft message exists; that is part 2 (T-0010).
+chat, move buffering across a reconnect, tiers, rerolls, a character-select screen, and presets stored on
+the server.
 
 One gap worth naming: `auth.ok.room` covers a resume that arrives while the seat is still held — a
 second tab, or a reconnect the server has not yet seen the close for. A **full page reload** after a

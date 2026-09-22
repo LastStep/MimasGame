@@ -329,7 +329,7 @@ The effect vocabulary (closed; one handler each in `Units/BoonOverlay.cs`):
 
 | `type` | Fields | Allowed on | Meaning |
 |---|---|---|---|
-| `stat` | `key` (`hp`, `ap`, `power.<lane>`, `defense.<lane>`), `amount` (≠ 0) | blessing | Added to the unit's stats; negatives are self trade-offs, floored on the total by `rules.boons` |
+| `stat` | `key` (`hp`, `ap`, `power.<lane>`, `defense.<lane>`), `amount` (≠ 0) | blessing | Added to the unit's stats; negatives are self trade-offs, floored on the total by `rules.boons`. A `stackable` boon of this kind may be drafted again — shipped: `thor-might`, `hanuman-heart` |
 | `modifier` | `id` | blessing, enchant | The modifier is attached to the unit for the session |
 | `abilityOverride` | `target` (an enchant's slot, or one ability id; a blessing's target must be an innate ability id), `field`, `amount` (≠ 0) or `value` | blessing, enchant | Additive integer override of one field. Numeric fields: `range`, `minRange`, `damage`, `cost`, `apex`, `hits`, `climb`, `jumpHeight`. Skeleton fields with a string `value`: `trajectory` (`direct` / `arc` / `sky`), `lineOfSight` (`true` / `false`). A slot target means every ability the item grants, Sigils included whichever was drafted first; a field with no meaning on one of them (`apex` on a direct attack) is ignored for that one |
 | `addElement` | `target` (the slot), `element` | enchant | Every attack the item grants gains the element |
@@ -347,6 +347,10 @@ type); a `stat` lane is declared; an `addElement` element is declared.
 `hits`, `trajectory` and `lineOfSight` are **skeletons** (spec D part 1 §6.7): they parse and link, and a
 unit built with one throws `NotSupportedException` naming the spec. Nothing shipped uses them.
 
+Shipped: **thirty boons** — a starting Blessing and nine pool boons for each of the three lineages. Four
+Sigils grant an ability no item does: `dash`, `hammerfall`, `wind-step`, and part 2's `storm-bolt`
+(Indra's Storm, a lightning spell on the crown); two more grant the shipped `jab` and `strike`.
+
 ## Lineages (`lineages/*.json`)
 
 ```json
@@ -362,7 +366,8 @@ exists, is a blessing, belongs here; every pool id exists and belongs here; the 
 kinds**; and **for every item in the catalogue at least one Enchant or Sigil in the pool is applicable to
 it** — `#lineage` rule 2 read per item, through `BoonDef.IsApplicableTo(slot, kind, abilityIds)`: the
 slot and kind match, every ability-id target is one of the item's abilities, and no granted ability already
-is. Shipped: `greek` (Athena's Guard), `norse` (Thor's Vigour), `hindu` (Vayu's Breath), six boons each.
+is. Shipped: `greek` (Athena's Guard), `norse` (Thor's Vigour), `hindu` (Vayu's Breath), **nine boons
+each** since part 2 — three of every kind, so every draft offers a real choice in every kind.
 
 ## Session and draft (Core, `Mimas.Core.Session`)
 
@@ -380,13 +385,23 @@ picked at once; a `DraftPickCommand(player, offerIndex, reason)` — a timeout i
 (`DraftPickedEvent`), and the second pick starts the next round in the same `Apply`. `Phase` is `Round`,
 `Draft` or `Over`; `CommandRejectReason` gained `WrongPhase`, `AlreadyPicked`, `BadOffer`.
 
+**Conceding concedes the series** (`#session` rule 7; decided 22 Sep 2026, P8). A `ResignCommand` inside a
+round scores that round first — it did end, and the `RoundEndedEvent` says how — and then stops the
+session whatever the score; the same command is legal in a draft, where it scores nothing because a draft
+is not a round. Either way the last event is one `SessionEndedEvent(winner, score0, score1, reason)`, whose
+`SessionEndReason` is `Score`, `Resign` or `Forfeit` (a disconnect past the grace is a resign with
+`ResignReason.Disconnect`). `SessionView` carries `NextMapId` (the map the next round plays, null once the
+session is over), `MapId` (the running round's, or the next one's between rounds) and `RoundsToWin`; its
+`Create` factory is the twin of `PlayerView.Create` and the only way a client builds one.
+
 `Draft` is pure and seeded: `IsApplicable` (the gear can use it), `IsEligible` (applicable, not owned unless
 stackable, no exclusive clash; the starting Blessing counts as owned), `Offer` (the eligible pool in ordinal
 order, shuffled, then the first Blessing, Enchant and Sigil in kind order while the count allows, then the
 rest of the shuffle; index 0 is what a timeout picks). Session events subclass `MatchEvent` so one list
 carries everything; `SessionEventFilter.ForPlayer` leaves a viewer their own offers and only "a pick was
 made" for the opponent's, and filters round events with the state that produced them; `SessionView.For`
-is the per-player projection part 2 encodes. `IBot.ChooseDraft`: the `RandomBot` keeps offer 0.
+is the per-player projection, which part 2 put on the wire (ADR-036, `docs/networking.md`).
+`IBot.ChooseDraft`: the `RandomBot` keeps offer 0.
 
 ## Match flow (Core, `Mimas.Core.Match`)
 
