@@ -121,6 +121,9 @@ namespace Mimas.Client.Presentation
         // HUD state.
         private readonly List<HudAction> _actions = new List<HudAction>();
         private readonly List<AbilityDef> _abilities = new List<AbilityDef>();
+
+        /// <summary>Ids of the local unit's abilities whose cost, range or damage a boon changed: the bar marks them.</summary>
+        private readonly HashSet<string> _modifiedAbilities = new HashSet<string>(StringComparer.Ordinal);
         private readonly List<Hex> _highlight = new List<Hex>();
         private readonly List<IBody> _targetScratch = new List<IBody>();
         private int _armed = None;
@@ -684,16 +687,41 @@ namespace Mimas.Client.Presentation
             return _wallColor;
         }
 
+        /// <summary>
+        /// The action bar's abilities, resolved through the mirror rather than read from the catalogue
+        /// (ADR-034): a Sigil's grant and an Enchant's changed cost, range or damage are on the unit's
+        /// overlay, and the catalogue's base def knows nothing about either.
+        /// </summary>
         private void CollectAbilities()
         {
             _abilities.Clear();
+            _modifiedAbilities.Clear();
             Unit unit;
-            if (_localUnitId == None || !Rules.Units.TryGet(_localUnitId, out unit)) return;
+            if (Rules == null || _localUnitId == None || !Rules.Units.TryGet(_localUnitId, out unit)) return;
             for (int i = 0; i < unit.AbilityIds.Count; i++)
             {
                 AbilityDef def;
-                if (_catalog.Abilities.TryGet(unit.AbilityIds[i], out def)) _abilities.Add(def);
+                if (!Rules.ResolveAbility(unit, unit.AbilityIds[i], out def)) continue;
+                _abilities.Add(def);
+                if (IsChangedByABoon(unit, def.Id)) _modifiedAbilities.Add(def.Id);
             }
+        }
+
+        /// <summary>
+        /// True when a boon on this unit changes a number the button shows. Asked of the unit's own overlay
+        /// rather than of the catalogue, because the overlay is where a boon's effect lives (ADR-034).
+        /// </summary>
+        private static bool IsChangedByABoon(Unit unit, string abilityId)
+        {
+            IReadOnlyList<AbilityOverride> overrides = unit.Overlay.Overrides;
+            for (int i = 0; i < overrides.Count; i++)
+            {
+                if (overrides[i].AbilityId != abilityId) continue;
+                string field = overrides[i].Field;
+                if (field == AbilityFields.Cost || field == AbilityFields.Range
+                    || field == AbilityFields.MinRange || field == AbilityFields.Damage) return true;
+            }
+            return false;
         }
 
         // ---- commands in, events out ----------------------------------------------------------------
@@ -851,6 +879,14 @@ namespace Mimas.Client.Presentation
                     RefreshView();
                     RefreshMarkers();
                     RaiseStateChanged();
+                    break;
+
+                case BoonRevealedEvent revealed:
+                    PlayBoonRevealed(revealed);
+                    break;
+
+                case LineageRevealedEvent revealed:
+                    PlayLineageRevealed(revealed);
                     break;
 
                 case AttackResolvedEvent attack:
@@ -1119,7 +1155,9 @@ namespace Mimas.Client.Presentation
 
             ClearAim();
 
-            var def = _catalog.Abilities.TryGet(attack.AbilityId, out AbilityDef ability) ? ability as AttackDef : null;
+            // The attacker's own resolved def: an Enchant that lengthened the shot changed the curve it flew,
+            // and the catalogue's base def would draw the wrong one (ADR-034).
+            var def = ResolveFor(attack.AttackerId, attack.AbilityId) as AttackDef;
             Func<float, Vector3> curve = BuildResolvedCurve(attack, def);
             float duration = def != null ? ProjectilePlayback.DurationFor(def.Trajectory, ResolvedDistance(attack)) : 0f;
 
@@ -1223,6 +1261,48 @@ namespace Mimas.Client.Presentation
         }
 
         /// <summary>Where the damage number pops: above the body that was hit.</summary>
+        /// <summary>
+        /// A boon showed itself. The flyover names it over the unit it belongs to, the nameplate gains a
+        /// marker, and the examine panel stops saying "Unknown boon" (design: #hidden-info).
+        /// </summary>
+        private void PlayBoonRevealed(BoonRevealedEvent revealed)
+        {
+            BoonDef boon;
+            bool known = _catalog.Boons.TryGet(revealed.BoonId, out boon);
+            _revealedThisBatch.Add(revealed.BoonId);
+            RaiseFlyover(revealed.UnitId,
+                "Revealed: " + (known ? boon.Name : revealed.BoonId),
+                known ? LineageName(boon.LineageId) + " · " + KindName(boon.Kind) : null);
+            RefreshView();
+            RefreshMarkers();
+            RefreshExamine();
+            RaiseStateChanged();
+        }
+
+        private void PlayLineageRevealed(LineageRevealedEvent revealed)
+        {
+            LineageDef lineage;
+            string name = _catalog.Lineages.TryGet(revealed.LineageId, out lineage) ? lineage.Name : revealed.LineageId;
+
+            HudUnit hud;
+            if (_hudUnitsById.TryGetValue(revealed.UnitId, out hud)) hud.LineageTag = name;
+            RaiseFlyover(revealed.UnitId, "Lineage revealed: " + name, null);
+            RefreshView();
+            RefreshExamine();
+            RaiseStateChanged();
+        }
+
+        private void RaiseFlyover(int unitId, string headline, string detail)
+        {
+            Action<HudFlyover> handler = Flyover;
+            if (handler == null) return;
+            UnitView view;
+            Vector3 at = _unitViews.TryGetValue(unitId, out view) && view != null
+                ? view.transform.position + new Vector3(0f, _overlayHeight, 0f)
+                : Vector3.zero;
+            handler(new HudFlyover { UnitId = unitId, WorldPosition = at, Headline = headline, Detail = detail });
+        }
+
         private Vector3 TargetOverlayPosition(AttackResolvedEvent attack)
         {
             if (attack.TargetIsProp)
@@ -1290,6 +1370,22 @@ namespace Mimas.Client.Presentation
                     if (!_catalog.Modifiers.TryGet(entry.Id, out def)) continue;
                     hud.Markers.Add(new HudMarker { Id = def.Id, Name = def.Name, Icon = def.Icon });
                 }
+
+                // A revealed boon earns its own mark, and the lineage its tag — read from the view rather
+                // than only from the event, so a reconnect shows what was learned while we were away.
+                for (int b = 0; b < unit.Boons.Count; b++)
+                {
+                    KnownEntry entry = unit.Boons[b];
+                    if (!entry.Revealed) continue;
+                    BoonDef def;
+                    if (!_catalog.Boons.TryGet(entry.Id, out def)) continue;
+                    hud.Markers.Add(new HudMarker { Id = def.Id, Name = def.Name, Icon = def.Icon });
+                }
+                if (unit.LineageId != null)
+                {
+                    LineageDef lineage;
+                    hud.LineageTag = _catalog.Lineages.TryGet(unit.LineageId, out lineage) ? lineage.Name : unit.LineageId;
+                }
             }
         }
 
@@ -1303,7 +1399,7 @@ namespace Mimas.Client.Presentation
                 AbilityDef def = _abilities[i];
                 bool affordable = me != null && me.Ap >= def.Cost;
                 _actions.Add(new HudAction(def.Id, def.Name, def.Description, DescribeAttackRules(def as AttackDef),
-                    def.Icon, def.Category, def.Cost, affordable, canAct && affordable));
+                    def.Icon, def.Category, def.Cost, affordable, canAct && affordable, _modifiedAbilities.Contains(def.Id)));
             }
         }
 
@@ -1336,7 +1432,9 @@ namespace Mimas.Client.Presentation
             var examine = new HudExamine
             {
                 Title = "Hero",
-                Subtitle = unit.IsMine ? "Your unit" : "Opponent",
+                // The lineage sits under the name: yours always, theirs once something has revealed it
+                // (design: #lineage rule 3).
+                Subtitle = LineageSubtitle(unit),
                 Description = null,
                 Hp = unit.Hp,
                 MaxHp = unit.MaxHp,
@@ -1376,7 +1474,41 @@ namespace Mimas.Client.Presentation
                 });
             }
 
+            AddBoonEntries(examine, unit);
             _examine = examine;
+        }
+
+        private string LineageSubtitle(Mimas.Core.Match.UnitView unit)
+        {
+            if (unit.LineageId == null) return unit.IsMine ? "Your unit" : "Unknown lineage";
+            LineageDef lineage;
+            string name = _catalog.Lineages.TryGet(unit.LineageId, out lineage) ? lineage.Name : unit.LineageId;
+            return unit.IsMine ? "Your unit · " + name : name;
+        }
+
+        /// <summary>
+        /// The unit's boons, in grant order. Yours by name, kind and god; theirs as one "?" row per boon they
+        /// hold, so the count is public and the identity is not (design: #hidden-info rule 5). A row turns
+        /// into a name the moment a reveal names it.
+        /// </summary>
+        private void AddBoonEntries(HudExamine examine, Mimas.Core.Match.UnitView unit)
+        {
+            for (int i = 0; i < unit.Boons.Count; i++)
+            {
+                KnownEntry entry = unit.Boons[i];
+                BoonDef def = null;
+                bool known = entry.Revealed && _catalog.Boons.TryGet(entry.Id, out def);
+                examine.Boons.Add(new HudExamineEntry
+                {
+                    Name = entry.Revealed ? (known ? def.Name : entry.Id) : "Unknown boon",
+                    Description = entry.Revealed
+                        ? (known ? def.Description : null)
+                        : "Revealed when it changes something you can see.",
+                    Icon = known ? def.Icon : null,
+                    Hidden = !entry.Revealed,
+                    Group = known ? KindName(def.Kind) : null,
+                });
+            }
         }
 
         /// <summary>
@@ -1411,6 +1543,24 @@ namespace Mimas.Client.Presentation
             return examine;
         }
 
+        /// <summary>One unit's ability as it really is: gear plus every boon on it (ADR-034). Null when it has none.</summary>
+        private AbilityDef ResolveFor(int unitId, string abilityId)
+        {
+            Unit unit;
+            AbilityDef def;
+            if (Rules == null || abilityId == null || !Rules.Units.TryGet(unitId, out unit)) return null;
+            return Rules.ResolveAbility(unit, abilityId, out def) ? def : null;
+        }
+
+        /// <summary>The same, as the local seat knows it: only the boons that have been revealed to them apply.</summary>
+        private AbilityDef ResolveKnownFor(int unitId, string abilityId)
+        {
+            Unit unit;
+            AbilityDef def;
+            if (Rules == null || abilityId == null || !Rules.Units.TryGet(unitId, out unit)) return null;
+            return Rules.ResolveAbilityKnownTo(LocalPlayer, unit, abilityId, out def) ? def : null;
+        }
+
         /// <summary>Adds every ability the given item grants (or every innate one when <paramref name="itemId"/> is null).</summary>
         private void AddAbilityEntries(HudExamine examine, Mimas.Core.Match.UnitView unit, string itemId)
         {
@@ -1426,8 +1576,10 @@ namespace Mimas.Client.Presentation
                 KnownEntry entry = unit.Abilities[i];
                 if (entry.SourceItemId != itemId) continue;
 
-                AbilityDef def = null;
-                bool known = entry.Revealed && _catalog.Abilities.TryGet(entry.Id, out def);
+                // The enemy's abilities as this seat knows them: only the boons they have been shown apply,
+                // and one the mirror cannot resolve at all keeps the "Unknown ability" row.
+                AbilityDef def = entry.Revealed ? ResolveKnownFor(unit.Id, entry.Id) : null;
+                bool known = def != null;
                 examine.Abilities.Add(new HudExamineEntry
                 {
                     Name = entry.Revealed ? (known ? def.Name : entry.Id) : "Unknown ability",
@@ -1496,7 +1648,17 @@ namespace Mimas.Client.Presentation
                 ? "range " + attack.Range
                 : "range " + attack.MinRange + "-" + attack.Range;
 
-            return travel + "  ·  " + sight + "  ·  " + range;
+            // Elements come first: what a shot carries is the first thing that decides whether it lands at
+            // all, against an immunity or a rider (design #elements).
+            string line = travel + "  ·  " + sight + "  ·  " + range;
+            for (int i = attack.Elements.Count - 1; i >= 0; i--) line = Capitalised(attack.Elements[i]) + "  ·  " + line;
+            return line;
+        }
+
+        private static string Capitalised(string word)
+        {
+            if (string.IsNullOrEmpty(word)) return word;
+            return char.ToUpperInvariant(word[0]) + word.Substring(1);
         }
 
         private static string DescribeAbility(AbilityDef def)
@@ -1923,6 +2085,24 @@ namespace Mimas.Client.Presentation
                 case DamageLineKind.Base: return "Base";
                 case DamageLineKind.Power: return Capitalise(StatBlock.DamageTypeOf(line.Id)) + " power";
                 case DamageLineKind.Defense: return Capitalise(StatBlock.DamageTypeOf(line.Id)) + " defense";
+
+                // A Blessing's strength is its own line, and it says which god's (ADR-035).
+                case DamageLineKind.BoonStat:
+                {
+                    BoonDef boon;
+                    return _catalog.Boons.TryGet(line.Id, out boon) ? boon.Name : line.Id;
+                }
+
+                // An immunity does not reduce the damage, it cancels it: the line says which element.
+                case DamageLineKind.Nullify:
+                {
+                    ModifierDef nullify;
+                    string element = _catalog.Modifiers.TryGet(line.Id, out nullify) && nullify.Elements.Count > 0
+                        ? nullify.Elements[0]
+                        : null;
+                    return element != null ? "Immune (" + element + ")" : "Immune";
+                }
+
                 default:
                 {
                     ModifierDef def;

@@ -1097,3 +1097,21 @@
     opacity: 0.35;
     border-color: var(--hud-edge);
 }
+
+/* ---- what a boon changed (ADR-034) ------------------------------------------------------------ */
+
+/* A small mark on a button whose cost, range or damage a boon moved. The number on it is already the
+   changed one; this only says why it is not the number on the item. */
+.action--modified {
+    border-color: rgb(255, 214, 120);
+}
+
+/* The god on the nameplate, once something has revealed it. */
+.tag-lineage {
+    margin-top: 2px;
+    color: var(--hud-text-dim);
+    font-size: 9px;
+    letter-spacing: 2px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+}

@@ -89,6 +89,8 @@ namespace Mimas.Client.UI
         private Label _examineDescription;
         private Label _examineItemsCaption;
         private Label _examineModifiersCaption;
+        private Label _examineBoonsCaption;
+        private VisualElement _examineBoons;
         private Label _previewTitle;
         private Label _previewTotal;
         private Label _previewBlocked;
@@ -135,6 +137,7 @@ namespace Mimas.Client.UI
             public VisualElement Bar;
             public Label Number;
             public VisualElement Markers;
+            public Label Lineage;
             public readonly List<VisualElement> Segments = new List<VisualElement>();
             public int MaxHp;
             public string MarkerSignature;
@@ -258,6 +261,8 @@ namespace Mimas.Client.UI
             _examineAbilities = root.Q<VisualElement>("examine-abilities");
             _examineModifiersCaption = root.Q<Label>("examine-modifiers-caption");
             _examineModifiers = root.Q<VisualElement>("examine-modifiers");
+            _examineBoonsCaption = root.Q<Label>("examine-boons-caption");
+            _examineBoons = root.Q<VisualElement>("examine-boons");
             _examineClose = root.Q<Button>("examine-close");
             _endTurn = root.Q<Button>("end-turn");
             _unitLayer = root.Q<VisualElement>("unit-layer");
@@ -294,7 +299,8 @@ namespace Mimas.Client.UI
                 || _flyLayer == null || _banner == null || _bannerPanel == null || _bannerDetail == null || _bannerButton == null
                 || _statusLine == null || _resign == null
                 || _seriesLine == null || _draftPanel == null || _draftHeadline == null || _draftNext == null
-                || _draftCards == null || _draftTimerFill == null || _draftDot == null || _draftStatus == null || _draftConfirm == null)
+                || _draftCards == null || _draftTimerFill == null || _draftDot == null || _draftStatus == null || _draftConfirm == null
+                || _examineBoonsCaption == null || _examineBoons == null)
             {
                 Debug.LogError("[MatchHudView] MatchHud.uxml is missing one of the named elements.", this);
                 enabled = false;
@@ -483,6 +489,7 @@ namespace Mimas.Client.UI
                 slot.EnableInClassList("action-slot--active", i == active);
                 slot.EnableInClassList("action-slot--disabled", !action.Enabled && action.Affordable);
                 slot.EnableInClassList("action-slot--unaffordable", !action.Affordable);
+                slot.EnableInClassList("action--modified", action.Modified);
                 ApplyIcon(slot.Q<VisualElement>("icon"), slot.Q<Label>("glyph"), action.Icon, action.Name);
                 slot.Q<Label>("cost").text = action.Cost.ToString();
             }
@@ -535,6 +542,11 @@ namespace Mimas.Client.UI
             bool anyModifiers = examine.Modifiers.Count > 0;
             _examineModifiersCaption.style.display = anyModifiers ? DisplayStyle.Flex : DisplayStyle.None;
             _examineModifiers.style.display = anyModifiers ? DisplayStyle.Flex : DisplayStyle.None;
+
+            FillEntries(_examineBoons, examine.Boons);
+            bool anyBoons = examine.Boons.Count > 0;
+            _examineBoonsCaption.style.display = anyBoons ? DisplayStyle.Flex : DisplayStyle.None;
+            _examineBoons.style.display = anyBoons ? DisplayStyle.Flex : DisplayStyle.None;
 
             _examine.AddToClassList("examine--visible");
         }
@@ -725,6 +737,11 @@ namespace Mimas.Client.UI
                 tag.Root.EnableInClassList("unit-tag--emphasised", unit.Emphasised || ghost > 0);
                 tag.Root.EnableInClassList("unit-tag--dead", !unit.IsAlive);
 
+                // The god, once something has revealed it (design #lineage rule 3).
+                bool hasLineage = !string.IsNullOrEmpty(unit.LineageTag);
+                if (hasLineage) tag.Lineage.text = unit.LineageTag;
+                tag.Lineage.style.display = hasLineage ? DisplayStyle.Flex : DisplayStyle.None;
+
                 SyncMarkers(tag, unit);
             }
 
@@ -767,6 +784,11 @@ namespace Mimas.Client.UI
             tag.Number = new Label { pickingMode = PickingMode.Ignore };
             tag.Number.AddToClassList("unit-number");
             tag.Root.Add(tag.Number);
+
+            tag.Lineage = new Label { name = "tag-lineage", pickingMode = PickingMode.Ignore };
+            tag.Lineage.AddToClassList("tag-lineage");
+            tag.Lineage.style.display = DisplayStyle.None;
+            tag.Root.Add(tag.Lineage);
 
             tag.Markers = new VisualElement { pickingMode = PickingMode.Ignore };
             tag.Markers.AddToClassList("unit-markers");

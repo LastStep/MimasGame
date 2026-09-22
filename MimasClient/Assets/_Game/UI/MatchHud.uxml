@@ -79,6 +79,9 @@
             <ui:VisualElement name="examine-abilities" class="examine-abilities" />
             <ui:Label name="examine-modifiers-caption" class="examine-caption" text="PASSIVES" />
             <ui:VisualElement name="examine-modifiers" class="examine-abilities" />
+            <!-- Yours by name, kind and god; theirs as one "?" row per boon they hold (#hidden-info rule 5). -->
+            <ui:Label name="examine-boons-caption" class="examine-caption" text="BOONS" />
+            <ui:VisualElement name="examine-boons" class="examine-abilities" />
         </ui:VisualElement>
 
         <!-- Bottom centre: action points, then one section per category, filled at runtime from IMatchHudSource. -->

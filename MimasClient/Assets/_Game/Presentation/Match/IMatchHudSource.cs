@@ -29,7 +29,13 @@ namespace Mimas.Client.Presentation
         /// <summary>True when clicking it arms it: the player's turn, nothing playing, and affordable.</summary>
         public readonly bool Enabled;
 
-        public HudAction(string id, string name, string description, string detail, string icon, string category, int cost, bool affordable, bool enabled)
+        /// <summary>
+        /// A boon changed the cost, range or damage this button shows (ADR-034). The numbers here are already
+        /// the changed ones; the mark says so, and it is only ever set for the local unit, whose boons it knows.
+        /// </summary>
+        public readonly bool Modified;
+
+        public HudAction(string id, string name, string description, string detail, string icon, string category, int cost, bool affordable, bool enabled, bool modified = false)
         {
             Id = id;
             Name = name;
@@ -40,6 +46,7 @@ namespace Mimas.Client.Presentation
             Cost = cost;
             Affordable = affordable;
             Enabled = enabled;
+            Modified = modified;
         }
     }
 
@@ -68,6 +75,9 @@ namespace Mimas.Client.Presentation
         public List<HudExamineEntry> Items = new List<HudExamineEntry>();
         public List<HudExamineEntry> Abilities = new List<HudExamineEntry>();
         public List<HudExamineEntry> Modifiers = new List<HudExamineEntry>();
+
+        /// <summary>The unit's boons in grant order, grouped by kind; the enemy's are "?" rows until revealed.</summary>
+        public List<HudExamineEntry> Boons = new List<HudExamineEntry>();
     }
 
     /// <summary>A revealed passive drawn as a small icon under a unit's bar.</summary>
@@ -155,6 +165,9 @@ namespace Mimas.Client.Presentation
 
         /// <summary>Hit points the armed attack would remove if it landed on this unit, or 0 (ghosted on the bar).</summary>
         public int GhostDamage;
+
+        /// <summary>The lineage's name once it has been revealed, drawn on the nameplate; null until then.</summary>
+        public string LineageTag;
 
         public Transform Anchor;
         public Vector3 AnchorOffset;
