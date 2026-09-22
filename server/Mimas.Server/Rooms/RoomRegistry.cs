@@ -103,6 +103,13 @@ public sealed class RoomRegistry
             return;
         }
 
+        string? lineageId = p.Value<string>("lineage");
+        if (string.IsNullOrWhiteSpace(lineageId))
+        {
+            connection.SendError(Messages.Errors.BadLoadout, $"A lineage is required: one of {KnownLineages()}.");
+            return;
+        }
+
         Loadout loadout;
         try
         {
@@ -112,8 +119,10 @@ public sealed class RoomRegistry
                 json.Value<string>("boots") ?? "",
                 json.Value<string>("armour") ?? "");
 
-            // Every id must exist and must fill the slot it was put in; nothing is stored until all four do.
+            // Every id must exist and must fill the slot it was put in; nothing is stored until all four do,
+            // and until the lineage is one the catalogue knows.
             foreach (string slot in ItemSlots.All) _catalog.GetItemForSlot(slot, loadout.IdForSlot(slot));
+            _catalog.GetLineage(lineageId);
         }
         catch (Exception e) when (e is ArgumentException || e is ContentLoadException || e is KeyNotFoundException)
         {
@@ -122,7 +131,7 @@ public sealed class RoomRegistry
         }
 
         bool ready = p.Value<bool?>("ready") ?? true;
-        if (!room.SetLoadout(player, loadout, ready))
+        if (!room.SetLoadout(player, loadout, lineageId, ready))
             connection.SendError(Messages.Errors.NotInRoom, "That room is no longer choosing.");
     }
 
@@ -188,6 +197,10 @@ public sealed class RoomRegistry
     // ---- plumbing ----------------------------------------------------------------------------------
 
     private Room? RoomOf(Player player) => player.RoomId == 0 ? null : TryGet(player.RoomId);
+
+    /// <summary>The catalogue's lineage ids, sorted, for the message a missing lineage gets.</summary>
+    private string KnownLineages()
+        => string.Join(", ", _catalog.Lineages.All.Select(l => l.Id).OrderBy(id => id, StringComparer.Ordinal));
 
     /// <summary>True (and the client has been told) when this player already has somewhere to be.</summary>
     private bool Busy(Player player, WsConnection connection)

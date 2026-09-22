@@ -18,16 +18,18 @@ public sealed class ServerOptions
     /// <summary>How long a dropped seat is held before it forfeits; null uses <c>rules.clock.reconnectGraceMs</c>.</summary>
     public int? ReconnectGraceMs { get; set; }
 
-    /// <summary>How long the server's bot appears to think before each of its actions.</summary>
+    /// <summary>How long a draft is open before the server picks offer 0 for whoever has not; null uses <c>rules.draft.timeoutMs</c>.</summary>
+    public int? DraftTimeoutMs { get; set; }
+
+    /// <summary>How long the server's bot appears to think before each of its actions, a draft pick included.</summary>
     public int BotThinkMs { get; set; } = 1000;
 
-    public string MapId { get; set; } = "arena-4";
-
     /// <summary>
-    /// The hidden modifiers the bot seat carries. The shipped pair is deliberate: it is what makes an
-    /// online bot match exercise the reveal path rather than only the happy one.
+    /// The lineage the bot seat prays to; null draws one at random from the catalogue with the room's own
+    /// seed, so every lineage gets seen (decided 22 Sep 2026, P6). A test that wants a known reveal fixes it.
+    /// The bot's starting Blessing is its lineage's; the two dev passives it used to carry retired with part 2.
     /// </summary>
-    public string[] BotModifierIds { get; set; } = { "ward-of-feathers", "stone-skin" };
+    public string? BotLineageId { get; set; }
 
     /// <summary>The bot's gear, in slot order (weapon, crown, boots, armour). The bot does not choose in a room.</summary>
     public string[] BotLoadout { get; set; } = { "flintlock", "ember-circlet", "blink-boots", "leather-jerkin" };

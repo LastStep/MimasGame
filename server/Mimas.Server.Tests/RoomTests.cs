@@ -196,7 +196,7 @@ public class RoomTests
             Assert.Equal(hostStart.Value<int>("matchId"), guestStart.Value<int>("matchId"));
             Assert.Equal("Friend", hostStart.Value<string>("opponentName"));
             Assert.Equal("Rohan", guestStart.Value<string>("opponentName"));
-            Assert.Equal("arena-4", hostStart.Value<string>("mapId"));
+            Assert.Equal("board-3", hostStart.Value<string>("mapId"));   // round 1 of the ladder (D17)
             Assert.Equal(400, ((JObject)hostStart["clock"]!).Value<int>("turnMs"));
         }
     }
@@ -218,6 +218,61 @@ public class RoomTests
         // Nothing was stored, so the seat is still not ready and a good loadout still works.
         await host.SendAsync(Messages.RoomLoadout, Loadouts.Ready(Loadouts.Bow));
         Assert.True(SeatReady(await host.ExpectAsync(Messages.RoomState), 0));
+    }
+
+    [Fact]
+    public async Task Loadout_WithoutLineage_BadLoadout()
+    {
+        await using var factory = new MimasServerFactory();
+        await using FakeClient host = await factory.JoinAsync("Rohan");
+        await host.SendAsync(Messages.RoomCreate);
+        await host.ExpectAsync(Messages.RoomState);
+
+        // Gear is not enough since part 2: you also pray to a god (design: #lineage).
+        await host.SendAsync(Messages.RoomLoadout, Loadouts.NoLineage(Loadouts.Bow));
+        JObject error = await host.ExpectErrorAsync();
+        Assert.Equal(Messages.Errors.BadLoadout, error.Value<string>("code"));
+        Assert.Contains("greek, hindu, norse", error.Value<string>("message"));
+
+        await Task.Delay(200);
+        Assert.False(host.EverReceived(Messages.MatchStart));
+    }
+
+    [Fact]
+    public async Task Loadout_UnknownLineage_BadLoadout()
+    {
+        await using var factory = new MimasServerFactory();
+        await using FakeClient host = await factory.JoinAsync("Rohan");
+        await host.SendAsync(Messages.RoomCreate);
+        await host.ExpectAsync(Messages.RoomState);
+
+        await host.SendAsync(Messages.RoomLoadout, Loadouts.ReadyWith(Loadouts.Bow, "atlantean"));
+        Assert.Equal(Messages.Errors.BadLoadout, (await host.ExpectErrorAsync()).Value<string>("code"));
+
+        // Nothing was stored, so a good one still works.
+        await host.SendAsync(Messages.RoomLoadout, Loadouts.Ready(Loadouts.Bow));
+        Assert.True(SeatReady(await host.ExpectAsync(Messages.RoomState), 0));
+    }
+
+    [Fact]
+    public async Task Room_LineageIsNotLeakedBeforeStart()
+    {
+        await using var factory = new MimasServerFactory();
+        await using FakeClient host = await factory.JoinAsync("Rohan");
+        await using FakeClient guest = await factory.JoinAsync("Friend");
+
+        await host.SendAsync(Messages.RoomCreate);
+        string code = (await host.ExpectAsync(Messages.RoomState)).Value<string>("code")!;
+        await guest.SendAsync(Messages.RoomJoin, new JObject { ["code"] = code });
+        await guest.ExpectAsync(Messages.RoomState);
+
+        await host.SendAsync(Messages.RoomLoadout, Loadouts.ReadyWith(Loadouts.Bow, "hindu"));
+        JObject seen = await guest.ExpectAsync(Messages.RoomState);
+
+        // Which god you pray to is hidden until something you do reveals it (#lineage rule 3).
+        Assert.True(SeatReady(seen, 0));
+        Assert.DoesNotContain("hindu", seen.ToString());
+        Assert.DoesNotContain("lineage", seen.ToString());
     }
 
     [Fact]
@@ -294,14 +349,14 @@ public class RoomTests
     }
 
     [Fact]
-    public async Task Room_MatchOver_ReadyAgain_StartsRoundTwo()
+    public async Task Room_MatchOver_ReadyAgain_StartsSeriesTwo()
     {
         await using var factory = new MimasServerFactory();
         (FakeClient host, FakeClient guest, string code, JObject hostStart, JObject _) = await Rooms.PlayWithCodeAsync(factory);
         await using (host)
         await using (guest)
         {
-            Assert.Equal(1, hostStart.Value<int>("round"));
+            Assert.Equal(1, hostStart.Value<int>("series"));
 
             await ResignAsync(host, hostStart);
             await ExpectMatchEndedAsync(host);
@@ -316,10 +371,11 @@ public class RoomTests
             JObject hostSecond = await host.ExpectAsync(Messages.MatchStart);
             JObject guestSecond = await guest.ExpectAsync(Messages.MatchStart);
 
-            Assert.Equal(2, hostSecond.Value<int>("round"));
-            Assert.Equal(2, guestSecond.Value<int>("round"));
+            Assert.Equal(2, hostSecond.Value<int>("series"));
+            Assert.Equal(2, guestSecond.Value<int>("series"));
+            Assert.Equal(1, hostSecond.Value<int>("round"));    // a new series starts its rounds again
 
-            // The room's id is the room's, so it is the round that tells the two matches apart, and the
+            // The room's id is the room's, so it is the series that tells the two apart, and the
             // rematch is played in the same room rather than in a second one behind the same code.
             Assert.Equal(hostStart.Value<int>("matchId"), hostSecond.Value<int>("matchId"));
             Assert.Equal(1, (await factory.HealthAsync()).Value<int>("rooms"));
@@ -380,7 +436,7 @@ public class RoomTests
         Assert.True(SeatReady(state, 1));   // the bot has nothing to choose and never un-readies
 
         await client.SendAsync(Messages.RoomLoadout, Loadouts.Ready(Loadouts.Bow));
-        Assert.Equal(2, (await client.ExpectAsync(Messages.MatchStart)).Value<int>("round"));
+        Assert.Equal(2, (await client.ExpectAsync(Messages.MatchStart)).Value<int>("series"));
     }
 
     [Fact]

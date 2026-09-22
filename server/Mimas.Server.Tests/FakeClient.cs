@@ -97,6 +97,28 @@ public sealed class FakeClient : IAsyncDisposable
         }
     }
 
+    /// <summary>The next message of any of these types: for a series loop, which takes events, starts and refusals.</summary>
+    public async Task<(string Type, JObject Payload)> ExpectAnyAsync(string[] types, TimeSpan? timeout = null)
+    {
+        DateTime deadline = DateTime.UtcNow + (timeout ?? DefaultTimeout);
+        while (true)
+        {
+            lock (_gate)
+            {
+                while (_cursor < _received.Count)
+                {
+                    (string Type, JObject Payload) message = _received[_cursor++];
+                    if (types.Contains(message.Type)) return message;
+                }
+            }
+
+            TimeSpan left = deadline - DateTime.UtcNow;
+            if (left <= TimeSpan.Zero)
+                throw new Xunit.Sdk.XunitException($"{Name}: timed out waiting for one of '{string.Join("', '", types)}'. Got: {string.Join(", ", Received.Select(m => m.Type))}");
+            await _arrived.WaitAsync(left < TimeSpan.FromMilliseconds(50) ? left : TimeSpan.FromMilliseconds(50), _cts.Token);
+        }
+    }
+
     /// <summary>True when a message of that type has arrived at any point, consumed or not.</summary>
     public bool EverReceived(string t)
     {

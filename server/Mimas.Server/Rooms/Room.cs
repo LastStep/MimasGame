@@ -3,12 +3,17 @@ using Mimas.Core.Bots;
 using Mimas.Core.Content;
 using Mimas.Core.Match;
 using Mimas.Core.Protocol;
+using Mimas.Core.Session;
 using Mimas.Server.Net;
 using Mimas.Server.Options;
 using Mimas.Server.Players;
 using Newtonsoft.Json.Linq;
 
 namespace Mimas.Server.Rooms;
+
+// The class is Mimas.Core.Session.Session; from another namespace the bare name finds the namespace
+// first, so this alias inside our own namespace puts the class first (spec D part 2 §6.2).
+using Session = Mimas.Core.Session.Session;
 
 public enum RoomPhase
 {
@@ -24,10 +29,16 @@ public enum RoomPhase
 
 /// <summary>
 /// One room: a four-letter code two friends can agree on, two seats, and — once both are ready — the
-/// truth of one match. The room is the only thing that touches its <see cref="MatchState"/>, always under
-/// one lock, and the only bytes that leave it are a <see cref="PlayerView"/> for one seat or the events
-/// <see cref="EventFilter"/> passed for that seat. That is the hidden-information guarantee as a place in
-/// the code rather than as a promise.
+/// truth of one <b>session</b>: a best-of-3 with a draft between its rounds (ADR-036). The room is the only
+/// thing that touches its <see cref="Session"/>, always under one lock, and the only bytes that leave it
+/// are one seat's <see cref="PlayerView"/> and <see cref="SessionView"/> and the events
+/// <see cref="SessionEventFilter"/> passed for that seat. That is the hidden-information guarantee as a
+/// place in the code rather than as a promise.
+/// <para>
+/// The room never reads the session's rules: it forwards commands, arms the clocks, submits the timeouts
+/// and the forfeits as commands, and splits the outgoing batches — a batch carrying a
+/// <see cref="RoundStartedEvent"/> goes out as <c>match.start</c>, everything else as <c>match.events</c>.
+/// </para>
 /// <para>
 /// Room codes rather than a queue: OPT-0001 (spec amendment A1). Four friends in two arranged pairs are
 /// not a matchmaking problem, and a queue pairs them in the order they click.
@@ -47,6 +58,10 @@ public sealed class Room
     private CancellationTokenSource? _ticker;
     private RandomBot? _bot;
     private long _botDueAt;
+
+    /// <summary>When the open draft is up, in <see cref="Environment.TickCount64"/> ms; 0 when no draft is open.</summary>
+    private long _draftDeadline;
+
     private int _seq;
 
     public int MatchId { get; }
@@ -55,18 +70,25 @@ public sealed class Room
     public RoomClock Clock { get; }
 
     /// <summary>
-    /// Which match this is in the room's life: 1 for the first, 2 for the rematch, and so on. The room's
-    /// <see cref="MatchId"/> is the room's own id and is reused across rounds, so this is what tells two
-    /// matches apart in a log line (ADR-032).
+    /// Which <b>series</b> this is in the room's life: 1 for the first, 2 for the rematch, and so on. The
+    /// room's <see cref="MatchId"/> is the room's own id and is reused across series, so this is what tells
+    /// two of them apart in a log line (ADR-032, ADR-036). The round inside a series is
+    /// <see cref="Mimas.Core.Session.Session.Round"/>.
     /// </summary>
-    public int Round { get; private set; }
+    public int Series { get; private set; }
 
     /// <summary>
-    /// The truth, while the match is being played. Never serialised, never handed out (golden rule 6).
+    /// The truth, while the series is being played. Never serialised, never handed out (golden rule 6).
     /// Non-null exactly while <see cref="Phase"/> is <see cref="RoomPhase.Playing"/>: the result is sent
-    /// before the room goes back to waiting, and nothing may answer from a finished match afterwards.
+    /// before the room goes back to waiting, and nothing may answer from a finished series afterwards.
     /// </summary>
-    public MatchState? State { get; private set; }
+    public Session? Session { get; private set; }
+
+    /// <summary>The running round, or null between rounds. Shorthand for the places that only need the round.</summary>
+    public MatchState? State => Session?.Match;
+
+    /// <summary>Drawn once, when a bot room opens: what the bot's lineage is picked with (P6).</summary>
+    public uint RoomSeed { get; private set; }
 
     public IReadOnlyList<Seat> Seats => _seats;
 
@@ -83,6 +105,8 @@ public sealed class Room
 
     private int ReconnectGraceMs => _options.ReconnectGraceMs ?? _catalog.Rules.Clock.ReconnectGraceMs;
 
+    private int DraftTimeoutMs => _options.DraftTimeoutMs ?? _catalog.Rules.Draft.TimeoutMs;
+
     // ---- joining and leaving ---------------------------------------------------------------------
 
     /// <summary>Puts the host in seat 0, and the bot in seat 1 when this is a bot room.</summary>
@@ -96,9 +120,11 @@ public sealed class Room
                 _seats[1].IsBot = true;
                 _seats[1].BotName = _options.BotName;
                 _seats[1].Loadout = BotLoadout();
+                _seats[1].LineageId = _options.BotLineageId ?? PickBotLineage();
                 _seats[1].Ready = true;
             }
-            _log.LogInformation("room {Code} ({MatchId}) opened by {Player}{Bot}", Code, MatchId, host, vsBot ? " vs bot" : "");
+            _log.LogInformation("room {Code} ({MatchId}) opened by {Player}{Bot}", Code, MatchId, host,
+                vsBot ? $" vs bot ({_seats[1].LineageId})" : "");
             BroadcastRoomState();
         }
     }
@@ -121,13 +147,14 @@ public sealed class Room
         }
     }
 
-    internal bool SetLoadout(Player player, Loadout loadout, bool ready)
+    internal bool SetLoadout(Player player, Loadout loadout, string lineageId, bool ready)
     {
         lock (_gate)
         {
             Seat? seat = SeatOf(player);
             if (seat == null || Phase != RoomPhase.Waiting) return false;
             seat.Loadout = loadout;
+            seat.LineageId = lineageId;
             seat.Ready = ready;
             BroadcastRoomState();
             StartIfBothReady();
@@ -165,6 +192,7 @@ public sealed class Room
         seat.DisconnectedAt = null;
         seat.Ready = false;
         seat.Loadout = null;
+        seat.LineageId = null;
         player.RoomId = MatchId;
     }
 
@@ -174,39 +202,47 @@ public sealed class Room
         return new Loadout(ids[0], ids[1], ids[2], ids[3]);
     }
 
+    /// <summary>One draw, at the room's birth, from the catalogue's lineages in id order (P6).</summary>
+    private string PickBotLineage()
+    {
+        RoomSeed = (uint)RandomNumberGenerator.GetInt32(1, int.MaxValue);
+        List<string> ids = _catalog.Lineages.All.Select(l => l.Id).OrderBy(id => id, StringComparer.Ordinal).ToList();
+        return ids[(int)new Mimas.Core.Rng(RoomSeed).Range(0, ids.Count)];
+    }
+
     // ---- starting --------------------------------------------------------------------------------
 
     private void StartIfBothReady()
     {
         if (Phase != RoomPhase.Waiting) return;
         foreach (Seat seat in _seats)
-            if (!seat.Occupied || !seat.Ready || seat.Loadout == null) return;
+            if (!seat.Occupied || !seat.Ready || seat.Loadout == null || seat.LineageId == null) return;
 
-        // Seed and coin flip come from the server, not from either client, so neither can pick its map
-        // side or its rolls. Everything downstream of the seed is deterministic (golden rule 4).
+        // The seed comes from the server, not from either client, so neither can pick its rolls. Everything
+        // downstream of it is deterministic (golden rule 4) — the coin flip, every round's seed, every
+        // draft's shuffle are the session's own, drawn from this one number.
         var seed = (uint)RandomNumberGenerator.GetInt32(1, int.MaxValue);
-        int firstPlayer = (int)new Mimas.Core.Rng(seed).Range(0, MatchSetup.PlayerCount);
+        var setup = new SessionSetup(
+            new PlayerBuild(_seats[0].Loadout!, _seats[0].LineageId!),
+            new PlayerBuild(_seats[1].Loadout!, _seats[1].LineageId!));
 
-        var setup = new MatchSetup(_options.MapId, _seats[0].Loadout!, _seats[1].Loadout!, firstPlayer);
+        Session = new Session(_catalog, setup, seed);
         foreach (Seat seat in _seats)
-        {
-            if (!seat.IsBot) continue;
-            foreach (string modifierId in _options.BotModifierIds) setup.WithModifier(seat.Index, modifierId);
-            _bot = new RandomBot(seed ^ 0x9E3779B9);
-        }
+            if (seat.IsBot) _bot = new RandomBot(seed ^ 0x9E3779B9);
 
-        State = new MatchState(_catalog, setup, seed);
         Phase = RoomPhase.Playing;
         _seq = 0;
-        Round++;
+        _draftDeadline = 0;
+        Series++;
 
-        IReadOnlyList<MatchEvent> started = State.Start();
+        IReadOnlyList<MatchEvent> started = Session.Start();
         long now = Environment.TickCount64;
         Clock.Arm(now);
         _botDueAt = now + _options.BotThinkMs;
 
-        _log.LogInformation("room {Code}: match {MatchId} round {Round} started on {Map}, seed {Seed}, first player {First}",
-            Code, MatchId, Round, _options.MapId, seed, firstPlayer);
+        RoundStartedEvent round1 = started.OfType<RoundStartedEvent>().First();
+        _log.LogInformation("room {Code}: match {MatchId} series {Series} round {Round} started on {Map}, seed {Seed}, first player {First}",
+            Code, MatchId, Series, round1.Round, round1.MapId, seed, round1.FirstPlayer);
 
         foreach (Seat seat in _seats) SendMatchStart(seat, started);
         StartTicking();
@@ -214,25 +250,32 @@ public sealed class Room
 
     private void SendMatchStart(Seat seat, IReadOnlyList<MatchEvent>? events)
     {
-        if (seat.Connection == null || !seat.IsHuman || State == null) return;
+        if (seat.Connection == null || !seat.IsHuman || Session == null) return;
 
         _filtered.Clear();
-        if (events != null) EventFilter.ForPlayer(events, seat.Index, State, _filtered);
+        if (events != null) SessionEventFilter.ForPlayer(events, seat.Index, Session, _filtered);
 
+        SessionView session = SessionView.For(Session, seat.Index);
         var p = new JObject
         {
             ["matchId"] = MatchId,
-            ["round"] = Round,
+            ["series"] = Series,
+            ["round"] = Session.Round,
             ["seq"] = _seq,
-            ["mapId"] = State.MapData.Id,
+            ["mapId"] = session.MapId,
             ["youAre"] = seat.Index,
             ["opponentName"] = _seats[1 - seat.Index].Name,
-            ["view"] = Wire.View(State.ViewFor(seat.Index)),
+            ["view"] = ViewPayload(session),
+            ["session"] = Wire.Session(session),
             ["clock"] = ClockPayload(),
             ["events"] = Wire.Events(_filtered),
         };
         seat.Connection.Send(Messages.MatchStart, p);
     }
+
+    /// <summary>The round's view, or an explicit null between rounds — never an omitted field.</summary>
+    private static JToken ViewPayload(SessionView session)
+        => session.Match != null ? Wire.View(session.Match) : JValue.CreateNull();
 
     // ---- playing ---------------------------------------------------------------------------------
 
@@ -241,7 +284,7 @@ public sealed class Room
         lock (_gate)
         {
             Seat? seat = SeatOf(player);
-            if (seat == null || State == null || Phase != RoomPhase.Playing)
+            if (seat == null || Session == null || Phase != RoomPhase.Playing)
             {
                 connection.SendError(Messages.Errors.UnknownMatch, "You are not seated in a running match.");
                 return;
@@ -255,7 +298,7 @@ public sealed class Room
             }
 
             _scratch.Clear();
-            if (!State.TryApply(command, _scratch, out CommandResult result))
+            if (!Session.TryApply(command, _scratch, out CommandResult result))
             {
                 _log.LogDebug("room {Code}: refused {Command} ({Reason})", Code, command, result);
                 Reject(seat, result.ToString());
@@ -272,16 +315,18 @@ public sealed class Room
         lock (_gate)
         {
             Seat? seat = SeatOf(player);
-            if (seat == null || State == null)
+            if (seat == null || Session == null)
             {
                 connection.SendError(Messages.Errors.UnknownMatch, "You are not seated in a running match.");
                 return;
             }
+            SessionView session = SessionView.For(Session, seat.Index);
             connection.Send(Messages.MatchView, new JObject
             {
                 ["matchId"] = MatchId,
                 ["seq"] = _seq,
-                ["view"] = Wire.View(State.ViewFor(seat.Index)),
+                ["view"] = ViewPayload(session),
+                ["session"] = Wire.Session(session),
                 ["clock"] = ClockPayload(),
             });
         }
@@ -289,12 +334,14 @@ public sealed class Room
 
     private void Reject(Seat seat, string reason)
     {
-        if (seat.Connection == null || State == null) return;
+        if (seat.Connection == null || Session == null) return;
+        SessionView session = SessionView.For(Session, seat.Index);
         seat.Connection.Send(Messages.MatchRejected, new JObject
         {
             ["matchId"] = MatchId,
             ["reason"] = reason,
-            ["view"] = Wire.View(State.ViewFor(seat.Index)),
+            ["view"] = ViewPayload(session),
+            ["session"] = Wire.Session(session),
             ["clock"] = ClockPayload(),
         });
     }
@@ -305,37 +352,57 @@ public sealed class Room
     /// </summary>
     private void Broadcast(IReadOnlyList<MatchEvent> events)
     {
-        if (State == null) return;
+        if (Session == null) return;
         _seq++;
 
+        // The clocks. A round's turn clock re-arms on the last turnStarted; a draft has one deadline for
+        // both seats, armed when the draft opens, and no lag grace — nobody is racing a move.
         long now = Environment.TickCount64;
-        MatchEvent? lastTurnStarted = events.LastOrDefault(e => e is TurnStartedEvent);
-        if (lastTurnStarted != null && !State.IsOver)
+        if (Session.Phase == SessionPhase.Round && events.Any(e => e is TurnStartedEvent))
         {
             Clock.Arm(now);
             _botDueAt = now + _options.BotThinkMs;
         }
+        if (events.Any(e => e is DraftStartedEvent) && Session.Phase == SessionPhase.Draft)
+        {
+            _draftDeadline = now + DraftTimeoutMs;
+            _botDueAt = now + _options.BotThinkMs;
+        }
 
+        // The split rule (ADR-036): a batch that started a round is that round's match.start.
+        bool startsARound = events.Any(e => e is RoundStartedEvent);
         foreach (Seat seat in _seats)
         {
             if (!seat.IsHuman || seat.Connection == null) continue;
+            if (startsARound)
+            {
+                SendMatchStart(seat, events);
+                continue;
+            }
             _filtered.Clear();
-            EventFilter.ForPlayer(events, seat.Index, State, _filtered);
+            SessionEventFilter.ForPlayer(events, seat.Index, Session, _filtered);
+            SessionView session = SessionView.For(Session, seat.Index);
             seat.Connection.Send(Messages.MatchEvents, new JObject
             {
                 ["matchId"] = MatchId,
                 ["seq"] = _seq,
                 ["events"] = Wire.Events(_filtered),
-                ["view"] = Wire.View(State.ViewFor(seat.Index)),
+                ["view"] = ViewPayload(session),
+                ["session"] = Wire.Session(session),
                 ["clock"] = ClockPayload(),
             });
         }
 
-        if (!State.IsOver) return;
+        var roundEnded = events.OfType<RoundEndedEvent>().LastOrDefault();
+        if (roundEnded != null)
+            _log.LogInformation("room {Code}: match {MatchId} series {Series} round {Round} over, winner {Winner} ({Reason}), score {Score0}-{Score1}",
+                Code, MatchId, Series, roundEnded.Round, roundEnded.Winner, roundEnded.Reason, roundEnded.Score0, roundEnded.Score1);
 
-        var ended = events.OfType<MatchEndedEvent>().LastOrDefault();
-        _log.LogInformation("room {Code}: match {MatchId} round {Round} over, winner {Winner} ({Reason})",
-            Code, MatchId, Round, State.Winner, ended?.Reason);
+        if (!Session.IsOver) return;
+
+        var over = events.OfType<SessionEndedEvent>().LastOrDefault();
+        _log.LogInformation("room {Code}: match {MatchId} series {Series} over, winner {Winner} {Score0}-{Score1} ({Reason})",
+            Code, MatchId, Series, Session.Winner, over?.Score0, over?.Score1, over?.Reason);
         ReturnToWaiting();
     }
 
@@ -354,7 +421,8 @@ public sealed class Room
         _ticker?.Cancel();
         _ticker = null;
         _bot = null;
-        State = null;
+        Session = null;
+        _draftDeadline = 0;
 
         foreach (Seat seat in _seats)
         {
@@ -373,8 +441,8 @@ public sealed class Room
                 continue;
             }
 
-            // Loadout is deliberately kept: Ready is one click, and the preset dropdown still shows what
-            // they played. It is still never broadcast (q-online-room-loadout).
+            // Loadout and lineage are deliberately kept: Ready is one click, and the preset dropdown and
+            // the lineage row still show what they played. Neither is ever broadcast (q-online-room-loadout).
             seat.Ready = false;
             seat.DisconnectedAt = null;
         }
@@ -389,12 +457,30 @@ public sealed class Room
         BroadcastRoomState();
     }
 
-    private JObject ClockPayload() => new()
+    /// <summary>
+    /// One shape, two modes: a turn's deadline for the active seat, or — in a draft — one deadline for both,
+    /// which <c>activePlayer: -1</c> says. The client re-anchors on it exactly the same way either way.
+    /// </summary>
+    private JObject ClockPayload()
     {
-        ["activePlayer"] = State?.ActivePlayer ?? 0,
-        ["turnMs"] = Clock.TurnMs,
-        ["remainingMs"] = Clock.Remaining(Environment.TickCount64),
-    };
+        long now = Environment.TickCount64;
+        if (Session != null && Session.Phase == SessionPhase.Draft)
+        {
+            long left = _draftDeadline - now;
+            return new JObject
+            {
+                ["activePlayer"] = -1,
+                ["turnMs"] = DraftTimeoutMs,
+                ["remainingMs"] = left <= 0 ? 0 : (int)left,
+            };
+        }
+        return new JObject
+        {
+            ["activePlayer"] = State?.ActivePlayer ?? 0,
+            ["turnMs"] = Clock.TurnMs,
+            ["remainingMs"] = Clock.Remaining(now),
+        };
+    }
 
     // ---- the tick --------------------------------------------------------------------------------
 
@@ -419,53 +505,105 @@ public sealed class Room
         }, ct);
     }
 
-    /// <summary>The clock, the bot and the reconnect graces, in that order. Internal so a test can step it by hand.</summary>
+    /// <summary>
+    /// The clocks, the bot and the reconnect graces. Two modes, because a session has two: inside a round
+    /// it is the turn clock and the bot's move, between rounds it is the one draft deadline and the bot's
+    /// pick. The graces run in both — a seat that never comes back forfeits the series either way.
+    /// Internal so a test can step it by hand.
+    /// </summary>
     internal void Tick()
     {
         lock (_gate)
         {
-            if (State == null || Phase != RoomPhase.Playing) return;
-            long now = Environment.TickCount64;
-
-            Seat active = _seats[State.ActivePlayer];
-
-            // 1. The clock. A bot never times out; it has nothing to wait for.
-            if (!active.IsBot && Clock.Expired(now, active.RttMs))
+            if (Session == null || Phase != RoomPhase.Playing) return;
+            switch (Session.Phase)
             {
-                _log.LogInformation("room {Code}: seat {Seat} timed out", Code, active.Index);
-                Apply(new EndTurnCommand(active.Index, EndTurnReason.Timeout));
-                if (State == null || Phase != RoomPhase.Playing) return;
-                now = Environment.TickCount64;
-                active = _seats[State.ActivePlayer];
-            }
-
-            // 2. The bot, once it has appeared to think for long enough.
-            if (active.IsBot && _bot != null && now >= _botDueAt)
-            {
-                Command command = _bot.Choose(State, active.Index) ?? new EndTurnCommand(active.Index);
-                Apply(command);
-                _botDueAt = Environment.TickCount64 + _options.BotThinkMs;
-                if (State == null || Phase != RoomPhase.Playing) return;
-            }
-
-            // 3. Anyone who has been gone too long concedes — through the same command a player would send.
-            foreach (Seat seat in _seats)
-            {
-                if (!seat.IsHuman || seat.DisconnectedAt == null) continue;
-                if (now - seat.DisconnectedAt.Value < ReconnectGraceMs) continue;
-                _log.LogInformation("room {Code}: seat {Seat} did not return, forfeiting", Code, seat.Index);
-                Apply(new ResignCommand(seat.Index, ResignReason.Disconnect));
-                return;
+                case SessionPhase.Round:
+                    TickRound();
+                    return;
+                case SessionPhase.Draft:
+                    TickDraft();
+                    return;
+                default:
+                    return;                                     // Over: ReturnToWaiting already ran
             }
         }
     }
 
-    /// <summary>Applies a command the server itself decided on (a timeout, a forfeit, the bot's move).</summary>
+    private void TickRound()
+    {
+        long now = Environment.TickCount64;
+        Seat active = _seats[Session!.Match!.ActivePlayer];
+
+        // 1. The clock. A bot never times out; it has nothing to wait for.
+        if (!active.IsBot && Clock.Expired(now, active.RttMs))
+        {
+            _log.LogInformation("room {Code}: seat {Seat} timed out", Code, active.Index);
+            Apply(new EndTurnCommand(active.Index, EndTurnReason.Timeout));
+            if (!StillIn(SessionPhase.Round)) return;
+            now = Environment.TickCount64;
+            active = _seats[Session!.Match!.ActivePlayer];
+        }
+
+        // 2. The bot, once it has appeared to think for long enough.
+        if (active.IsBot && _bot != null && now >= _botDueAt)
+        {
+            Command command = _bot.Choose(Session!.Match!, active.Index) ?? new EndTurnCommand(active.Index);
+            Apply(command);
+            _botDueAt = Environment.TickCount64 + _options.BotThinkMs;
+            if (!StillIn(SessionPhase.Round)) return;
+        }
+
+        TickGraces(Environment.TickCount64);
+    }
+
+    private void TickDraft()
+    {
+        // 1. The deadline, with no lag grace: the server keeps offer 0 for whoever has not chosen (#draft rule 4).
+        if (_draftDeadline > 0 && Environment.TickCount64 >= _draftDeadline)
+        {
+            foreach (Seat seat in _seats)
+            {
+                if (!seat.IsHuman || Session!.HasPicked(seat.Index)) continue;
+                _log.LogInformation("room {Code}: seat {Seat} did not pick in time", Code, seat.Index);
+                Apply(new DraftPickCommand(seat.Index, 0, DraftPickReason.Timeout));
+                if (!StillIn(SessionPhase.Draft)) return;
+            }
+        }
+
+        // 2. The bot picks after the same think delay it uses for a move.
+        Seat? bot = _seats.FirstOrDefault(s => s.IsBot);
+        if (bot != null && _bot != null && !Session!.HasPicked(bot.Index) && Environment.TickCount64 >= _botDueAt)
+        {
+            Command? pick = _bot.ChooseDraft(Session, bot.Index);
+            if (pick != null) Apply(pick);
+            if (!StillIn(SessionPhase.Draft)) return;
+        }
+
+        TickGraces(Environment.TickCount64);
+    }
+
+    /// <summary>Anyone who has been gone too long concedes the series — through the same command a player would send.</summary>
+    private void TickGraces(long now)
+    {
+        foreach (Seat seat in _seats)
+        {
+            if (!seat.IsHuman || seat.DisconnectedAt == null) continue;
+            if (now - seat.DisconnectedAt.Value < ReconnectGraceMs) continue;
+            _log.LogInformation("room {Code}: seat {Seat} did not return, forfeiting the series", Code, seat.Index);
+            Apply(new ResignCommand(seat.Index, ResignReason.Disconnect));
+            return;
+        }
+    }
+
+    private bool StillIn(SessionPhase phase) => Session != null && Phase == RoomPhase.Playing && Session.Phase == phase;
+
+    /// <summary>Applies a command the server itself decided on (a timeout, a forfeit, the bot's move or pick).</summary>
     private void Apply(Command command)
     {
-        if (State == null) return;
+        if (Session == null) return;
         _scratch.Clear();
-        if (!State.TryApply(command, _scratch, out CommandResult result))
+        if (!Session.TryApply(command, _scratch, out CommandResult result))
         {
             _log.LogWarning("room {Code}: the server's own {Command} was refused ({Reason})", Code, command, result);
             return;

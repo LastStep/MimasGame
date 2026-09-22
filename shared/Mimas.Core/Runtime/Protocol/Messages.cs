@@ -25,7 +25,7 @@ namespace Mimas.Core.Protocol
         /// <summary><c>{ code }</c> — take the free seat in someone else's room.</summary>
         public const string RoomJoin = "room.join";
 
-        /// <summary><c>{ loadout, ready }</c> — choose gear in the room, and say whether you are ready.</summary>
+        /// <summary><c>{ loadout, lineage, ready }</c> — choose gear and a god in the room, and say whether you are ready. Both are required.</summary>
         public const string RoomLoadout = "room.loadout";
 
         /// <summary><c>{}</c> — leave a room you have not yet started playing in.</summary>
@@ -34,7 +34,8 @@ namespace Mimas.Core.Protocol
         /// <summary><c>{}</c> — open a room whose other seat is the server's random bot, already ready.</summary>
         public const string BotPlay = "bot.play";
 
-        /// <summary><c>{ matchId, command }</c> — submit a command to the room that holds the truth.</summary>
+        /// <summary><c>{ matchId, command }</c> — submit a command to the room that holds the truth. A draft
+        /// pick is one of them (<c>{ type: "draftPick", … }</c>); there is no separate draft message (ADR-036).</summary>
         public const string MatchCommand = "match.command";
 
         /// <summary><c>{ matchId }</c> — ask for a fresh full view.</summary>
@@ -55,18 +56,20 @@ namespace Mimas.Core.Protocol
         /// <summary><c>{}</c> — you are out of the room; the lobby is yours again.</summary>
         public const string RoomLeft = "room.left";
 
-        /// <summary><c>{ matchId, round, seq, mapId, youAre, opponentName, view, clock, events }</c> —
-        /// <c>matchId</c> is the room's id and is reused across rounds; <c>round</c> counts the matches
-        /// played in it, 1 for the first.</summary>
+        /// <summary><c>{ matchId, series, round, seq, mapId, youAre, opponentName, view, session, clock, events }</c> —
+        /// <c>matchId</c> is the room's id and is reused across series; <c>series</c> counts the best-of-3s
+        /// played in the room, 1 for the first, and <c>round</c> the round inside one. Every round begins
+        /// with one of these, so a client that sees a round it is not showing reloads its board (ADR-036).
+        /// <c>view</c> is null between rounds.</summary>
         public const string MatchStart = "match.start";
 
-        /// <summary><c>{ matchId, seq, events, view, clock }</c> — events already filtered for this seat.</summary>
+        /// <summary><c>{ matchId, seq, events, view, session, clock }</c> — events already filtered for this seat; <c>view</c> null between rounds.</summary>
         public const string MatchEvents = "match.events";
 
-        /// <summary><c>{ matchId, reason, view, clock }</c></summary>
+        /// <summary><c>{ matchId, reason, view, session, clock }</c></summary>
         public const string MatchRejected = "match.rejected";
 
-        /// <summary><c>{ matchId, seq, view, clock }</c></summary>
+        /// <summary><c>{ matchId, seq, view, session, clock }</c></summary>
         public const string MatchView = "match.view";
 
         /// <summary><c>{ matchId, connected, graceMs }</c></summary>

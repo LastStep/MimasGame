@@ -26,6 +26,13 @@ public sealed class Seat
     /// <summary>Gear chosen in the room. Null until chosen — and a seat with no loadout can never be ready.</summary>
     public Loadout? Loadout { get; internal set; }
 
+    /// <summary>
+    /// The lineage prayed to, chosen in the room under the preset. Null until chosen, and a seat without
+    /// one can never be ready. Never broadcast: which god you chose is hidden until a reveal says so
+    /// (design: #lineage rule 3).
+    /// </summary>
+    public string? LineageId { get; internal set; }
+
     public bool Ready { get; internal set; }
 
     /// <summary>The socket this seat is attached to, or null while the player is away. Always null for the bot.</summary>
@@ -52,6 +59,7 @@ public sealed class Seat
         IsBot = false;
         BotName = null;
         Loadout = null;
+        LineageId = null;
         Ready = false;
         Connection = null;
         DisconnectedAt = null;
