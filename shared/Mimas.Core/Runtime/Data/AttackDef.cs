@@ -114,6 +114,17 @@ namespace Mimas.Core.Data
             => new AttackDef(Id, Name, Category, Cost, Damage, DamageType, Range, MinRange,
                 trajectory, lineOfSight, apex, new List<string>(_tags), Description, Icon, new List<string>(_elements), Hits);
 
+        /// <summary>
+        /// A copy with a unit's overlay applied (spec D part 1 §6.3): new numbers for the overridable fields,
+        /// and the element and tag sets grown. <see cref="Damage"/> is deliberately <b>not</b> a parameter: a
+        /// damage override stays a breakdown line so the preview-versus-actual rule reveals it (§6.5 (d)).
+        /// The caller has already floored the numbers.
+        /// </summary>
+        public AttackDef WithOverlay(int cost, int range, int minRange, int apex, int hits, IReadOnlyList<string> elements, IReadOnlyList<string> tags)
+            => new AttackDef(Id, Name, Category, cost, Damage, DamageType, range, minRange,
+                Trajectory, LineOfSight, apex, tags != null ? new List<string>(tags) : new List<string>(_tags), Description, Icon,
+                elements != null ? new List<string>(elements) : new List<string>(_elements), hits);
+
         public static AttackDef FromJson(string json)
         {
             if (string.IsNullOrWhiteSpace(json)) throw new MapLoadException("Attack JSON is empty.");

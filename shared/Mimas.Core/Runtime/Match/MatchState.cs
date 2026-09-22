@@ -81,6 +81,8 @@ namespace Mimas.Core.Match
         private readonly DamageCalculator _damage;
         private readonly RevealedSet _revealed = new RevealedSet();
         private readonly List<IBody> _targetScratch = new List<IBody>();
+        private readonly List<AbilityOverride> _overrideScratch = new List<AbilityOverride>();
+        private readonly List<AbilityAddition> _additionScratch = new List<AbilityAddition>();
 
         public ContentCatalog Catalog { get; }
         public MatchSetup Setup { get; }
@@ -149,11 +151,15 @@ namespace Mimas.Core.Match
         {
             for (int player = 0; player < MatchSetup.PlayerCount; player++)
             {
-                Loadout loadout = setup.LoadoutOf(player);
+                PlayerBuild build = setup.BuildOf(player);
                 var items = new List<ItemDef>(ItemSlots.All.Length);
                 for (int s = 0; s < ItemSlots.All.Length; s++)
-                    items.Add(catalog.GetItemForSlot(ItemSlots.All[s], loadout.IdForSlot(ItemSlots.All[s])));
-                var unit = new Unit(player, player, player == 0 ? MapData.SpawnP1 : MapData.SpawnP2, catalog.Rules, items);
+                    items.Add(catalog.GetItemForSlot(ItemSlots.All[s], build.Loadout.IdForSlot(ItemSlots.All[s])));
+                if (build.LineageId != null) catalog.GetLineage(build.LineageId);
+                var boons = new List<BoonDef>(build.BoonIds.Count);
+                for (int b = 0; b < build.BoonIds.Count; b++) boons.Add(catalog.GetBoon(build.BoonIds[b]));
+
+                var unit = new Unit(player, player, player == 0 ? MapData.SpawnP1 : MapData.SpawnP2, catalog.Rules, items, build.LineageId, boons);
                 IReadOnlyList<string> modifiers = setup.ModifierIdsOf(player);
                 for (int i = 0; i < modifiers.Count; i++)
                 {
@@ -162,7 +168,22 @@ namespace Mimas.Core.Match
                     unit.AddModifier(modifiers[i]);
                 }
                 Units.Add(unit);
+
+                // The other skeleton (spec §6.7): an attack file that says hits > 1 fails closed the moment a unit would carry it.
+                for (int a = 0; a < unit.AbilityIds.Count; a++)
+                {
+                    AbilityDef def;
+                    if (!ResolveAbility(unit, unit.AbilityIds[a], out def))
+                        throw new ArgumentException($"Unit {unit.Id} carries unknown ability '{unit.AbilityIds[a]}'.", nameof(setup));
+                    var attack = def as AttackDef;
+                    if (attack != null && attack.Hits > 1)
+                        throw new NotSupportedException($"multi-hit attacks are not implemented (spec D part 1 §6.7, E5/S3): '{attack.Id}' has hits {attack.Hits}.");
+                }
             }
+
+            // What the session already showed each player (design: #hidden-info rule 1; session-long reveals).
+            for (int i = 0; i < setup.RevealedEntries.Count; i++)
+                _revealed.Add(setup.RevealedEntries[i].Viewer, setup.RevealedEntries[i].UnitId, setup.RevealedEntries[i].Id);
 
             // Props come after the units, in the map's authored hex order, so their ids are stable.
             int nextId = 0;
@@ -268,6 +289,118 @@ namespace Mimas.Core.Match
 
         public bool Knows(int viewer, int unitId, string id) => _revealed.Contains(viewer, unitId, id);
 
+        /// <summary>Everything each player has been shown, in the order it was learned: what a session exports at a round's end and imports into the next.</summary>
+        public IReadOnlyList<RevealedEntry> RevealedEntries => _revealed.Entries;
+
+        // ---- the one ability resolver (spec D part 1 §6.3, ADR-034) --------------------------------
+
+        /// <summary>
+        /// The ability as this unit has it: the catalogue's definition with the unit's boon overlay applied
+        /// (numbers changed, floored by <c>rules.boons</c>; elements and tags added). <b>Nothing in Core reads a
+        /// unit's ability any other way.</b> False when the catalogue has no such id. A <c>damage</c> override
+        /// is not applied here: it becomes a breakdown line, so the preview-versus-actual rule reveals it.
+        /// </summary>
+        public bool ResolveAbility(Unit unit, string abilityId, out AbilityDef def) => ResolveAbilityCore(unit, abilityId, -1, out def);
+
+        /// <summary>
+        /// The same ability as <paramref name="viewer"/> knows it: only the overlay entries whose boon has
+        /// been revealed to them apply (all of them for the owner). What the observation rule compares
+        /// against, and what a mirror previews with.
+        /// </summary>
+        public bool ResolveAbilityKnownTo(int viewer, Unit unit, string abilityId, out AbilityDef def)
+        {
+            if (viewer < 0 || viewer >= MatchSetup.PlayerCount) throw new ArgumentOutOfRangeException(nameof(viewer));
+            return ResolveAbilityCore(unit, abilityId, viewer, out def);
+        }
+
+        private bool ResolveAbilityCore(Unit unit, string abilityId, int viewer, out AbilityDef def)
+        {
+            if (unit == null) throw new ArgumentNullException(nameof(unit));
+            AbilityDef raw;
+            if (!Catalog.Abilities.TryGet(abilityId, out raw))
+            {
+                def = null;
+                return false;
+            }
+            def = raw;
+            if (unit.Overlay.IsEmpty || !unit.HasAbility(abilityId)) return true;
+
+            BoonRulesDef floors = Catalog.Rules.Boons;
+            int cost = raw.Cost, costDelta = 0;
+            var attack = raw as AttackDef;
+            var movement = raw as MovementDef;
+            int range = attack != null ? attack.Range : movement != null ? movement.Range : 0;
+            int minRange = attack != null ? attack.MinRange : 0;
+            int apex = attack != null ? attack.Apex : 0;
+            int hits = attack != null ? attack.Hits : 1;
+            int climb = movement != null ? movement.MaxClimb : 0;
+            int jump = movement != null ? movement.JumpHeight : 0;
+            bool changed = false;
+
+            unit.Overlay.OverridesFor(abilityId, _overrideScratch);
+            for (int i = 0; i < _overrideScratch.Count; i++)
+            {
+                AbilityOverride o = _overrideScratch[i];
+                if (!BoonKnownTo(viewer, unit, o.BoonId)) continue;
+                if (!AbilityFields.AppliesTo(o.Field, raw)) continue;          // ignored for this ability (spec §5.6)
+                if (o.IsValue) throw new NotSupportedException($"trajectory swap is not implemented (spec D part 1 §6.7, E6): boon '{o.BoonId}' overrides {o.Field} on '{abilityId}'.");
+                switch (o.Field)
+                {
+                    case AbilityFields.Cost: costDelta += o.Amount; changed = true; break;
+                    case AbilityFields.Range: range += o.Amount; changed = true; break;
+                    case AbilityFields.MinRange: minRange += o.Amount; changed = true; break;
+                    case AbilityFields.Apex: apex += o.Amount; changed = true; break;
+                    case AbilityFields.Hits: throw new NotSupportedException($"multi-hit attacks are not implemented (spec D part 1 §6.7, E5/S3): boon '{o.BoonId}' overrides hits on '{abilityId}'.");
+                    case AbilityFields.Climb: climb += o.Amount; changed = true; break;
+                    case AbilityFields.JumpHeight: jump += o.Amount; changed = true; break;
+                    case AbilityFields.Damage: break;                            // a breakdown line, not a def change (spec §6.5 (d))
+                }
+            }
+
+            List<string> elements = null, tags = null;
+            if (attack != null)
+            {
+                unit.Overlay.AddedElementsFor(abilityId, _additionScratch);
+                for (int i = 0; i < _additionScratch.Count; i++)
+                {
+                    if (!BoonKnownTo(viewer, unit, _additionScratch[i].BoonId)) continue;
+                    if (elements == null) elements = new List<string>(attack.Elements);
+                    if (!elements.Contains(_additionScratch[i].Value)) elements.Add(_additionScratch[i].Value);
+                    changed = true;
+                }
+                unit.Overlay.AddedTagsFor(abilityId, _additionScratch);
+                for (int i = 0; i < _additionScratch.Count; i++)
+                {
+                    if (!BoonKnownTo(viewer, unit, _additionScratch[i].BoonId)) continue;
+                    if (tags == null) tags = new List<string>(attack.Tags);
+                    if (!tags.Contains(_additionScratch[i].Value)) tags.Add(_additionScratch[i].Value);
+                    changed = true;
+                }
+            }
+            if (!changed) return true;
+
+            // Floors (spec §6.3): cost never below rules.boons.minCost once an override touched it; range at
+            // least 1; minRange inside 1..range; apex, climb and jump height never negative.
+            if (costDelta != 0) cost = Math.Max(floors.MinCost, raw.Cost + costDelta);
+            if (range < 1) range = 1;
+            if (attack != null)
+            {
+                if (minRange < 1) minRange = 1;
+                if (minRange > range) minRange = range;
+                if (apex < 0) apex = 0;
+                def = attack.WithOverlay(cost, range, minRange, apex, hits, elements, tags);
+                return true;
+            }
+            if (climb < 0) climb = 0;
+            if (jump < 0) jump = 0;
+            def = movement.WithOverlay(cost, range, climb, jump);
+            return true;
+        }
+
+        /// <summary>Full resolution (viewer -1), the owner, or a viewer the boon has been revealed to.</summary>
+        private bool BoonKnownTo(int viewer, Unit unit, string boonId)
+            => viewer < 0 || unit.Owner == viewer || _revealed.Contains(viewer, unit.Id, boonId);
+
         // ---- validation ----------------------------------------------------------------------------
 
         public CommandResult Validate(Command command)
@@ -296,7 +429,7 @@ namespace Mimas.Core.Match
             if (!Units.TryGet(unitId, out unit)) return CommandResult.Reject(CommandRejectReason.UnknownUnit);
             if (unit.Owner != player) return CommandResult.Reject(CommandRejectReason.NotYourUnit);
             if (!unit.IsAlive) return CommandResult.Reject(CommandRejectReason.UnitDead);
-            if (!Catalog.Abilities.TryGet(abilityId, out ability)) return CommandResult.Reject(CommandRejectReason.UnknownAbility);
+            if (!ResolveAbility(unit, abilityId, out ability)) return CommandResult.Reject(CommandRejectReason.UnknownAbility);
             if (!unit.HasAbility(abilityId)) return CommandResult.Reject(CommandRejectReason.UnitLacksAbility);
             if (!unit.CanAfford(ability.Cost)) return CommandResult.Reject(CommandRejectReason.InsufficientAp);
             return CommandResult.Accepted;
@@ -367,7 +500,9 @@ namespace Mimas.Core.Match
             MoveResult result;
             ValidateMove(move, out result);
             Unit unit = Units.Get(move.UnitId);
-            MovementDef movement = Catalog.GetMovement(move.AbilityId);
+            AbilityDef ability;
+            ResolveAbility(unit, move.AbilityId, out ability);
+            var movement = (MovementDef)ability;
 
             unit.SpendAp(movement.Cost);
             unit.MoveTo(result.Plan.Destination);
@@ -501,7 +636,7 @@ namespace Mimas.Core.Match
                 for (int a = 0; a < unit.AbilityIds.Count; a++)
                 {
                     AbilityDef ability;
-                    if (!Catalog.Abilities.TryGet(unit.AbilityIds[a], out ability)) continue;
+                    if (!ResolveAbility(unit, unit.AbilityIds[a], out ability)) continue;
                     if (!unit.CanAfford(ability.Cost)) continue;
 
                     var movement = ability as MovementDef;
@@ -532,7 +667,7 @@ namespace Mimas.Core.Match
         {
             Unit unit; AbilityDef ability;
             if (IsOver || !Units.TryGet(unitId, out unit) || unit.Owner != ActivePlayer || !unit.IsAlive) return MovementOptions.Empty;
-            if (!Catalog.Abilities.TryGet(abilityId, out ability) || !unit.HasAbility(abilityId) || !unit.CanAfford(ability.Cost)) return MovementOptions.Empty;
+            if (!ResolveAbility(unit, abilityId, out ability) || !unit.HasAbility(abilityId) || !unit.CanAfford(ability.Cost)) return MovementOptions.Empty;
             var movement = ability as MovementDef;
             if (movement == null) return MovementOptions.Empty;
             return _resolvers.Enumerate(MoveContext(unit, movement));
@@ -545,7 +680,7 @@ namespace Mimas.Core.Match
             into.Clear();
             Unit unit; AbilityDef ability;
             if (IsOver || !Units.TryGet(unitId, out unit) || unit.Owner != ActivePlayer || !unit.IsAlive) return;
-            if (!Catalog.Abilities.TryGet(abilityId, out ability) || !unit.HasAbility(abilityId) || !unit.CanAfford(ability.Cost)) return;
+            if (!ResolveAbility(unit, abilityId, out ability) || !unit.HasAbility(abilityId) || !unit.CanAfford(ability.Cost)) return;
             var attack = ability as AttackDef;
             if (attack == null) return;
             AttackTargeting.Enumerate(Map, Bodies, Catalog.Rules.Heights, Trajectories, unit, attack, into);
@@ -558,7 +693,7 @@ namespace Mimas.Core.Match
         public TargetCheck CheckTarget(int unitId, string abilityId, Hex target)
         {
             Unit unit; AbilityDef ability;
-            if (!Units.TryGet(unitId, out unit) || !Catalog.Abilities.TryGet(abilityId, out ability))
+            if (!Units.TryGet(unitId, out unit) || !ResolveAbility(unit, abilityId, out ability))
                 return TargetCheck.Reject(TargetRejectReason.NoBody);
             var attack = ability as AttackDef;
             if (attack == null) return TargetCheck.Reject(TargetRejectReason.NoBody);
@@ -574,7 +709,7 @@ namespace Mimas.Core.Match
             if (into == null) throw new ArgumentNullException(nameof(into));
             into.Clear();
             Unit unit; AbilityDef ability;
-            if (!Units.TryGet(unitId, out unit) || !Catalog.Abilities.TryGet(abilityId, out ability)) return;
+            if (!Units.TryGet(unitId, out unit) || !ResolveAbility(unit, abilityId, out ability)) return;
             var attack = ability as AttackDef;
             if (attack == null) return;
             foreach (MapHex hex in MapData.Hexes)
@@ -648,10 +783,12 @@ namespace Mimas.Core.Match
             return PlayerView.Build(this, viewer);
         }
 
-        /// <summary>Records what each player has learned. Small lists, linear scans, stable order.</summary>
+        /// <summary>Records what each player has learned. Small lists, linear scans, stable insertion order.</summary>
         private sealed class RevealedSet
         {
-            private readonly List<Entry> _entries = new List<Entry>();
+            private readonly List<RevealedEntry> _entries = new List<RevealedEntry>();
+
+            public IReadOnlyList<RevealedEntry> Entries => _entries;
 
             public bool Contains(int viewer, int unitId, string id)
             {
@@ -664,22 +801,8 @@ namespace Mimas.Core.Match
             public bool Add(int viewer, int unitId, string id)
             {
                 if (Contains(viewer, unitId, id)) return false;
-                _entries.Add(new Entry(viewer, unitId, id));
+                _entries.Add(new RevealedEntry(viewer, unitId, id));
                 return true;
-            }
-
-            private readonly struct Entry
-            {
-                public readonly int Viewer;
-                public readonly int UnitId;
-                public readonly string Id;
-
-                public Entry(int viewer, int unitId, string id)
-                {
-                    Viewer = viewer;
-                    UnitId = unitId;
-                    Id = id;
-                }
             }
         }
     }

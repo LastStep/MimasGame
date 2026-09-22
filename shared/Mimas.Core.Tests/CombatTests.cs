@@ -89,7 +89,7 @@ namespace Mimas.Core.Tests
                 // ---- the boons fixture (spec D part 1 §9): one lineage, a boon of each kind and each effect type, two skeletons ----
                 // A spell for the crown sigil and a jump for the boots sigil, so every fixture slot can be covered.
                 new ContentFile("abilities/zap.json", @"{ ""version"": 1, ""id"": ""zap"", ""type"": ""attack"", ""category"": ""spell"", ""cost"": 1,
-                    ""attack"": { ""damage"": 3, ""damageType"": ""magic"", ""range"": 2, ""trajectory"": ""direct"", ""lineOfSight"": true } }"),
+                    ""attack"": { ""damage"": 3, ""damageType"": ""magic"", ""range"": 2, ""trajectory"": ""direct"", ""lineOfSight"": true, ""element"": ""lightning"" } }"),
                 new ContentFile("abilities/hop.json", @"{ ""version"": 1, ""id"": ""hop"", ""type"": ""movement"", ""cost"": 1, ""movement"": { ""mode"": ""jump"", ""range"": 2, ""jumpHeight"": 1 } }"),
                 // A second bow whose shot is an arc, so a slot-wide 'apex' override has one ability it applies to and one it is ignored for.
                 new ContentFile("abilities/lob.json", @"{ ""version"": 1, ""id"": ""lob"", ""type"": ""attack"", ""category"": ""weapon"", ""cost"": 1,
@@ -163,6 +163,11 @@ namespace Mimas.Core.Tests
 
         internal static MatchSetup Setup() => new MatchSetup("field-3", Archer, Brute);
 
+        /// <summary>The archer with the trial lineage and these boons (the starting Blessing is not implied; list it if wanted).</summary>
+        internal static PlayerBuild ArcherWith(params string[] boons) => ContentFixtures.BuildFor(Archer, "trial", boons);
+
+        internal static PlayerBuild BruteWith(params string[] boons) => ContentFixtures.BuildFor(Brute, "trial", boons);
+
         /// <summary>Archer (player 0) and brute (player 1) placed directly; the match is started so turn 1 belongs to player 0.</summary>
         internal static MatchState Started(ContentCatalog catalog, MatchSetup setup, Hex archerAt, Hex bruteAt)
         {
@@ -172,6 +177,10 @@ namespace Mimas.Core.Tests
             state.Start();
             return state;
         }
+
+        /// <summary>Two builds on field-3, placed and started.</summary>
+        internal static MatchState StartedWith(ContentCatalog catalog, PlayerBuild player0, PlayerBuild player1, Hex at0, Hex at1, int firstPlayer = 0)
+            => Started(catalog, new MatchSetup("field-3", player0, player1, firstPlayer), at0, at1);
     }
 
     public class DataSchemaTests

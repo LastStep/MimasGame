@@ -43,6 +43,20 @@ namespace Mimas.Core.Tests
             return new Unit(0, 0, at, catalog.Rules, items);
         }
 
+        /// <summary>A build: gear, a lineage and boons in grant order (spec D part 1 §9).</summary>
+        internal static PlayerBuild BuildFor(Loadout loadout, string lineage, params string[] boons) => new PlayerBuild(loadout, lineage, boons);
+
+        /// <summary>A hero built from a build, resolving gear, lineage and boons through the catalogue, with the given owner and id.</summary>
+        internal static Unit HeroFrom(ContentCatalog catalog, PlayerBuild build, Hex at, int id = 0, int owner = 0)
+        {
+            var items = new List<ItemDef>(ItemSlots.All.Length);
+            for (int i = 0; i < ItemSlots.All.Length; i++)
+                items.Add(catalog.GetItemForSlot(ItemSlots.All[i], build.Loadout.IdForSlot(ItemSlots.All[i])));
+            var boons = new List<BoonDef>();
+            foreach (string boonId in build.BoonIds) boons.Add(catalog.GetBoon(boonId));
+            return new Unit(id, owner, at, catalog.Rules, items, build.LineageId, boons);
+        }
+
         internal static string ErrorsOf(List<ContentFile> files)
         {
             var e = Assert.Throws<ContentLoadException>(() => ContentCatalog.Load(files));

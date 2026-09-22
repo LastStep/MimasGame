@@ -31,6 +31,10 @@ namespace Mimas.Core.Tests
         /// <summary>Absolute path of the shipped data folder (the single source of truth for content).</summary>
         internal static string DataRoot => Path.Combine(Root, "MimasClient", "Assets", "_Game", "Data");
 
+        /// <summary>The text of one Core source file, for the tests that scan code rather than run it.</summary>
+        internal static string CoreSource(string relativePath) =>
+            File.ReadAllText(Path.Combine(Root, "shared", "Mimas.Core", "Runtime", relativePath.Replace('/', Path.DirectorySeparatorChar)));
+
         internal static string Read(string relativePath) =>
             File.ReadAllText(Path.Combine(DataRoot, relativePath.Replace('/', Path.DirectorySeparatorChar)));
 

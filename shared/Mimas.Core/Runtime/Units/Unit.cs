@@ -28,12 +28,14 @@ namespace Mimas.Core.Units
     }
 
     /// <summary>
-    /// One unit on the board: identity, owner, gear, where it stands, its abilities, its modifiers, and
-    /// its live numbers (hit points, action points). Abilities and modifiers are ids resolved against the
-    /// <c>ContentCatalog</c>; a hero's ability list starts as the rules' innate abilities followed by the
-    /// abilities of each equipped item, and boons edit it later. Every state write has one method
-    /// (<see cref="MoveTo"/>, <see cref="TakeDamage"/>, <see cref="RefreshAp"/>, <see cref="SpendAp"/>) so
-    /// "who changed this" is always one search away.
+    /// One unit on the board: identity, owner, gear, lineage and boons, where it stands, its abilities, its
+    /// modifiers, and its live numbers (hit points, action points). Abilities and modifiers are ids resolved
+    /// against the <c>ContentCatalog</c>; a hero's ability list is the rules' innate abilities, then the
+    /// abilities of each equipped item, then what each boon's Sigil grants, in boon order. The boons are
+    /// folded once into <see cref="Overlay"/> (ADR-034) and rules code reads an ability only through
+    /// <c>MatchState.ResolveAbility</c>. Every state write has one method (<see cref="MoveTo"/>,
+    /// <see cref="TakeDamage"/>, <see cref="RefreshAp"/>, <see cref="SpendAp"/>) so "who changed this" is
+    /// always one search away.
     /// </summary>
     public sealed class Unit : IBody
     {
@@ -44,6 +46,7 @@ namespace Mimas.Core.Units
         });
 
         private static readonly string[] NoItems = new string[0];
+        private static readonly BoonDef[] NoBoons = new BoonDef[0];
 
         private readonly List<string> _abilityIds = new List<string>();
 
@@ -51,10 +54,17 @@ namespace Mimas.Core.Units
         private readonly List<string> _abilitySources = new List<string>();
 
         private readonly List<string> _modifierIds = new List<string>();
+
+        /// <summary>Parallel to <see cref="_modifierIds"/>: the boon that attached it, or null.</summary>
+        private readonly List<string> _modifierBoons = new List<string>();
+
+        private readonly List<string> _boonIds = new List<string>();
         private readonly List<string> _itemIds;
         private readonly HeightsDef _heights;
         private readonly List<HiddenSlot> _hiddenAbilitySlots = new List<HiddenSlot>();
         private readonly List<HiddenSlot> _hiddenModifierSlots = new List<HiddenSlot>();
+        private readonly List<HiddenSlot> _hiddenBoonSlots = new List<HiddenSlot>();
+        private readonly List<StatContribution> _statScratch = new List<StatContribution>();
 
         public int Id { get; }
 
@@ -64,7 +74,22 @@ namespace Mimas.Core.Units
         /// <summary>Equipped item ids in slot order (weapon, crown, boots, armour); empty for a bare test unit.</summary>
         public IReadOnlyList<string> ItemIds => _itemIds;
 
-        /// <summary>Base stats plus every item's stats (or a 10 hp / 3 ap stand-in for bare test units).</summary>
+        /// <summary>The lineage prayed to, or null (design: #lineage). Hidden from the opponent until a boon of it is revealed.</summary>
+        public string LineageId { get; }
+
+        /// <summary>Boon ids in grant order (the starting Blessing first, then each draft pick).</summary>
+        public IReadOnlyList<string> BoonIds => _boonIds;
+
+        /// <summary>The boons folded into tables; empty on a unit with none.</summary>
+        public BoonOverlay Overlay { get; }
+
+        /// <summary>Base stats plus every item's stats: what gear explains, and therefore public (design: #hidden-info).</summary>
+        public StatBlock PublicStats { get; }
+
+        /// <summary>
+        /// <see cref="PublicStats"/> plus every boon's stat contribution, floored by <c>rules.boons</c>
+        /// (hp and ap at their floors, everything else at 0). What the rules read.
+        /// </summary>
         public StatBlock Stats { get; }
 
         public Hex Position { get; private set; }
@@ -106,11 +131,17 @@ namespace Mimas.Core.Units
         /// <summary>Modifiers this unit has that the mirror's viewer may not see, by position. Always empty on the truth.</summary>
         public IReadOnlyList<HiddenSlot> HiddenModifierSlots => _hiddenModifierSlots;
 
+        /// <summary>Boons this unit has that the mirror's viewer may not see, by position. Always empty on the truth.</summary>
+        public IReadOnlyList<HiddenSlot> HiddenBoonSlots => _hiddenBoonSlots;
+
         /// <summary>How many of this unit's abilities the mirror's viewer cannot see. 0 on a truth unit.</summary>
         public int HiddenAbilityCount => _hiddenAbilitySlots.Count;
 
         /// <summary>How many of this unit's modifiers the mirror's viewer cannot see. 0 on a truth unit; what a "?" damage row counts.</summary>
         public int HiddenModifierCount => _hiddenModifierSlots.Count;
+
+        /// <summary>How many of this unit's boons the mirror's viewer cannot see. 0 on a truth unit; the count of picks is public, their identity is not.</summary>
+        public int HiddenBoonCount => _hiddenBoonSlots.Count;
 
         /// <summary>A unit with no gear and no abilities: for tests and scaffolding.</summary>
         public Unit(int id, int owner, Hex position, HeightsDef heights)
@@ -120,22 +151,37 @@ namespace Mimas.Core.Units
             Owner = owner;
             Position = position;
             _heights = heights ?? throw new ArgumentNullException(nameof(heights));
+            PublicStats = BareStats;
             Stats = BareStats;
+            Overlay = BoonOverlay.Empty;
             Hp = Stats.Hp;
             Ap = 0;
             _itemIds = new List<string>(NoItems);
         }
 
-        /// <summary>A hero built from the rules' base stats and innate abilities plus four items in slot order.</summary>
+        /// <summary>A hero built from the rules' base stats and innate abilities plus four items in slot order, with no lineage and no boons.</summary>
         public Unit(int id, int owner, Hex position, RulesDef rules, IReadOnlyList<ItemDef> items)
+            : this(id, owner, position, rules, items, null, NoBoons)
+        {
+        }
+
+        /// <summary>
+        /// A hero built from gear, a lineage and boons (spec D part 1 §6.2): stats are base + items + boon
+        /// stats, floored; abilities are innate, then each item's, then each Sigil's grant in boon order;
+        /// every boon modifier is attached and remembers its boon. Throws <see cref="NotSupportedException"/>
+        /// when a boon uses a skeleton field (§6.7).
+        /// </summary>
+        public Unit(int id, int owner, Hex position, RulesDef rules, IReadOnlyList<ItemDef> items, string lineageId, IReadOnlyList<BoonDef> boons)
         {
             if (rules == null) throw new ArgumentNullException(nameof(rules));
             if (items == null) throw new ArgumentNullException(nameof(items));
+            if (boons == null) throw new ArgumentNullException(nameof(boons));
             CheckIds(id, owner);
             Id = id;
             Owner = owner;
             Position = position;
             _heights = rules.Heights;
+            LineageId = string.IsNullOrEmpty(lineageId) ? null : lineageId;
 
             StatBlock stats = rules.BaseStats;
             _itemIds = new List<string>(items.Count);
@@ -146,7 +192,19 @@ namespace Mimas.Core.Units
                 stats = stats.Add(item.Stats);
                 _itemIds.Add(item.Id);
             }
-            Stats = stats;
+            PublicStats = stats;
+
+            for (int i = 0; i < boons.Count; i++)
+            {
+                if (boons[i] == null) throw new ArgumentException($"Boon {i} is null.", nameof(boons));
+                _boonIds.Add(boons[i].Id);
+            }
+            Overlay = boons.Count == 0 ? BoonOverlay.Empty : new BoonOverlay(items, boons);
+
+            string skeleton;
+            if (Overlay.TryFindSkeleton(out skeleton)) throw new NotSupportedException(skeleton);
+
+            Stats = FloorStats(stats, Overlay, rules.Boons);
             Hp = Stats.Hp;
             Ap = 0;
 
@@ -156,9 +214,57 @@ namespace Mimas.Core.Units
                 ItemDef item = items[i];
                 for (int a = 0; a < item.AbilityIds.Count; a++) Grant(item.AbilityIds[a], item.Id);
             }
+            for (int g = 0; g < Overlay.Grants.Count; g++)
+                Grant(Overlay.Grants[g].AbilityId, Overlay.Grants[g].ItemId);
+
+            // Set semantics for modifiers: the first boon in grant order owns a modifier two boons both attach.
+            for (int m = 0; m < Overlay.Modifiers.Count; m++)
+                AddModifier(Overlay.Modifiers[m].ModifierId, Overlay.Modifiers[m].BoonId);
+        }
+
+        /// <summary>Base + items + every boon contribution, then the floors: hp and ap at <c>rules.boons.floors</c>, everything else at 0 (spec §6.2).</summary>
+        private static StatBlock FloorStats(StatBlock publicStats, BoonOverlay overlay, BoonRulesDef floors)
+        {
+            if (overlay.StatContributions.Count == 0) return publicStats;
+            var entries = new List<KeyValuePair<string, int>>();
+            for (int i = 0; i < overlay.StatContributions.Count; i++)
+                entries.Add(new KeyValuePair<string, int>(overlay.StatContributions[i].Key, overlay.StatContributions[i].Amount));
+            StatBlock summed = publicStats;
+            for (int i = 0; i < entries.Count; i++)
+                summed = summed.Add(new StatBlock(new[] { entries[i] }));
+
+            var floored = new List<KeyValuePair<string, int>>(summed.Entries.Count);
+            for (int i = 0; i < summed.Entries.Count; i++)
+            {
+                string key = summed.Entries[i].Key;
+                int value = summed.Entries[i].Value;
+                int floor = key == StatBlock.HpKey ? floors.HpFloor : key == StatBlock.ApKey ? floors.ApFloor : 0;
+                floored.Add(new KeyValuePair<string, int>(key, value < floor ? floor : value));
+            }
+            return new StatBlock(floored);
         }
 
         public bool HasAbility(string abilityId) => abilityId != null && _abilityIds.Contains(abilityId);
+
+        /// <summary>The Sigil that granted an ability, or null for an innate or item ability (design: #hidden-info rule 5: the item is public, the boon is not).</summary>
+        public string BoonOfAbility(string abilityId) => abilityId != null && _abilityIds.Contains(abilityId) ? Overlay.BoonOfGrant(abilityId) : null;
+
+        /// <summary>The boon that attached a modifier, or null when it came from elsewhere (a setup knob, a pickup).</summary>
+        public string BoonOfModifier(string modifierId)
+        {
+            if (modifierId == null) return null;
+            int index = _modifierIds.IndexOf(modifierId);
+            return index < 0 ? null : _modifierBoons[index];
+        }
+
+        public bool HasBoon(string boonId) => boonId != null && _boonIds.Contains(boonId);
+
+        /// <summary>Every boon contribution to one stat key, in boon order (what the calculator turns into lines).</summary>
+        public IReadOnlyList<StatContribution> BoonStatContributions(string key)
+        {
+            Overlay.StatContributionsFor(key, _statScratch);
+            return _statScratch;
+        }
 
         /// <summary>The item that granted an ability, or null for an innate ability or an unknown id.</summary>
         public string AbilitySourceOf(string abilityId)
@@ -190,14 +296,27 @@ namespace Mimas.Core.Units
 
         public bool HasModifier(string modifierId) => modifierId != null && _modifierIds.Contains(modifierId);
 
-        /// <summary>Grants a modifier. Same id twice does not stack (set semantics until data says otherwise).</summary>
-        public void AddModifier(string modifierId)
+        /// <summary>Grants a modifier from no boon (a setup knob, a pickup). Same id twice does not stack (set semantics until data says otherwise).</summary>
+        public void AddModifier(string modifierId) => AddModifier(modifierId, null);
+
+        /// <summary>Grants a modifier and remembers the boon that did. Same id twice does not stack; the first grant owns it.</summary>
+        public void AddModifier(string modifierId, string boonId)
         {
             if (string.IsNullOrEmpty(modifierId)) throw new ArgumentException("Modifier id must not be empty.", nameof(modifierId));
-            if (!_modifierIds.Contains(modifierId)) _modifierIds.Add(modifierId);
+            if (_modifierIds.Contains(modifierId)) return;
+            _modifierIds.Add(modifierId);
+            _modifierBoons.Add(boonId);
         }
 
-        public bool RemoveModifier(string modifierId) => modifierId != null && _modifierIds.Remove(modifierId);
+        public bool RemoveModifier(string modifierId)
+        {
+            if (modifierId == null) return false;
+            int index = _modifierIds.IndexOf(modifierId);
+            if (index < 0) return false;
+            _modifierIds.RemoveAt(index);
+            _modifierBoons.RemoveAt(index);
+            return true;
+        }
 
         /// <summary>Relocates the unit. Callers validate the move first; this is the state write, nothing more.</summary>
         public void MoveTo(Hex destination)
@@ -275,7 +394,7 @@ namespace Mimas.Core.Units
             for (int i = 0; i < view.Modifiers.Count; i++)
             {
                 KnownEntry entry = view.Modifiers[i];
-                if (entry.Revealed) unit._modifierIds.Add(entry.Id);
+                if (entry.Revealed) unit.AddModifier(entry.Id, null);
                 else unit._hiddenModifierSlots.Add(new HiddenSlot(i, null));
             }
 

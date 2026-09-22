@@ -73,6 +73,11 @@ namespace Mimas.Core.Movement
             _overriddenTerrainIds.Sort(string.CompareOrdinal);
         }
 
+        /// <summary>A copy with a unit's overlay applied (spec D part 1 §6.3): new range, climb, jump height and cost, everything else untouched. The caller has already floored the numbers.</summary>
+        public MovementDef WithOverlay(int cost, int range, int maxClimb, int jumpHeight)
+            => new MovementDef(Id, Name, Mode, range, maxClimb, jumpHeight, IgnoreHeight, RequiresLineOfSight,
+                new Dictionary<string, int>(_terrainCosts, StringComparer.Ordinal), Description, Icon, cost);
+
         /// <summary>True when this movement overrides the catalogue entry for <paramref name="terrainId"/>.</summary>
         public bool HasTerrainOverride(string terrainId) => terrainId != null && _terrainCosts.ContainsKey(terrainId);
 
