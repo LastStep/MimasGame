@@ -1,0 +1,11 @@
+{
+  "$schema": "../../../../../tools/schemas/modifier.schema.json",
+  "version": 1,
+  "id": "thor-charge",
+  "name": "Thor's Charge",
+  "description": "+2 damage on lightning spells.",
+  "trigger": "dealDamage",
+  "when": { "damageTypes": ["spell"], "elements": ["lightning"] },
+  "effect": { "damage": 2 },
+  "visibility": "hidden"
+}

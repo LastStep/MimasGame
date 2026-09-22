@@ -1,0 +1,11 @@
+{
+  "$schema": "../../../../../tools/schemas/modifier.schema.json",
+  "version": 1,
+  "id": "ymir-hide",
+  "name": "Ymir's Hide",
+  "description": "Takes 1 less damage from weapon attacks.",
+  "trigger": "takeDamage",
+  "when": { "damageTypes": ["weapon"] },
+  "effect": { "damage": -1 },
+  "visibility": "hidden"
+}

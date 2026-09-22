@@ -1,0 +1,11 @@
+{
+  "$schema": "../../../../../tools/schemas/modifier.schema.json",
+  "version": 1,
+  "id": "agni-warmth",
+  "name": "Agni's Warmth",
+  "description": "Immune to fire.",
+  "trigger": "takeDamage",
+  "when": { "elements": ["fire"] },
+  "effect": { "nullify": true },
+  "visibility": "hidden"
+}

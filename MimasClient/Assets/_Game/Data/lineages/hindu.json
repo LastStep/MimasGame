@@ -1,0 +1,10 @@
+{
+  "$schema": "../../../../../tools/schemas/lineage.schema.json",
+  "version": 1,
+  "id": "hindu",
+  "name": "Hindu",
+  "description": "Pray to Agni, Vayu and Indra.",
+  "startingBlessing": "vayu-breath",
+  "pool": ["agni-warmth", "indra-wrath", "agni-crown", "indra-mail", "agni-spark", "vayu-wings"],
+  "icon": "hindu"
+}

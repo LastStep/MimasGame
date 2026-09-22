@@ -1,0 +1,10 @@
+{
+  "$schema": "../../../../../tools/schemas/modifier.schema.json",
+  "version": 1,
+  "id": "athena-plating",
+  "name": "Athena's Plating",
+  "description": "Takes 1 less damage from everything.",
+  "trigger": "takeDamage",
+  "effect": { "damage": -1 },
+  "visibility": "hidden"
+}

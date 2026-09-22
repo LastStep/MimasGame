@@ -1,0 +1,14 @@
+{
+  "$schema": "../../../../../tools/schemas/boon.schema.json",
+  "version": 1,
+  "id": "hermes-heels",
+  "name": "Hermes' Heels",
+  "kind": "sigil",
+  "lineage": "greek",
+  "description": "Your boots learn Dash: three hexes for two points.",
+  "requires": { "slot": "boots" },
+  "effects": [
+    { "type": "grantAbility", "target": "boots", "ability": "dash" }
+  ],
+  "icon": "hermes-heels"
+}

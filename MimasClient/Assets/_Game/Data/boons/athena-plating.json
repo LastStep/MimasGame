@@ -1,0 +1,14 @@
+{
+  "$schema": "../../../../../tools/schemas/boon.schema.json",
+  "version": 1,
+  "id": "athena-plating",
+  "name": "Athena's Plating",
+  "kind": "enchant",
+  "lineage": "greek",
+  "description": "Your armour turns 1 more of everything.",
+  "requires": { "slot": "armour" },
+  "effects": [
+    { "type": "modifier", "id": "athena-plating" }
+  ],
+  "icon": "athena-plating"
+}

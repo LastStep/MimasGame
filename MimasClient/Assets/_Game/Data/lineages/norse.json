@@ -1,0 +1,10 @@
+{
+  "$schema": "../../../../../tools/schemas/lineage.schema.json",
+  "version": 1,
+  "id": "norse",
+  "name": "Norse",
+  "description": "Pray to Thor, Odin and Skadi.",
+  "startingBlessing": "thor-vigour",
+  "pool": ["berserker-blood", "skadi-hide", "thor-charge", "ymir-hide", "thor-hammerfall", "odin-leap"],
+  "icon": "norse"
+}

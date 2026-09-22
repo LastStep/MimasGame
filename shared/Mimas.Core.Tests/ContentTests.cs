@@ -71,16 +71,21 @@ namespace Mimas.Core.Tests
         {
             var catalog = ContentFixtures.RepoCatalog();
             Assert.True(catalog.Terrains.Count >= 2);
-            Assert.Equal(new[] { "aimed-shot", "arcane-spark", "arrow-shot", "fire-bolt", "heavy-shot", "jab", "jump", "move", "quick-shot", "strike", "teleport" },
+            // The eleven of the loadout slice plus the six the boons ship (spec D part 1 §5.8).
+            Assert.Equal(new[] { "aimed-shot", "arcane-spark", "arrow-shot", "dash", "ember-shot", "fire-bolt", "hammerfall", "heavy-shot", "jab", "jump", "long-leap", "move", "quick-shot", "strike", "teleport", "wind-step", "zeus-bolt" },
                 catalog.Abilities.All.Select(a => a.Id).ToArray());
-            Assert.Equal(new[] { "high-ground", "stone-skin", "ward-of-feathers" }, catalog.Modifiers.All.Select(m => m.Id).ToArray());
+            // The three of the loadout slice plus the nine the boons ship.
+            Assert.Equal(new[] { "agni-fire", "agni-warmth", "apollo-eye", "athena-plating", "high-ground", "indra-mail", "indra-wrath", "skadi-hide", "stone-skin", "thor-charge", "ward-of-feathers", "ymir-hide" },
+                catalog.Modifiers.All.Select(m => m.Id).ToArray());
             Assert.Equal(new[] { "weapon", "spell" }, catalog.Rules.DamageTypes);
             Assert.Equal(new[] { "blink-boots", "ember-circlet", "flintlock", "leaping-boots", "leather-jerkin", "longbow" },
                 catalog.Items.All.Select(i => i.Id).ToArray());
             Assert.Contains("arena-4", catalog.Maps.All.Select(m => m.Id));
             Assert.Equal(new[] { "pillar", "wall" }, catalog.Props.All.Select(p => p.Id).ToArray());
             Assert.Equal(3, catalog.TimeControls.Count);
-            Assert.Equal(3, catalog.Movements.Count);
+            Assert.Equal(6, catalog.Movements.Count);
+            Assert.Equal(21, catalog.Boons.Count);
+            Assert.Equal(new[] { "greek", "hindu", "norse" }, catalog.Lineages.All.Select(l => l.Id).ToArray());
             Assert.Equal(64, catalog.Hash.Length);
         }
 
@@ -398,7 +403,7 @@ namespace Mimas.Core.Tests
         {
             var catalog = ContentFixtures.RepoCatalog();
             var attacks = catalog.Abilities.All.OfType<AttackDef>().ToList();
-            Assert.Equal(8, attacks.Count);
+            Assert.Equal(11, attacks.Count);                      // 8 from the loadout slice, 3 Sigil attacks from the boons
             Assert.All(attacks, a => Assert.True(Trajectories.IsKnown(a.Trajectory), a.Id));
             Assert.All(attacks, a => Assert.True(a.Apex == 0 || a.Trajectory == Trajectories.Arc, a.Id));
         }

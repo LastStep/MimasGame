@@ -1,0 +1,11 @@
+{
+  "$schema": "../../../../../tools/schemas/modifier.schema.json",
+  "version": 1,
+  "id": "skadi-hide",
+  "name": "Skadi's Hide",
+  "description": "Immune to frost.",
+  "trigger": "takeDamage",
+  "when": { "elements": ["frost"] },
+  "effect": { "nullify": true },
+  "visibility": "hidden"
+}

@@ -1,0 +1,13 @@
+{
+  "$schema": "../../../../../tools/schemas/boon.schema.json",
+  "version": 1,
+  "id": "indra-wrath",
+  "name": "Indra's Wrath",
+  "kind": "blessing",
+  "lineage": "hindu",
+  "description": "Indra storms through your spells: +2 damage on every spell.",
+  "effects": [
+    { "type": "modifier", "id": "indra-wrath" }
+  ],
+  "icon": "indra-wrath"
+}

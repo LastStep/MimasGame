@@ -1,0 +1,11 @@
+{
+  "$schema": "../../../../../tools/schemas/modifier.schema.json",
+  "version": 1,
+  "id": "indra-wrath",
+  "name": "Indra's Wrath",
+  "description": "+2 damage on spells.",
+  "trigger": "dealDamage",
+  "when": { "damageTypes": ["spell"] },
+  "effect": { "damage": 2 },
+  "visibility": "hidden"
+}

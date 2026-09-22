@@ -1,0 +1,12 @@
+{
+  "$schema": "../../../../../tools/schemas/ability.schema.json",
+  "version": 1,
+  "id": "hammerfall",
+  "name": "Hammerfall",
+  "type": "attack",
+  "category": "weapon",
+  "icon": "hammerfall",
+  "description": "A hurled hammer that drops on an enemy within three tiles, over cover you cannot see past.",
+  "cost": 2,
+  "attack": { "damage": 5, "damageType": "weapon", "range": 3, "trajectory": "arc", "apex": 2, "lineOfSight": false }
+}

@@ -1,0 +1,11 @@
+{
+  "$schema": "../../../../../tools/schemas/ability.schema.json",
+  "version": 1,
+  "id": "long-leap",
+  "name": "Long Leap",
+  "type": "movement",
+  "icon": "long-leap",
+  "description": "Leap straight to a tile up to four hexes away, clearing two levels.",
+  "cost": 2,
+  "movement": { "mode": "jump", "range": 4, "jumpHeight": 2 }
+}

@@ -1,0 +1,13 @@
+{
+  "$schema": "../../../../../tools/schemas/boon.schema.json",
+  "version": 1,
+  "id": "vayu-breath",
+  "name": "Vayu's Breath",
+  "kind": "blessing",
+  "lineage": "hindu",
+  "description": "Vayu carries you: your walk reaches one tile further.",
+  "effects": [
+    { "type": "abilityOverride", "target": "move", "field": "range", "amount": 1 }
+  ],
+  "icon": "vayu-breath"
+}

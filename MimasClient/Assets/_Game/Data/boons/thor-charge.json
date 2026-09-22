@@ -1,0 +1,16 @@
+{
+  "$schema": "../../../../../tools/schemas/boon.schema.json",
+  "version": 1,
+  "id": "thor-charge",
+  "name": "Thor's Charge",
+  "kind": "enchant",
+  "lineage": "norse",
+  "description": "Every spell from your crown crackles with lightning, and lightning spells hit 2 harder.",
+  "requires": { "slot": "crown" },
+  "exclusive": ["crown-element"],
+  "effects": [
+    { "type": "addElement", "target": "crown", "element": "lightning" },
+    { "type": "modifier", "id": "thor-charge" }
+  ],
+  "icon": "thor-charge"
+}

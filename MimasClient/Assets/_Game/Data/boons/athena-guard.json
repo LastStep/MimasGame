@@ -1,0 +1,14 @@
+{
+  "$schema": "../../../../../tools/schemas/boon.schema.json",
+  "version": 1,
+  "id": "athena-guard",
+  "name": "Athena's Guard",
+  "kind": "blessing",
+  "lineage": "greek",
+  "description": "Athena turns a little of every blow: +1 armour against weapons and spells.",
+  "effects": [
+    { "type": "stat", "key": "defense.weapon", "amount": 1 },
+    { "type": "stat", "key": "defense.spell", "amount": 1 }
+  ],
+  "icon": "athena-guard"
+}

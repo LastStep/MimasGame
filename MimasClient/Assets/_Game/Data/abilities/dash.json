@@ -1,0 +1,11 @@
+{
+  "$schema": "../../../../../tools/schemas/ability.schema.json",
+  "version": 1,
+  "id": "dash",
+  "name": "Dash",
+  "type": "movement",
+  "icon": "dash",
+  "description": "A sprint: three hexes for two points.",
+  "cost": 2,
+  "movement": { "mode": "walk", "range": 3, "maxClimb": 1 }
+}

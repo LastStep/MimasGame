@@ -1,0 +1,14 @@
+{
+  "$schema": "../../../../../tools/schemas/boon.schema.json",
+  "version": 1,
+  "id": "agni-spark",
+  "name": "Agni's Spark",
+  "kind": "sigil",
+  "lineage": "hindu",
+  "description": "Your weapon learns Ember Shot: a cheap burning shot within three tiles.",
+  "requires": { "slot": "weapon" },
+  "effects": [
+    { "type": "grantAbility", "target": "weapon", "ability": "ember-shot" }
+  ],
+  "icon": "agni-spark"
+}

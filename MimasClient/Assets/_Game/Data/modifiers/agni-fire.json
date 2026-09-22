@@ -1,0 +1,11 @@
+{
+  "$schema": "../../../../../tools/schemas/modifier.schema.json",
+  "version": 1,
+  "id": "agni-fire",
+  "name": "Agni's Fire",
+  "description": "+2 damage on fire spells.",
+  "trigger": "dealDamage",
+  "when": { "damageTypes": ["spell"], "elements": ["fire"] },
+  "effect": { "damage": 2 },
+  "visibility": "hidden"
+}

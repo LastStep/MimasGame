@@ -1,0 +1,14 @@
+{
+  "$schema": "../../../../../tools/schemas/boon.schema.json",
+  "version": 1,
+  "id": "odin-leap",
+  "name": "Odin's Leap",
+  "kind": "sigil",
+  "lineage": "norse",
+  "description": "Your boots learn Long Leap: four hexes in a line, clearing two levels.",
+  "requires": { "slot": "boots" },
+  "effects": [
+    { "type": "grantAbility", "target": "boots", "ability": "long-leap" }
+  ],
+  "icon": "odin-leap"
+}

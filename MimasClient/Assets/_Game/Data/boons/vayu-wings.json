@@ -1,0 +1,14 @@
+{
+  "$schema": "../../../../../tools/schemas/boon.schema.json",
+  "version": 1,
+  "id": "vayu-wings",
+  "name": "Vayu's Wings",
+  "kind": "sigil",
+  "lineage": "hindu",
+  "description": "Your boots learn Wind Step: a short step through the wind, seen or not.",
+  "requires": { "slot": "boots" },
+  "effects": [
+    { "type": "grantAbility", "target": "boots", "ability": "wind-step" }
+  ],
+  "icon": "vayu-wings"
+}

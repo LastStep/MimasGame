@@ -1,0 +1,14 @@
+{
+  "$schema": "../../../../../tools/schemas/boon.schema.json",
+  "version": 1,
+  "id": "berserker-blood",
+  "name": "Odin's Berserker Blood",
+  "kind": "blessing",
+  "lineage": "norse",
+  "description": "Odin trades blood for fury: +2 Strength, -2 Health.",
+  "effects": [
+    { "type": "stat", "key": "power.weapon", "amount": 2 },
+    { "type": "stat", "key": "hp", "amount": -2 }
+  ],
+  "icon": "berserker-blood"
+}

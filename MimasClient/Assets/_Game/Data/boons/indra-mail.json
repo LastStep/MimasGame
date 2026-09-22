@@ -1,0 +1,14 @@
+{
+  "$schema": "../../../../../tools/schemas/boon.schema.json",
+  "version": 1,
+  "id": "indra-mail",
+  "name": "Indra's Mail",
+  "kind": "enchant",
+  "lineage": "hindu",
+  "description": "Your armour turns 1 more of every spell.",
+  "requires": { "slot": "armour" },
+  "effects": [
+    { "type": "modifier", "id": "indra-mail" }
+  ],
+  "icon": "indra-mail"
+}

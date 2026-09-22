@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Mimas.Core.Content;
 using Mimas.Core.Data;
+using Mimas.Core.Match;
 using Xunit;
 
 namespace Mimas.Core.Tests
@@ -267,6 +268,138 @@ namespace Mimas.Core.Tests
             Assert.Contains("starting Blessing 'trial-zap' is a sigil, not a blessing", LineageErrors(FullPool, "trial-zap"));
             Assert.Contains("pool names unknown boon 'trial-nothing'", LineageErrors(FullPool + @", ""trial-nothing"""));
             Assert.Throws<MapLoadException>(() => LineageDef.FromJson(@"{ ""version"": 1, ""id"": ""x"", ""startingBlessing"": ""a"", ""pool"": [ ""b"", ""b"" ] }"));
+        }
+
+        // ---- the shipped content (spec §5.8) ------------------------------------------------------------
+
+        [Fact]
+        public void ShippedLineages_CoverEveryItem()
+        {
+            var catalog = ContentFixtures.RepoCatalog();
+            Assert.Equal(3, catalog.Lineages.Count);
+            foreach (var lineage in catalog.Lineages.All)
+            {
+                Assert.Equal(6, lineage.PoolIds.Count);
+                var pool = lineage.PoolIds.Select(catalog.GetBoon).ToList();
+                Assert.Equal(2, pool.Count(b => b.IsBlessing));
+                Assert.Equal(2, pool.Count(b => b.IsEnchant));
+                Assert.Equal(2, pool.Count(b => b.IsSigil));
+                Assert.All(pool, b => Assert.Equal(lineage.Id, b.LineageId));
+                Assert.DoesNotContain(lineage.StartingBlessingId, lineage.PoolIds);
+                Assert.True(catalog.GetBoon(lineage.StartingBlessingId).IsBlessing);
+
+                // The catalogue enforced this at load; say it in plain terms here too: every item has an Enchant or Sigil.
+                foreach (var item in catalog.Items.All)
+                    Assert.Contains(pool, b => !b.IsBlessing && b.IsApplicableTo(item.Slot, item.Kind, item.AbilityIds));
+            }
+            Assert.Equal(21, catalog.Boons.Count);
+            Assert.Equal(new[] { "athena-guard", "thor-vigour", "vayu-breath" },
+                new[] { "greek", "norse", "hindu" }.Select(id => catalog.GetLineage(id).StartingBlessingId));
+        }
+
+        [Fact]
+        public void ShippedStartingBlessings_AreTheThreeDecided()
+        {
+            var catalog = ContentFixtures.RepoCatalog();
+            var athena = catalog.GetBoon("athena-guard");
+            Assert.Equal(new[] { "defense.weapon", "defense.spell" }, athena.Effects.Select(e => e.Key));
+            Assert.All(athena.Effects, e => Assert.Equal(1, e.Amount));
+            Assert.Equal(4, catalog.GetBoon("thor-vigour").Effects.Single().Amount);
+            Assert.Equal("hp", catalog.GetBoon("thor-vigour").Effects.Single().Key);
+            var vayu = catalog.GetBoon("vayu-breath").Effects.Single();
+            Assert.Equal(BoonEffectTypes.AbilityOverride, vayu.Type);
+            Assert.Equal("move", vayu.Target);
+            Assert.Equal(AbilityFields.Range, vayu.Field);
+            Assert.Equal(1, vayu.Amount);
+        }
+
+        [Fact]
+        public void ShippedContent_UsesNoSkeletonField()
+        {
+            var catalog = ContentFixtures.RepoCatalog();
+            foreach (var attack in catalog.Abilities.All.OfType<AttackDef>())
+                Assert.Equal(1, attack.Hits);
+            foreach (var boon in catalog.Boons.All)
+                foreach (var effect in boon.Effects)
+                {
+                    if (effect.Type != BoonEffectTypes.AbilityOverride) continue;
+                    Assert.False(AbilityFields.IsSkeleton(effect.Field), $"{boon.Id} uses the skeleton field '{effect.Field}'");
+                    Assert.Null(effect.Value);
+                }
+        }
+
+        [Fact]
+        public void ShippedBoons_FollowTheConventions()
+        {
+            var catalog = ContentFixtures.RepoCatalog();
+            foreach (var boon in catalog.Boons.All)
+            {
+                Assert.Contains("'", boon.Name);                             // "<God>'s <thing>" (q-lineage-names), or Berserker Blood
+                Assert.False(string.IsNullOrWhiteSpace(boon.Description));
+                Assert.False(boon.Stackable);
+                Assert.Equal(boon.Id, boon.Icon);
+                foreach (var effect in boon.Effects)
+                    if (effect.Type == BoonEffectTypes.Modifier) Assert.True(catalog.Modifiers.Get(effect.Id).IsHidden, effect.Id);
+            }
+            Assert.Equal(new[] { "crown-element" }, catalog.GetBoon("thor-charge").ExclusiveGroups);
+            Assert.Equal(new[] { "crown-element" }, catalog.GetBoon("agni-crown").ExclusiveGroups);
+            Assert.True(catalog.Modifiers.Get("skadi-hide").Nullify);
+            Assert.True(catalog.Modifiers.Get("agni-warmth").Nullify);
+            Assert.Equal(new[] { "lightning" }, catalog.GetAttack("zeus-bolt").Elements);
+            Assert.Equal(new[] { "fire" }, catalog.GetAttack("ember-shot").Elements);
+            Assert.Equal(new[] { "fire" }, catalog.GetAttack("fire-bolt").Elements);
+        }
+
+        [Fact]
+        public void ShippedDraft_OffersOneOfEachKind_ForEveryLineageAndKit()
+        {
+            var catalog = ContentFixtures.RepoCatalog();
+            var into = new List<string>();
+            foreach (var lineage in catalog.Lineages.All)
+                foreach (var kit in new[] { ContentFixtures.BowKit, ContentFixtures.GunKit })
+                    for (uint seed = 1; seed <= 5; seed++)
+                    {
+                        var build = new PlayerBuild(kit, lineage.Id, new[] { lineage.StartingBlessingId });
+                        Session.Draft.Offer(catalog, build, 3, new Rng(seed), into);
+                        Assert.Equal(new[] { BoonKinds.Blessing, BoonKinds.Enchant, BoonKinds.Sigil }, into.Select(id => catalog.GetBoon(id).Kind));
+                    }
+        }
+
+        [Fact]
+        public void ContentHash_ChangesWhenABoonChanges()
+        {
+            var files = ContentFixtures.Repo();
+            string before = ContentHash.Compute(files);
+            var edited = files.Select(f => f.Path == "boons/thor-vigour.json"
+                ? new ContentFile(f.Path, f.Text.Replace("\"amount\": 4", "\"amount\": 5"))
+                : f).ToList();
+            Assert.NotEqual(before, ContentHash.Compute(edited));
+            Assert.Contains("boons/thor-vigour.json", ContentCatalog.Load(files).Files);
+            Assert.Contains("lineages/norse.json", ContentCatalog.Load(files).Files);
+        }
+
+        [Fact]
+        public void ShippedContent_PlaysABestOf3_WithBotsAndDrafts()
+        {
+            var catalog = ContentFixtures.RepoCatalog();
+            var setup = new Session.SessionSetup(new PlayerBuild(ContentFixtures.BowKit, "greek"), new PlayerBuild(ContentFixtures.GunKit, "hindu"));
+            var session = new Session.Session(catalog, setup, 5);
+            var bots = new Bots.IBot[] { new Bots.RandomBot(11), new Bots.RandomBot(12) };
+            session.Start();
+            Assert.Equal(new[] { "board-3", "arena-4" }, session.Ladder);      // ladder positions 1 and 3
+            int commands = 0;
+            while (!session.IsOver && commands < 3000)
+            {
+                Match.Command command = session.Phase == Session.SessionPhase.Draft
+                    ? bots[0].ChooseDraft(session, 0) ?? bots[1].ChooseDraft(session, 1)
+                    : bots[session.Match.ActivePlayer].Choose(session.Match, session.Match.ActivePlayer);
+                Assert.NotNull(command);
+                session.Apply(command);
+                commands++;
+            }
+            Assert.True(session.Round >= 2, "the bots did not reach round 2 within the command budget");
+            Assert.True(session.BuildOf(0).BoonIds.Count >= 2);               // Athena's Guard plus at least one pick
+            Assert.True(session.BuildOf(1).BoonIds.Count >= 2);
         }
 
         [Fact]

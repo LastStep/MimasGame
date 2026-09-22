@@ -1,0 +1,11 @@
+{
+  "$schema": "../../../../../tools/schemas/modifier.schema.json",
+  "version": 1,
+  "id": "indra-mail",
+  "name": "Indra's Mail",
+  "description": "Takes 1 less damage from spells.",
+  "trigger": "takeDamage",
+  "when": { "damageTypes": ["spell"] },
+  "effect": { "damage": -1 },
+  "visibility": "hidden"
+}

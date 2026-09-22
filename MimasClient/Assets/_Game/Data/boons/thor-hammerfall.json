@@ -1,0 +1,14 @@
+{
+  "$schema": "../../../../../tools/schemas/boon.schema.json",
+  "version": 1,
+  "id": "thor-hammerfall",
+  "name": "Thor's Hammerfall",
+  "kind": "sigil",
+  "lineage": "norse",
+  "description": "Your weapon learns Hammerfall: a hurled hammer over cover, within three tiles.",
+  "requires": { "slot": "weapon" },
+  "effects": [
+    { "type": "grantAbility", "target": "weapon", "ability": "hammerfall" }
+  ],
+  "icon": "thor-hammerfall"
+}

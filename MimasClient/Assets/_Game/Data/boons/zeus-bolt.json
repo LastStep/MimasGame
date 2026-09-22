@@ -1,0 +1,14 @@
+{
+  "$schema": "../../../../../tools/schemas/boon.schema.json",
+  "version": 1,
+  "id": "zeus-bolt",
+  "name": "Zeus' Bolt",
+  "kind": "sigil",
+  "lineage": "greek",
+  "description": "Your crown learns Zeus' Bolt: a lightning strike within four tiles.",
+  "requires": { "slot": "crown" },
+  "effects": [
+    { "type": "grantAbility", "target": "crown", "ability": "zeus-bolt" }
+  ],
+  "icon": "zeus-bolt"
+}

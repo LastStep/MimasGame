@@ -1,0 +1,14 @@
+{
+  "$schema": "../../../../../tools/schemas/boon.schema.json",
+  "version": 1,
+  "id": "apollo-bowstring",
+  "name": "Apollo's Bowstring",
+  "kind": "enchant",
+  "lineage": "greek",
+  "description": "Every attack of your weapon reaches one tile further.",
+  "requires": { "slot": "weapon" },
+  "effects": [
+    { "type": "abilityOverride", "target": "weapon", "field": "range", "amount": 1 }
+  ],
+  "icon": "apollo-bowstring"
+}

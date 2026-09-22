@@ -1,0 +1,14 @@
+{
+  "$schema": "../../../../../tools/schemas/boon.schema.json",
+  "version": 1,
+  "id": "ymir-hide",
+  "name": "Ymir's Hide",
+  "kind": "enchant",
+  "lineage": "norse",
+  "description": "Your armour turns 1 more of every weapon blow.",
+  "requires": { "slot": "armour" },
+  "effects": [
+    { "type": "modifier", "id": "ymir-hide" }
+  ],
+  "icon": "ymir-hide"
+}

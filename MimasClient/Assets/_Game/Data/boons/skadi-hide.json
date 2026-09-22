@@ -1,0 +1,13 @@
+{
+  "$schema": "../../../../../tools/schemas/boon.schema.json",
+  "version": 1,
+  "id": "skadi-hide",
+  "name": "Skadi's Hide",
+  "kind": "blessing",
+  "lineage": "norse",
+  "description": "Skadi's cold is your own: immune to frost.",
+  "effects": [
+    { "type": "modifier", "id": "skadi-hide" }
+  ],
+  "icon": "skadi-hide"
+}

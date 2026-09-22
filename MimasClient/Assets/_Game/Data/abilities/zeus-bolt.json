@@ -1,0 +1,12 @@
+{
+  "$schema": "../../../../../tools/schemas/ability.schema.json",
+  "version": 1,
+  "id": "zeus-bolt",
+  "name": "Zeus' Bolt",
+  "type": "attack",
+  "category": "spell",
+  "icon": "zeus-bolt",
+  "description": "A bolt of lightning at any enemy you can see within four tiles.",
+  "cost": 2,
+  "attack": { "damage": 5, "damageType": "spell", "range": 4, "trajectory": "direct", "lineOfSight": true, "element": "lightning" }
+}

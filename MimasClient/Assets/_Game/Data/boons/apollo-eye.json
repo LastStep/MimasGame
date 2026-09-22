@@ -1,0 +1,13 @@
+{
+  "$schema": "../../../../../tools/schemas/boon.schema.json",
+  "version": 1,
+  "id": "apollo-eye",
+  "name": "Apollo's Eye",
+  "kind": "blessing",
+  "lineage": "greek",
+  "description": "Apollo guides shots from above: +2 damage from higher ground.",
+  "effects": [
+    { "type": "modifier", "id": "apollo-eye" }
+  ],
+  "icon": "apollo-eye"
+}

@@ -1,0 +1,11 @@
+{
+  "$schema": "../../../../../tools/schemas/ability.schema.json",
+  "version": 1,
+  "id": "wind-step",
+  "name": "Wind Step",
+  "type": "movement",
+  "icon": "wind-step",
+  "description": "Step through the wind to any free tile within two hexes, seen or not.",
+  "cost": 1,
+  "movement": { "mode": "teleport", "range": 2, "requiresLineOfSight": false }
+}

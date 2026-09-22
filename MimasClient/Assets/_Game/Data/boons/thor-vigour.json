@@ -1,0 +1,13 @@
+{
+  "$schema": "../../../../../tools/schemas/boon.schema.json",
+  "version": 1,
+  "id": "thor-vigour",
+  "name": "Thor's Vigour",
+  "kind": "blessing",
+  "lineage": "norse",
+  "description": "Thor hardens you: +4 Health.",
+  "effects": [
+    { "type": "stat", "key": "hp", "amount": 4 }
+  ],
+  "icon": "thor-vigour"
+}

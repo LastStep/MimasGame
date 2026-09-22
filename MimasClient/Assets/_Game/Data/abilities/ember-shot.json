@@ -1,0 +1,12 @@
+{
+  "$schema": "../../../../../tools/schemas/ability.schema.json",
+  "version": 1,
+  "id": "ember-shot",
+  "name": "Ember Shot",
+  "type": "attack",
+  "category": "weapon",
+  "icon": "ember-shot",
+  "description": "A burning shot at any enemy you can see within three tiles.",
+  "cost": 1,
+  "attack": { "damage": 2, "damageType": "weapon", "range": 3, "trajectory": "direct", "lineOfSight": true, "element": "fire" }
+}

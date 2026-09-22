@@ -1,0 +1,10 @@
+{
+  "$schema": "../../../../../tools/schemas/lineage.schema.json",
+  "version": 1,
+  "id": "greek",
+  "name": "Greek",
+  "description": "Pray to Apollo, Athena and Hermes.",
+  "startingBlessing": "athena-guard",
+  "pool": ["apollo-eye", "zeus-favour", "apollo-bowstring", "athena-plating", "zeus-bolt", "hermes-heels"],
+  "icon": "greek"
+}

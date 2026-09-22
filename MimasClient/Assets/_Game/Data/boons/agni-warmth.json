@@ -1,0 +1,13 @@
+{
+  "$schema": "../../../../../tools/schemas/boon.schema.json",
+  "version": 1,
+  "id": "agni-warmth",
+  "name": "Agni's Warmth",
+  "kind": "blessing",
+  "lineage": "hindu",
+  "description": "Agni's fire cannot burn its own: immune to fire.",
+  "effects": [
+    { "type": "modifier", "id": "agni-warmth" }
+  ],
+  "icon": "agni-warmth"
+}

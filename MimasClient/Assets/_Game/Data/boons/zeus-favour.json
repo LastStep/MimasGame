@@ -1,0 +1,13 @@
+{
+  "$schema": "../../../../../tools/schemas/boon.schema.json",
+  "version": 1,
+  "id": "zeus-favour",
+  "name": "Zeus' Favour",
+  "kind": "blessing",
+  "lineage": "greek",
+  "description": "Zeus lends his fury: +2 Magic.",
+  "effects": [
+    { "type": "stat", "key": "power.spell", "amount": 2 }
+  ],
+  "icon": "zeus-favour"
+}

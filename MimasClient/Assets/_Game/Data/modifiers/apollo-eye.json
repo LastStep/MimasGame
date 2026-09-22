@@ -1,0 +1,11 @@
+{
+  "$schema": "../../../../../tools/schemas/modifier.schema.json",
+  "version": 1,
+  "id": "apollo-eye",
+  "name": "Apollo's Eye",
+  "description": "+2 damage when attacking from higher ground.",
+  "trigger": "dealDamage",
+  "when": { "heightAdvantage": true },
+  "effect": { "damage": 2 },
+  "visibility": "hidden"
+}

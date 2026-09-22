@@ -1,0 +1,16 @@
+{
+  "$schema": "../../../../../tools/schemas/boon.schema.json",
+  "version": 1,
+  "id": "agni-crown",
+  "name": "Agni's Crown",
+  "kind": "enchant",
+  "lineage": "hindu",
+  "description": "Every spell from your crown burns, and fire spells hit 2 harder.",
+  "requires": { "slot": "crown" },
+  "exclusive": ["crown-element"],
+  "effects": [
+    { "type": "addElement", "target": "crown", "element": "fire" },
+    { "type": "modifier", "id": "agni-fire" }
+  ],
+  "icon": "agni-crown"
+}
