@@ -73,6 +73,9 @@ namespace Mimas.Client.UI
         private VisualElement _actionBar;
         private VisualElement _tooltip;
         private ExamineView _examineView;
+
+        /// <summary>The HUD's one hover panel (hover-mount), shared by the plate, the bar and the preview.</summary>
+        private HoverPanel _hover;
         private VisualElement _unitLayer;
         private VisualElement _preview;
         private VisualElement _previewLines;
@@ -187,6 +190,12 @@ namespace Mimas.Client.UI
             Unbind();
         }
 
+        private void OnDestroy()
+        {
+            // The generated fades are shared by everything on this HUD; the next scene makes its own.
+            Ramps.Release();
+        }
+
         private void Update()
         {
             if (!_bound && !TryBind()) return;
@@ -285,7 +294,8 @@ namespace Mimas.Client.UI
                 return false;
             }
 
-            _examineView = new ExamineView(_root, examineMount, hoverMount, HandleExamineClose);
+            _hover = new HoverPanel(hoverMount);
+            _examineView = new ExamineView(_root, examineMount, _hover, HandleExamineClose);
             _actionBar.RegisterCallback<GeometryChangedEvent>(HandleActionBarGeometry);
 
             _draftConfirm.clicked += HandleDraftConfirmClicked;
@@ -305,6 +315,7 @@ namespace Mimas.Client.UI
             if (!_bound) return;
             _endTurn.clicked -= HandleEndTurnClicked;
             if (_examineView != null) { _examineView.Dispose(); _examineView = null; }
+            _hover = null;
             _resign.clicked -= HandleResignClicked;
             _bannerButton.clicked -= HandleBackToLobbyClicked;
             _draftConfirm.clicked -= HandleDraftConfirmClicked;

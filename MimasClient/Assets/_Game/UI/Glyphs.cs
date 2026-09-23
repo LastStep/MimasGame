@@ -247,6 +247,10 @@ namespace Mimas.Client.UI
             { "eye", P("M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z", new Circle(12, 12, 3)) },
             { "eye-struck", P("M3 3l18 18M10 6c.7-.1 1.3-.2 2-.2 6 0 10 6 10 6s-1 1.6-2.8 3.2M6.5 6.5C4 8.3 2 12 2 12s4 7 10 7c1.6 0 3-.4 4.3-1") },
 
+            // Your own action the opponent has not seen yet (language §3 glyph.unseen-by-them): a lid and three
+            // lashes. Never "no sight needed" — that is eye-struck.
+            { "eye-closed", P("M3 10c2.5 3 5.5 4.5 9 4.5s6.5-1.5 9-4.5M7 13.5l-1.5 2.5M12 15v3M17 13.5l1.5 2.5") },
+
             // Lineage emblems (placeholders until art: docs/ui/examine.md §6).
             { "laurel", P("M12 20V6M12 6c-3 0-5 2-5 5 2 0 4-1 5-3M12 6c3 0 5 2 5 5-2 0-4-1-5-3M12 12c-3 0-5 2-5 5 2 0 4-1 5-3M12 12c3 0 5 2 5 5-2 0-4-1-5-3") },
             { "hammer", P("M4 20l7-7M9 8l4-4 7 7-4 4zM11 6l7 7") },

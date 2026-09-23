@@ -8,18 +8,17 @@ using Mimas.Client.Presentation;
 namespace Mimas.Client.UI
 {
     /// <summary>
-    /// Binds <c>Examine.uxml</c> to a <see cref="HudExamine"/> and owns the one hover panel
-    /// (<c>HoverPanel.uxml</c>) and the close-on-any-outside-press rule (docs/ui/examine.md §2, spec E §7.3,
-    /// §7.10, §7.11). The plate is a layer over the whole HUD: it appears and goes without a slide and moves
+    /// Binds <c>Examine.uxml</c> to a <see cref="HudExamine"/> and owns the close-on-any-outside-press rule
+    /// (docs/ui/examine.md §2, spec E §7.3, §7.11). The hover panel is the HUD's one <see cref="HoverPanel"/>,
+    /// shared with the action bar, the boons column and the attack preview (spec H §3); the plate opens it
+    /// to its left. The plate is a layer over the whole HUD: it appears and goes without a slide and moves
     /// nothing else. Not a MonoBehaviour: <see cref="MatchHudView"/> keeps the document and makes one of these from
-    /// the two template instances in <c>MatchHud.uxml</c>. It formats numbers and picks classes; every word
+    /// the template instance in <c>MatchHud.uxml</c>. It formats numbers and picks classes; every word
     /// it shows was composed by the presenter, and every colour is a token (the painting's hues are data).
     /// </summary>
     public sealed class ExamineView
     {
         private const float HoverDelayMs = 120f;
-        private const float HoverGap = 22f;
-        private const float HoverLift = 12f;
         private const float TallWindow = 900f;
 
         private readonly VisualElement _hudRoot;
@@ -56,17 +55,15 @@ namespace Mimas.Client.UI
         private readonly EventCallback<PointerDownEvent> _onAnyPress;
         private IVisualElementScheduledItem _pendingHover;
 
-        private readonly Dictionary<string, Texture2D> _paintings = new Dictionary<string, Texture2D>(StringComparer.Ordinal);
         private readonly Dictionary<string, Texture2D> _squares = new Dictionary<string, Texture2D>(StringComparer.Ordinal);
-        private Texture2D _washTexture;
 
         public bool IsOpen => _model != null;
 
         /// <param name="hudRoot">The HUD's root: every press on the HUD passes through it, and the hover panel is clamped inside it.</param>
         /// <param name="examine">The instance of Examine.uxml.</param>
-        /// <param name="hoverPanel">The instance of HoverPanel.uxml.</param>
+        /// <param name="hover">The HUD's one hover panel.</param>
         /// <param name="close">What ✕ and a press outside the plate call: the presenter's CloseExamine.</param>
-        public ExamineView(VisualElement hudRoot, VisualElement examine, VisualElement hoverPanel, Action close)
+        internal ExamineView(VisualElement hudRoot, VisualElement examine, HoverPanel hover, Action close)
         {
             _hudRoot = hudRoot ?? throw new ArgumentNullException(nameof(hudRoot));
             if (examine == null) throw new ArgumentNullException(nameof(examine));
@@ -100,7 +97,7 @@ namespace Mimas.Client.UI
             foreach (string element in new[] { "hp", "ap", "strength", "magic", "armour-weapon", "armour-spell" })
                 _statCells[element] = Require(examine, "ex.stat." + element);
 
-            _hover = new HoverPanel(hoverPanel ?? throw new ArgumentNullException(nameof(hoverPanel)));
+            _hover = hover ?? throw new ArgumentNullException(nameof(hover));
 
             // Any press on the HUD outside the plate closes it, and then carries on to whatever it hit: the
             // action bar and End Turn stay usable with the plate open (Rohan, 23 Sep 2026). Trickle-down, so
@@ -111,10 +108,10 @@ namespace Mimas.Client.UI
             _close.RegisterCallback<ClickEvent>(evt => { evt.StopPropagation(); _close_(); });
 
             _hudRoot.RegisterCallback<GeometryChangedEvent>(evt => ApplyWindowHeight(evt.newRect.height));
-            _wash.style.backgroundImage = new StyleBackground(WashTexture());
+            _wash.style.backgroundImage = new StyleBackground(Ramps.LeftToRight());
 
-            RegisterHover(_vitalsHp, () => StatContent(_model != null ? _model.FindStat("hp") : null));
-            RegisterHover(_vitalsAp, () => StatContent(_model != null ? _model.FindStat("ap") : null));
+            RegisterHover(_vitalsHp, () => HoverContents.Stat(_model != null ? _model.FindStat("hp") : null));
+            RegisterHover(_vitalsAp, () => HoverContents.Stat(_model != null ? _model.FindStat("ap") : null));
         }
 
         private void OnAnyPress(PointerDownEvent evt)
@@ -155,10 +152,7 @@ namespace Mimas.Client.UI
         {
             _hudRoot.UnregisterCallback(_onAnyPress, TrickleDown.TrickleDown);
             HideHover();
-            foreach (Texture2D texture in _paintings.Values) UnityEngine.Object.Destroy(texture);
             foreach (Texture2D texture in _squares.Values) UnityEngine.Object.Destroy(texture);
-            if (_washTexture != null) UnityEngine.Object.Destroy(_washTexture);
-            _paintings.Clear();
             _squares.Clear();
         }
 
@@ -186,7 +180,7 @@ namespace Mimas.Client.UI
                 dark = Color.Lerp(paper, new Color(0.086f, 0.082f, 0.102f), 0.55f);
                 light = Color.Lerp(paper, new Color(0.086f, 0.082f, 0.102f), 0.25f);
             }
-            _portrait.style.backgroundImage = new StyleBackground(Painting(dark, light, paper));
+            _portrait.style.backgroundImage = new StyleBackground(Ramps.Painting(dark, light, paper));
             _emblem.Shape = model.LineageIcon;
             _emblem.style.display = string.IsNullOrEmpty(model.LineageIcon) ? DisplayStyle.None : DisplayStyle.Flex;
             _emblem.Tint = light;
@@ -247,7 +241,7 @@ namespace Mimas.Client.UI
             cell.Add(label);
 
             HudStat captured = stat;
-            RegisterHover(cell, () => StatContent(captured));
+            RegisterHover(cell, () => HoverContents.Stat(captured));
         }
 
         private VisualElement BoonRow(HudBoon boon, int index)
@@ -257,14 +251,14 @@ namespace Mimas.Client.UI
             row.AddToClassList("ex-row");
             row.EnableInClassList("ex-boon--unrevealed", !boon.Revealed);
 
-            var glyph = new Glyph(boon.Revealed ? KindShape(boon.Kind) : GlyphPaths.Unknown) { Filled = boon.Starting };
+            var glyph = new Glyph(boon.Revealed ? HoverContents.KindShape(boon.Kind) : GlyphPaths.Unknown) { Filled = boon.Starting };
             glyph.AddToClassList("ex-boon-glyph");
             row.Add(glyph);
             row.Add(Text(boon.Revealed ? boon.Name : "Unrevealed", "ex-boon-name"));
             if (!string.IsNullOrEmpty(boon.OnItemName)) row.Add(Text(boon.OnItemName, "ex-boon-on"));
 
             HudBoon captured = boon;
-            RegisterHover(row, () => BoonContent(captured));
+            RegisterHover(row, () => HoverContents.Boon(captured));
             return row;
         }
 
@@ -279,14 +273,14 @@ namespace Mimas.Client.UI
             var square = new VisualElement { pickingMode = PickingMode.Ignore };
             square.AddToClassList("ex-item-square");
             square.style.backgroundImage = new StyleBackground(Square(dark, light));
-            var slotGlyph = new Glyph(SlotShape(item.Slot));
+            var slotGlyph = new Glyph(HoverContents.SlotShape(item.Slot));
             slotGlyph.AddToClassList("ex-item-slot-glyph");
             square.Add(slotGlyph);
             head.Add(square);
             head.Add(Text(item.Name, "ex-item-name"));
             if (!string.IsNullOrEmpty(item.StatLine)) head.Add(Text(item.StatLine, "ex-item-stat"));
             HudItem captured = item;
-            RegisterHover(head, () => ItemContent(captured));
+            RegisterHover(head, () => HoverContents.Item(captured));
             group.Add(head);
 
             if (item.Tiles.Count == 0)
@@ -331,7 +325,7 @@ namespace Mimas.Client.UI
             root.Add(Text((tile.Revealed ? tile.Name : "unseen").ToUpperInvariant(), "ex-tile-name"));
 
             HudTile captured = tile;
-            RegisterHover(root, () => TileContent(captured));
+            RegisterHover(root, () => HoverContents.Tile(captured));
             return root;
         }
 
@@ -348,7 +342,8 @@ namespace Mimas.Client.UI
                     _pendingHover = null;
                     HoverContent c = content();
                     if (c == null || _model == null) return;
-                    _hover.Show(c, _model.IsMine, element.worldBound, _plate.worldBound.xMin - HoverGap, _hudRoot.worldBound, HoverLift);
+                    _hover.Show(this, c, _model.IsMine, HoverPlacement.Left, element.worldBound, _hudRoot.worldBound,
+                        _plate.worldBound.xMin - HoverPanel.LeftGap);
                 }).StartingIn((long)HoverDelayMs);
             });
             element.RegisterCallback<PointerLeaveEvent>(evt => HideHover());
@@ -364,152 +359,10 @@ namespace Mimas.Client.UI
         private void HideHover()
         {
             CancelPendingHover();
-            _hover.Hide();
-        }
-
-        private static HoverContent TileContent(HudTile tile)
-        {
-            if (!tile.Revealed)
-            {
-                return new HoverContent
-                {
-                    Unknown = true,
-                    Shape = GlyphPaths.Unknown,
-                    Name = "Unseen",
-                    Type = tile.TypeLine,
-                    Text = tile.Description,
-                };
-            }
-
-            var c = new HoverContent
-            {
-                Letter = tile.Letter,
-                Name = tile.Name,
-                Type = tile.TypeLine,
-                Text = tile.Description,
-                DamageLine = tile.DamageLine,
-                Conditions = tile.Conditions.Count > 0 ? string.Join(" · ", tile.Conditions) : null,
-            };
-            c.Changes.AddRange(tile.Changes);
-
-            HudTileNumbers n = tile.Numbers;
-            if (n != null)
-            {
-                c.Numbers.Add(new HoverNumber("bolt", n.Cost.ToString(), "cost", changed: n.CostChanged));
-                if (n.Damage.HasValue) c.Numbers.Add(new HoverNumber("sword", n.Damage.Value.ToString(), "damage", amount: true, changed: n.DamageChanged));
-                if (n.RangeMax.HasValue)
-                {
-                    string reach = n.RangeMin.HasValue && n.RangeMin.Value > 1 && n.RangeMin.Value != n.RangeMax.Value
-                        ? n.RangeMin.Value + "–" + n.RangeMax.Value
-                        : n.RangeMax.Value.ToString();
-                    c.Numbers.Add(new HoverNumber(tile.IsMovement ? "walk" : "straight", reach, tile.IsMovement ? "hexes" : "reach", changed: n.RangeChanged));
-                }
-                if (n.Apex.HasValue) c.Numbers.Add(new HoverNumber("arc", n.Apex.Value.ToString(), "apex"));
-                if (!string.IsNullOrEmpty(n.Element)) c.Numbers.Add(new HoverNumber(n.Element == "fire" ? "fire" : "spark", n.Element, "element"));
-            }
-            return c;
-        }
-
-        private static HoverContent BoonContent(HudBoon boon)
-        {
-            if (!boon.Revealed)
-            {
-                return new HoverContent
-                {
-                    Unknown = true,
-                    Shape = GlyphPaths.Unknown,
-                    Name = "Unrevealed",
-                    Type = boon.TypeLine,
-                    Text = boon.Description,
-                };
-            }
-            return new HoverContent
-            {
-                Shape = KindShape(boon.Kind),
-                ShapeFilled = boon.Starting,
-                Name = boon.Name,
-                Type = boon.TypeLine,
-                Text = boon.Description,
-                Conditions = boon.Badge,
-                Flavour = boon.Flavour,
-            };
-        }
-
-        private HoverContent ItemContent(HudItem item)
-        {
-            var c = new HoverContent
-            {
-                Shape = SlotShape(item.Slot),
-                Name = item.Name,
-                Type = item.Quick,
-                Text = string.IsNullOrEmpty(item.SeenLine) ? item.Description
-                    : string.IsNullOrEmpty(item.Description) ? item.SeenLine : item.Description + " " + item.SeenLine,
-                Conditions = item.Note,
-            };
-            if (!string.IsNullOrEmpty(item.StatLine))
-            {
-                string[] parts = item.StatLine.Split(new[] { " · " }, StringSplitOptions.RemoveEmptyEntries);
-                for (int i = 0; i < parts.Length; i++)
-                {
-                    int space = parts[i].IndexOf(' ');
-                    string value = space > 0 ? parts[i].Substring(0, space) : parts[i];
-                    string label = space > 0 ? parts[i].Substring(space + 1) : "";
-                    c.Numbers.Add(new HoverNumber(null, value, label));
-                }
-            }
-            for (int i = 0; i < item.BoonNames.Count; i++) c.Changes.Add(item.BoonNames[i] + " on this item");
-            return c;
-        }
-
-        private static HoverContent StatContent(HudStat stat)
-        {
-            if (stat == null) return null;
-            var c = new HoverContent
-            {
-                Shape = stat.Icon,
-                Name = stat.Label,
-                Type = "stat · base, then every change",
-            };
-            for (int i = 0; i < stat.Lines.Count; i++)
-            {
-                HudStatLine line = stat.Lines[i];
-                c.Rows.Add(new HoverRow
-                {
-                    Label = line.Label,
-                    Amount = line.Unknown ? "?" : i == 0 ? line.Amount.ToString() : Signed(line.Amount),
-                    Unknown = line.Unknown,
-                    Up = !line.Unknown && i > 0 && line.Amount > 0,
-                    Down = !line.Unknown && line.Amount < 0,
-                });
-            }
-            return c;
+            _hover.Hide(this);
         }
 
         // ---- small helpers ------------------------------------------------------------------------------
-
-        private static string Signed(int value) => value > 0 ? "+" + value : value < 0 ? "−" + (-value) : "0";
-
-        private static string KindShape(string kind)
-        {
-            if (string.IsNullOrEmpty(kind)) return GlyphPaths.Unknown;
-            switch (kind.ToLowerInvariant())
-            {
-                case "enchant": return "enchant";
-                case "sigil": return "sigil";
-                default: return "blessing";
-            }
-        }
-
-        private static string SlotShape(string slot)
-        {
-            switch (slot)
-            {
-                case "weapon": return "sword";
-                case "crown": return "crown";
-                case "boots": return "boot";
-                default: return "shield";
-            }
-        }
 
         private static Label Text(string text, string cls, string cls2 = null)
         {
@@ -546,47 +399,7 @@ namespace Mimas.Client.UI
             return _signature.ToString();
         }
 
-        // ---- textures: the painting, the item squares and the wash (USS has no gradients) --------------
-
-        private Texture2D Painting(Color dark, Color light, Color paper)
-        {
-            string key = ColorUtility.ToHtmlStringRGB(dark) + ColorUtility.ToHtmlStringRGB(light) + ColorUtility.ToHtmlStringRGB(paper);
-            Texture2D texture;
-            if (_paintings.TryGetValue(key, out texture) && texture != null) return texture;
-
-            // Big enough that the plate never magnifies it more than ~2x at 1080 (a 96×64 texture was
-            // visibly soft at large windows), dithered by half a level so the long dark-to-paper ramp
-            // does not band.
-            const int w = 224, h = 112;
-            texture = NewTexture(w, h);
-            var pixels = new Color[w * h];
-            for (int y = 0; y < h; y++)
-            {
-                // Texture rows run bottom-up; v is 0 at the top of the painting.
-                float v = 1f - (y + 0.5f) / h;
-                for (int x = 0; x < w; x++)
-                {
-                    float u = (x + 0.5f) / w;
-                    // Three layered radial washes: a light glow left of centre, a dark pool top right, a second
-                    // softer glow low left; then the lower 60% fades into paper.
-                    float glow = Radial(u, v, 0.36f, 0.30f, 0.62f);
-                    float pool = Radial(u, v, 0.92f, 0.05f, 0.55f);
-                    float low = Radial(u, v, 0.10f, 0.72f, 0.45f) * 0.5f;
-                    Color c = Color.Lerp(dark, light, Mathf.Clamp01(glow * 0.85f + low));
-                    c = Color.Lerp(c, dark * 0.85f, pool * 0.6f);
-                    float fade = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.40f, 1.0f, v));
-                    c = Color.Lerp(c, paper, fade);
-                    float dither = (Hash(x, y) - 0.5f) / 255f;
-                    c.r += dither; c.g += dither; c.b += dither;
-                    c.a = 1f;
-                    pixels[y * w + x] = c;
-                }
-            }
-            texture.SetPixels(pixels);
-            texture.Apply(false, true);
-            _paintings[key] = texture;
-            return texture;
-        }
+        // ---- the item squares (the painting and the wash are Ramps') -----------------------------------
 
         private Texture2D Square(Color dark, Color light)
         {
@@ -611,23 +424,6 @@ namespace Mimas.Client.UI
             return texture;
         }
 
-        /// <summary>White with alpha rising to 1 at the plate's edge; USS tints it to --mimas-wash.</summary>
-        private Texture2D WashTexture()
-        {
-            if (_washTexture != null) return _washTexture;
-            const int w = 64;
-            _washTexture = NewTexture(w, 1);
-            var pixels = new Color[w];
-            for (int x = 0; x < w; x++)
-            {
-                float t = (x + 0.5f) / w;
-                pixels[x] = new Color(1f, 1f, 1f, t);
-            }
-            _washTexture.SetPixels(pixels);
-            _washTexture.Apply(false, true);
-            return _washTexture;
-        }
-
         private static Texture2D NewTexture(int w, int h)
         {
             return new Texture2D(w, h, TextureFormat.RGBA32, false)
@@ -638,243 +434,12 @@ namespace Mimas.Client.UI
             };
         }
 
-        /// <summary>A fixed 0..1 value per pixel, for dithering; deterministic so the painting never shimmers.</summary>
-        private static float Hash(int x, int y)
-        {
-            uint h = (uint)(x * 374761393 + y * 668265263);
-            h = (h ^ (h >> 13)) * 1274126177u;
-            return (h ^ (h >> 16)) / (float)uint.MaxValue;
-        }
-
-        private static float Radial(float u, float v, float cu, float cv, float radius)
-        {
-            float du = u - cu, dv = (v - cv) * 0.66f;
-            float d = Mathf.Sqrt(du * du + dv * dv) / radius;
-            return Mathf.Clamp01(1f - d * d);
-        }
-
         private static VisualElement Require(VisualElement root, string name) => Require<VisualElement>(root, name);
 
         private static T Require<T>(VisualElement root, string name) where T : VisualElement
         {
             T found = root.Q<T>(name);
             if (found == null) throw new InvalidOperationException("Examine.uxml is missing '" + name + "'.");
-            return found;
-        }
-    }
-
-    /// <summary>What the hover panel shows, whatever was rested on (language §6).</summary>
-    internal sealed class HoverContent
-    {
-        public bool Unknown;
-        public string Shape;
-        public bool ShapeFilled;
-        public string Letter;
-        public string Name;
-        public string Type;
-        public readonly List<HoverNumber> Numbers = new List<HoverNumber>();
-        public readonly List<HoverRow> Rows = new List<HoverRow>();
-        public string Text;
-        public string DamageLine;
-        public readonly List<string> Changes = new List<string>();
-        public string Conditions;
-        public string Flavour;
-    }
-
-    internal readonly struct HoverNumber
-    {
-        public readonly string Glyph;
-        public readonly string Value;
-        public readonly string Label;
-        public readonly bool Amount;
-        public readonly bool Changed;
-
-        public HoverNumber(string glyph, string value, string label, bool amount = false, bool changed = false)
-        {
-            Glyph = glyph;
-            Value = value;
-            Label = label;
-            Amount = amount;
-            Changed = changed;
-        }
-    }
-
-    internal sealed class HoverRow
-    {
-        public string Label;
-        public string Amount;
-        public bool Up, Down, Unknown;
-    }
-
-    /// <summary>The one instance of <c>HoverPanel.uxml</c>: filled, placed to the left of the thing, clamped to the window.</summary>
-    internal sealed class HoverPanel
-    {
-        private readonly VisualElement _container;
-        private readonly VisualElement _root;
-        private readonly Glyph _tileGlyph;
-        private readonly Label _tileLetter;
-        private readonly Label _name;
-        private readonly Label _type;
-        private readonly VisualElement _numbers;
-        private readonly VisualElement _rows;
-        private readonly Label _text;
-        private readonly Label _damageLine;
-        private readonly VisualElement _changes;
-        private readonly Label _conditions;
-        private readonly Label _flavour;
-
-        private Rect _anchor;
-        private float _right;
-        private Rect _window;
-        private float _lift;
-
-        public HoverPanel(VisualElement instance)
-        {
-            _container = instance;
-            _container.pickingMode = PickingMode.Ignore;
-            _container.style.position = Position.Absolute;
-            _container.style.left = 0; _container.style.top = 0; _container.style.right = 0; _container.style.bottom = 0;
-            _root = Q(instance, "hp.root");
-            _tileGlyph = instance.Q<Glyph>("hp.tile.glyph");
-            _tileLetter = instance.Q<Label>("hp.tile.letter");
-            _name = instance.Q<Label>("hp.name");
-            _type = instance.Q<Label>("hp.type");
-            _numbers = Q(instance, "hp.numbers");
-            _rows = Q(instance, "hp.rows");
-            _text = instance.Q<Label>("hp.text");
-            _damageLine = instance.Q<Label>("hp.damageline");
-            _changes = Q(instance, "hp.changes");
-            _conditions = instance.Q<Label>("hp.conditions");
-            _flavour = instance.Q<Label>("hp.flavour");
-            _root.RegisterCallback<GeometryChangedEvent>(_ => Place());
-        }
-
-        public void Show(HoverContent c, bool mine, Rect anchor, float rightEdge, Rect window, float lift)
-        {
-            _root.EnableInClassList("hp--theirs", !mine && !c.Unknown);
-            _root.EnableInClassList("hp--unknown", c.Unknown);
-
-            bool shape = !string.IsNullOrEmpty(c.Shape) && GlyphPaths.Has(c.Shape);
-            _tileGlyph.Shape = shape ? c.Shape : null;
-            _tileGlyph.Filled = c.ShapeFilled;
-            _tileGlyph.style.display = shape ? DisplayStyle.Flex : DisplayStyle.None;
-            _tileLetter.text = shape ? string.Empty : (c.Letter ?? "?");
-            _tileLetter.style.display = shape ? DisplayStyle.None : DisplayStyle.Flex;
-
-            _name.text = (c.Name ?? string.Empty).ToUpperInvariant();
-            SetText(_type, c.Type != null ? c.Type.ToUpperInvariant() : null);
-
-            _numbers.Clear();
-            for (int i = 0; i < c.Numbers.Count; i++) _numbers.Add(NumberTile(c.Numbers[i]));
-            _numbers.style.display = c.Numbers.Count > 0 ? DisplayStyle.Flex : DisplayStyle.None;
-
-            _rows.Clear();
-            for (int i = 0; i < c.Rows.Count; i++) _rows.Add(Row(c.Rows[i]));
-            _rows.style.display = c.Rows.Count > 0 ? DisplayStyle.Flex : DisplayStyle.None;
-
-            SetText(_text, c.Text);
-            SetText(_damageLine, c.DamageLine);
-
-            _changes.Clear();
-            for (int i = 0; i < c.Changes.Count; i++)
-            {
-                var row = new VisualElement { pickingMode = PickingMode.Ignore };
-                row.AddToClassList("hp-change");
-                var mark = new Glyph("enchant") { Filled = true };
-                mark.AddToClassList("hp-change-glyph");
-                row.Add(mark);
-                var label = new Label(c.Changes[i]) { pickingMode = PickingMode.Ignore };
-                label.AddToClassList("hp-change-text");
-                row.Add(label);
-                _changes.Add(row);
-            }
-            _changes.style.display = c.Changes.Count > 0 ? DisplayStyle.Flex : DisplayStyle.None;
-
-            SetText(_conditions, c.Conditions);
-            SetText(_flavour, c.Flavour);
-
-            _anchor = anchor;
-            _right = rightEdge;
-            _window = window;
-            _lift = lift;
-            _root.AddToClassList("hp--visible");
-            Place();
-        }
-
-        public void Hide()
-        {
-            _root.RemoveFromClassList("hp--visible");
-        }
-
-        /// <summary>x = the plate's left − 22 − width; y = the row's top − 12; clamped inside the window.</summary>
-        private void Place()
-        {
-            if (!_root.ClassListContains("hp--visible")) return;
-            float width = _root.resolvedStyle.width;
-            float height = _root.resolvedStyle.height;
-            if (float.IsNaN(width) || width <= 0f) width = 340f;
-            if (float.IsNaN(height)) height = 0f;
-
-            Vector2 origin = _container.worldBound.position;
-            float x = _right - width;
-            float y = _anchor.yMin - _lift;
-            if (_window.height > 0f)
-            {
-                y = Mathf.Min(y, _window.yMax - height - 8f);
-                y = Mathf.Max(y, _window.yMin + 8f);
-                x = Mathf.Max(x, _window.xMin + 8f);
-            }
-            _root.style.left = x - origin.x;
-            _root.style.top = y - origin.y;
-        }
-
-        private static VisualElement NumberTile(HoverNumber n)
-        {
-            var tile = new VisualElement { pickingMode = PickingMode.Ignore };
-            tile.AddToClassList("hp-number");
-            tile.EnableInClassList("hp-number--amount", n.Amount);
-            tile.EnableInClassList("hp-number--changed", n.Changed && !n.Amount);
-            if (!string.IsNullOrEmpty(n.Glyph))
-            {
-                var glyph = new Glyph(n.Glyph);
-                glyph.AddToClassList("hp-number-glyph");
-                tile.Add(glyph);
-            }
-            var value = new Label(n.Value) { pickingMode = PickingMode.Ignore };
-            value.AddToClassList("hp-number-value");
-            tile.Add(value);
-            var label = new Label((n.Label ?? string.Empty).ToUpperInvariant()) { pickingMode = PickingMode.Ignore };
-            label.AddToClassList("hp-number-label");
-            tile.Add(label);
-            return tile;
-        }
-
-        private static VisualElement Row(HoverRow r)
-        {
-            var row = new VisualElement { pickingMode = PickingMode.Ignore };
-            row.AddToClassList("hp-row");
-            row.EnableInClassList("hp-row--up", r.Up);
-            row.EnableInClassList("hp-row--down", r.Down);
-            row.EnableInClassList("hp-row--unknown", r.Unknown);
-            var label = new Label(r.Label) { pickingMode = PickingMode.Ignore };
-            label.AddToClassList("hp-row-label");
-            row.Add(label);
-            var amount = new Label(r.Amount) { pickingMode = PickingMode.Ignore };
-            amount.AddToClassList("hp-row-amount");
-            row.Add(amount);
-            return row;
-        }
-
-        private static void SetText(Label label, string text)
-        {
-            label.text = text ?? string.Empty;
-            label.style.display = string.IsNullOrEmpty(text) ? DisplayStyle.None : DisplayStyle.Flex;
-        }
-
-        private static VisualElement Q(VisualElement root, string name)
-        {
-            VisualElement found = root.Q<VisualElement>(name);
-            if (found == null) throw new InvalidOperationException("HoverPanel.uxml is missing '" + name + "'.");
             return found;
         }
     }

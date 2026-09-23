@@ -1,6 +1,7 @@
 /*
- * The hover panel (docs/ui/language.md §6). Always ink, even over the paper plate. Names in the list,
- * numbers in the panel. Tokens only: no literal colour, no font file.
+ * The hover panel (docs/ui/language.md §6). Ink, on ink-2 over the ink plate and the board. Names in the
+ * list, numbers in the panel. Tokens only: no literal colour, no font file. The same panel is the attack
+ * preview (docs/ui/hud.md §5): a refused shot's reason first, then the head, then the total and the rows.
  */
 
 .hp-root {
@@ -41,6 +42,30 @@
     border-left-color: var(--hp-accent);
     padding: 14px 16px 14px 16px;
     flex-direction: column;
+}
+
+/* ---- a refused shot leads with why (docs/ui/hud.md §5 item 4) ------------------------------------ */
+
+.hp-reason {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.hp-reason-glyph {
+    width: 13px;
+    height: 13px;
+    margin-right: 8px;
+    --glyph-color: var(--mimas-them);
+}
+
+.hp-reason-text {
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-13);
+    letter-spacing: var(--mimas-caps-tracking-wide);
+    color: var(--mimas-fg);
+    margin: 0;
+    padding: 0;
 }
 
 /* ---- head: tile, name, type line ------------------------------------------------------------------ */
@@ -102,6 +127,43 @@
     white-space: normal;
 }
 
+/* ---- the preview's total: the number in amount, "+ ?" while a boon of theirs may move it -------- */
+
+.hp-total {
+    flex-direction: row;
+    align-items: flex-end;
+    margin-bottom: 12px;
+}
+
+.hp-total-value {
+    -unity-font-definition: var(--mimas-font-display);
+    font-size: var(--mimas-text-38);
+    color: var(--mimas-amount);
+    margin: 0;
+    padding: 0;
+}
+
+.hp-total--muted .hp-total-value {
+    color: var(--mimas-fg-3);
+}
+
+.hp-total-unknown {
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-15);
+    color: var(--mimas-fg-3);
+    margin: 0 0 8px 8px;
+    padding: 0;
+}
+
+.hp-total-caption {
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-11);
+    letter-spacing: var(--mimas-caps-tracking-wide);
+    color: var(--mimas-fg-3);
+    margin: 0 0 9px 14px;
+    padding: 0;
+}
+
 /* ---- numbers as tiles: glyph over value over label ------------------------------------------------- */
 
 .hp-numbers {
@@ -160,7 +222,23 @@
 .hp-row {
     flex-direction: row;
     justify-content: space-between;
+    align-items: center;
     margin-bottom: 3px;
+}
+
+.hp-row-left {
+    flex-direction: row;
+    align-items: center;
+    flex-shrink: 1;
+}
+
+/* The dashed "?" in front of what you have not seen. */
+.hp-row-glyph {
+    width: 13px;
+    height: 13px;
+    margin-right: 7px;
+    --glyph-color: var(--mimas-fg-3);
+    color: var(--mimas-fg-3);
 }
 
 .hp-row-label {
@@ -247,6 +325,44 @@
     white-space: normal;
     margin: 0 0 6px 0;
     padding: 0;
+}
+
+/* The "?" the unknown glyph sets in type (Glyphs.cs), inside the panel. */
+.hp-root .glyph-question {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    -unity-text-align: middle-center;
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-10);
+    margin: 0;
+    padding: 0;
+}
+
+/* An action of yours the opponent has not seen: one grey line with the closed eye (language §5). */
+.hp-note {
+    flex-direction: row;
+    align-items: center;
+    margin: 0 0 6px 0;
+}
+
+.hp-note-glyph {
+    width: 13px;
+    height: 13px;
+    margin-right: 7px;
+    --glyph-color: var(--mimas-fg-3);
+}
+
+.hp-note-text {
+    -unity-font-definition: var(--mimas-font-body);
+    font-size: var(--mimas-text-12);
+    color: var(--mimas-fg-3);
+    white-space: normal;
+    margin: 0;
+    padding: 0;
+    flex-shrink: 1;
 }
 
 .hp-flavour {

@@ -1,14 +1,20 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" xmlns:mimas="Mimas.Client.UI" editor-extension-mode="False">
     <!--
-        The one hover panel (docs/ui/language.md §6, spec E §7.10): 300 wide, on ink-2, a 2px left edge in the
-        owner's colour, to the left of whatever the pointer rests on. One instance; ExamineView moves it and
-        fills it. Sections without data are hidden. Order, top to bottom: tile and name and type line; the
-        numbers as tiles; one sentence; the damage line; changes; conditions; one line of flavour.
+        The one hover panel (docs/ui/language.md §6, spec H §3): 340 wide, on ink-2, a 2px left edge in the
+        owner's colour. One instance; HoverPanelView places it to the left of the plate or the boons column,
+        above an action-bar tile, or over a unit's tag as the attack preview (docs/ui/hud.md §5). Sections
+        without data are hidden. Order, top to bottom: a refused shot's reason; tile, name and type line; the
+        preview's total; the numbers as tiles; rows; one sentence; the damage line; changes; conditions; the
+        closed-eye note; one line of flavour.
     -->
     <Style src="HoverPanel.uss" />
     <ui:VisualElement name="hp.root" class="hp-root" picking-mode="Ignore">
         <ui:VisualElement name="hp.shadow" class="hp-shadow" picking-mode="Ignore" />
         <ui:VisualElement name="hp.body" class="hp-body" picking-mode="Ignore">
+            <ui:VisualElement name="hp.reason" class="hp-reason" picking-mode="Ignore">
+                <mimas:Glyph class="hp-reason-glyph" shape="close" />
+                <ui:Label name="hp.reason.text" class="hp-reason-text" text="TRAJECTORY BLOCKED" picking-mode="Ignore" />
+            </ui:VisualElement>
             <ui:VisualElement class="hp-head" picking-mode="Ignore">
                 <ui:VisualElement name="hp.tile" class="hp-tile" picking-mode="Ignore">
                     <mimas:Glyph name="hp.tile.glyph" class="hp-tile-glyph" shape="sword" />
@@ -19,12 +25,21 @@
                     <ui:Label name="hp.type" class="hp-type" text="WEAPON ATTACK · LONGBOW · ACTION" picking-mode="Ignore" />
                 </ui:VisualElement>
             </ui:VisualElement>
+            <ui:VisualElement name="hp.total" class="hp-total" picking-mode="Ignore">
+                <ui:Label name="hp.total.value" class="hp-total-value" text="4" picking-mode="Ignore" />
+                <ui:Label name="hp.total.unknown" class="hp-total-unknown" text="+ ?" picking-mode="Ignore" />
+                <ui:Label name="hp.total.caption" class="hp-total-caption" text="DAMAGE" picking-mode="Ignore" />
+            </ui:VisualElement>
             <ui:VisualElement name="hp.numbers" class="hp-numbers" picking-mode="Ignore" />
             <ui:VisualElement name="hp.rows" class="hp-rows" picking-mode="Ignore" />
             <ui:Label name="hp.text" class="hp-text" text="" picking-mode="Ignore" />
             <ui:Label name="hp.damageline" class="hp-damageline" text="" picking-mode="Ignore" />
             <ui:VisualElement name="hp.changes" class="hp-changes" picking-mode="Ignore" />
             <ui:Label name="hp.conditions" class="hp-conditions" text="" picking-mode="Ignore" />
+            <ui:VisualElement name="hp.note" class="hp-note" picking-mode="Ignore">
+                <mimas:Glyph class="hp-note-glyph" shape="eye-closed" />
+                <ui:Label name="hp.note.text" class="hp-note-text" text="They have not seen this yet." picking-mode="Ignore" />
+            </ui:VisualElement>
             <ui:Label name="hp.flavour" class="hp-flavour" text="" picking-mode="Ignore" />
         </ui:VisualElement>
     </ui:VisualElement>
