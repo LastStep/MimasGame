@@ -1,403 +1,12 @@
-/* Match HUD. Minimal chrome, four anchored panels; everything else is board. */
+/*
+ * The match HUD in the ink language (docs/ui/hud.md, docs/ui/between-rounds.md; spec H §7). Every colour, face,
+ * size and gap is a --mimas-* token from Theme.uss: no literal colour and no --hud-* variable. Pixel positions
+ * are the book's, at the 1920×1080 the panel scales from (1280×720 draws them at two thirds). No panel, no box,
+ * no divider (language §4): things are separated by space and captions, and the floors under the bar and the
+ * track are generated fades tinted here.
+ */
 
 @import url("Theme.uss");
-
-:root {
-    --hud-panel: rgba(12, 14, 20, 0.78);
-    --hud-panel-solid: rgba(12, 14, 20, 0.94);
-    --hud-edge: rgba(255, 255, 255, 0.08);
-    --hud-text: rgb(240, 242, 246);
-    --hud-text-dim: rgba(240, 242, 246, 0.6);
-    --hud-text-faint: rgba(240, 242, 246, 0.35);
-    --hud-accent: rgb(120, 200, 255);
-    --hud-accent-soft: rgba(120, 200, 255, 0.16);
-    --hud-rope: rgb(255, 140, 60);
-    --hud-ember: rgb(255, 232, 140);
-    --hud-theirs: rgb(255, 176, 120);
-    --hud-end: rgb(196, 74, 52);
-    --hud-end-hover: rgb(226, 94, 68);
-    --hud-hp: rgb(120, 230, 120);
-    --hud-hp-ghost: rgb(255, 110, 90);
-    --hud-hp-empty: rgba(255, 255, 255, 0.15);
-    --hud-ap: rgb(120, 200, 255);
-    --hud-ap-reserved: rgb(255, 110, 90);
-    --hud-ap-empty: rgba(255, 255, 255, 0.12);
-    --hud-plus: rgb(150, 230, 150);
-    --hud-minus: rgb(255, 120, 100);
-    --hud-unknown: rgb(255, 200, 90);
-    --hud-fly: rgb(255, 236, 120);
-}
-
-/* ---- unit overlays --------------------------------------------------------------------------- */
-
-.unit-layer {
-    position: absolute;
-    left: 0;
-    top: 0;
-    right: 0;
-    bottom: 0;
-}
-
-.unit-tag {
-    position: absolute;
-    width: 64px;
-    translate: -50% -100%;
-    flex-direction: column;
-    align-items: center;
-    opacity: 0.5;
-    transition-property: opacity;
-    transition-duration: 0.15s;
-}
-
-.unit-tag--emphasised {
-    opacity: 1;
-}
-
-.unit-tag--dead {
-    display: none;
-}
-
-.unit-bar {
-    flex-direction: row;
-    width: 100%;
-    height: 6px;
-}
-
-.unit-seg {
-    flex-grow: 1;
-    height: 6px;
-    margin-right: 2px;
-    border-radius: 1px;
-    background-color: var(--hud-hp);
-}
-
-.unit-seg--empty {
-    background-color: var(--hud-hp-empty);
-}
-
-.unit-seg--ghost {
-    background-color: var(--hud-hp-ghost);
-}
-
-.unit-tag--theirs .unit-seg {
-    background-color: rgb(255, 176, 120);
-}
-
-.unit-tag--theirs .unit-seg--empty {
-    background-color: var(--hud-hp-empty);
-}
-
-.unit-tag--theirs .unit-seg--ghost {
-    background-color: var(--hud-hp-ghost);
-}
-
-.unit-tag--prop {
-    width: 40px;
-}
-
-.unit-tag--prop .unit-seg {
-    height: 4px;
-    background-color: rgb(200, 180, 138);
-}
-
-.unit-tag--prop .unit-bar {
-    height: 4px;
-}
-
-.unit-tag--prop .unit-seg--empty {
-    background-color: var(--hud-hp-empty);
-}
-
-.unit-tag--prop .unit-seg--ghost {
-    background-color: var(--hud-hp-ghost);
-}
-
-.unit-tag--prop .unit-number {
-    font-size: 10px;
-    color: var(--hud-text-dim);
-}
-
-.unit-number {
-    color: var(--hud-text);
-    font-size: 11px;
-    -unity-font-style: bold;
-    margin: 3px 0 0 0;
-    padding: 0;
-    text-shadow: 0 1px 3px rgb(0, 0, 0);
-}
-
-.unit-number--ghost {
-    color: var(--hud-hp-ghost);
-}
-
-.unit-markers {
-    flex-direction: row;
-    margin-top: 2px;
-}
-
-.unit-marker {
-    width: 12px;
-    height: 12px;
-    margin: 0 1px;
-    border-radius: 6px;
-    background-color: var(--hud-unknown);
-    border-width: 1px;
-    border-color: rgba(0, 0, 0, 0.5);
-    justify-content: center;
-    align-items: center;
-    -unity-background-scale-mode: scale-to-fit;
-}
-
-.unit-marker-glyph {
-    color: rgb(20, 16, 8);
-    font-size: 8px;
-    -unity-font-style: bold;
-    margin: 0;
-    padding: 0;
-}
-
-/* ---- attack preview -------------------------------------------------------------------------- */
-
-.preview {
-    position: absolute;
-    width: 210px;
-    translate: -50% -100%;
-    padding: 8px 10px;
-    background-color: var(--hud-panel-solid);
-    border-radius: 8px;
-    border-width: 1px;
-    border-color: var(--hud-edge);
-    display: none;
-}
-
-.preview--visible {
-    display: flex;
-}
-
-.preview-header {
-    flex-direction: row;
-    justify-content: space-between;
-    align-items: flex-end;
-    margin-bottom: 4px;
-}
-
-.preview-title {
-    color: var(--hud-text);
-    font-size: 13px;
-    -unity-font-style: bold;
-    margin: 0;
-    padding: 0;
-}
-
-.preview-total {
-    color: var(--hud-fly);
-    font-size: 17px;
-    -unity-font-style: bold;
-    margin: 0;
-    padding: 0;
-}
-
-.preview-lines {
-    flex-direction: column;
-}
-
-.preview-line {
-    flex-direction: row;
-    justify-content: space-between;
-    padding: 1px 0;
-}
-
-.preview-line-label {
-    color: var(--hud-text-dim);
-    font-size: 12px;
-    margin: 0;
-    padding: 0;
-}
-
-.preview-line-amount {
-    color: var(--hud-text);
-    font-size: 12px;
-    -unity-font-style: bold;
-    margin: 0;
-    padding: 0;
-}
-
-.preview-line--plus .preview-line-amount {
-    color: var(--hud-plus);
-}
-
-.preview-line--minus .preview-line-amount {
-    color: var(--hud-minus);
-}
-
-.preview-line--unknown .preview-line-label {
-    color: var(--hud-unknown);
-}
-
-.preview-line--unknown .preview-line-amount {
-    color: var(--hud-unknown);
-}
-
-/* The refusal reads first and the damage below it is hypothetical, so the total loses its shout. */
-.preview-blocked {
-    color: var(--hud-minus);
-    font-size: 12px;
-    -unity-font-style: bold;
-    white-space: normal;
-    margin: 0 0 4px 0;
-    padding: 0;
-    display: none;
-}
-
-.preview--blocked .preview-blocked {
-    display: flex;
-}
-
-.preview--blocked .preview-total {
-    color: var(--hud-text-faint);
-}
-
-/* ---- cursor tag ------------------------------------------------------------------------------ */
-
-.cursor-tag {
-    position: absolute;
-    color: var(--hud-text);
-    font-size: 12px;
-    -unity-font-style: bold;
-    padding: 3px 7px;
-    background-color: var(--hud-panel-solid);
-    border-radius: 5px;
-    border-width: 1px;
-    border-color: var(--hud-edge);
-    margin: 0;
-    display: none;
-}
-
-.cursor-tag--visible {
-    display: flex;
-}
-
-/* ---- flyovers -------------------------------------------------------------------------------- */
-
-.fly-layer {
-    position: absolute;
-    left: 0;
-    top: 0;
-    right: 0;
-    bottom: 0;
-}
-
-.fly {
-    position: absolute;
-    translate: -50% -100%;
-    align-items: center;
-}
-
-.fly-headline {
-    color: var(--hud-fly);
-    font-size: 26px;
-    -unity-font-style: bold;
-    margin: 0;
-    padding: 0;
-    text-shadow: 0 2px 6px rgb(0, 0, 0);
-}
-
-.fly-detail {
-    color: var(--hud-theirs);
-    font-size: 11px;
-    letter-spacing: 1px;
-    -unity-font-style: bold;
-    margin: 2px 0 0 0;
-    padding: 0;
-    text-shadow: 0 1px 3px rgb(0, 0, 0);
-}
-
-/* ---- opponent status ------------------------------------------------------------------------- */
-
-/* Sits under the rope. Hidden unless the driver has something to say, which offline is never. */
-.status-line {
-    margin-top: 6px;
-    align-self: center;
-    padding: 3px 12px;
-    background-color: var(--hud-panel);
-    border-radius: 8px;
-    color: var(--hud-theirs);
-    font-size: 12px;
-    letter-spacing: 1px;
-    -unity-font-style: bold;
-    display: none;
-}
-
-.status-line--visible {
-    display: flex;
-}
-
-/* ---- banner ---------------------------------------------------------------------------------- */
-
-.banner-panel {
-    position: absolute;
-    top: 38%;
-    left: 50%;
-    translate: -50% -50%;
-    align-items: center;
-    display: none;
-}
-
-.banner-panel--visible {
-    display: flex;
-}
-
-.banner {
-    margin: 0;
-    padding: 18px 48px;
-    background-color: var(--hud-panel-solid);
-    border-radius: 16px;
-    border-width: 1px;
-    border-color: var(--hud-edge);
-    color: var(--hud-text);
-    font-size: 34px;
-    letter-spacing: 8px;
-    -unity-font-style: bold;
-}
-
-.banner--lost {
-    color: var(--hud-theirs);
-}
-
-/* How it ended, not just who won: "you resigned" and "opponent left" are different stories. */
-.banner-detail {
-    margin-top: 10px;
-    color: var(--hud-text-dim);
-    font-size: 14px;
-    letter-spacing: 2px;
-    -unity-font-style: bold;
-}
-
-/* Appears a beat after the result, so the result lands first. */
-.banner-button {
-    margin-top: 22px;
-    padding: 10px 24px;
-    background-color: var(--hud-panel-solid);
-    border-radius: 10px;
-    border-width: 1px;
-    border-color: var(--hud-edge);
-    color: var(--hud-text);
-    font-size: 14px;
-    letter-spacing: 2px;
-    -unity-font-style: bold;
-    display: none;
-    transition-property: background-color, scale;
-    transition-duration: 0.1s;
-}
-
-.banner-button--visible {
-    display: flex;
-}
-
-.banner-button:hover {
-    background-color: var(--hud-accent-soft);
-    scale: 1.03 1.03;
-}
 
 .hud-root {
     position: absolute;
@@ -407,576 +16,1249 @@
     bottom: 0;
 }
 
-/* ---- turn panel ------------------------------------------------------------------------------ */
-
-.turn-panel {
-    position: absolute;
-    top: 16px;
-    left: 50%;
-    translate: -50% 0;
-    min-width: 240px;
-    padding: 10px 22px 10px 22px;
-    align-items: center;
-    background-color: var(--hud-panel);
-    border-radius: 12px;
-    border-width: 1px;
-    border-color: var(--hud-edge);
+/* Between rounds, and while a moment holds the screen, the bar, the boons and the buttons step aside. */
+.hud--between .hud-bar,
+.hud--between .hud-boons,
+.hud--between .hud-end,
+.hud--between .hud-resign {
+    display: none;
 }
 
-.turn-owner {
-    color: var(--hud-text);
-    font-size: 14px;
-    letter-spacing: 3px;
-    -unity-font-style: bold;
+/* The "?" the unknown glyph sets in type, wherever the HUD draws one (tags, cards). */
+.hud-root .glyph-question {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    -unity-text-align: middle-center;
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-10);
     margin: 0;
     padding: 0;
 }
 
-.turn-panel--theirs .turn-owner {
-    color: var(--hud-theirs);
+/* ---- the floors (hud.md §2) --------------------------------------------------------------------- */
+
+.hud-floor {
+    position: absolute;
+    left: 0;
+    right: 0;
+    -unity-background-scale-mode: stretch-to-fill;
 }
 
-/* The rope: hidden until the last seconds, then burns from full width to nothing. */
-.rope {
-    width: 100%;
+.hud-floor--bottom {
+    bottom: 0;
+    height: 300px;
+    -unity-background-image-tint-color: var(--mimas-floor);
+}
+
+.hud-floor--top {
+    top: 0;
+    height: 220px;
+    -unity-background-image-tint-color: var(--mimas-floor-top);
+}
+
+/* ---- the turn track (hud.md §3.1) --------------------------------------------------------------- */
+
+.hud-track {
+    position: absolute;
+    top: 38px;
+    left: 50%;
+    width: var(--mimas-track-w);
+    translate: -50% 0;
+    flex-direction: column;
+}
+
+.hud-track__head {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    height: 22px;
+}
+
+.hud-track__end {
+    flex-direction: row;
+    align-items: center;
+}
+
+.hud-track__name {
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-15);
+    letter-spacing: var(--mimas-tracking-15);
+    color: var(--mimas-fg-3);
+    margin: 0;
+    padding: 0;
+}
+
+.hud-track__name--you {
+    margin-right: 12px;
+}
+
+.hud-track__name--them {
+    margin-left: 12px;
+}
+
+.hud-track--mine .hud-track__name--you {
+    color: var(--mimas-you);
+}
+
+.hud-track--theirs .hud-track__name--them {
+    color: var(--mimas-them);
+}
+
+.hud-track__pips {
+    flex-direction: row;
+    align-items: center;
+}
+
+.hud-pip {
+    width: 7px;
+    height: 7px;
+    border-radius: 4px;
+    border-width: 1px;
+    border-color: var(--mimas-fg-3);
+    margin: 0 2px;
+}
+
+.hud-track__pips--you .hud-pip--won {
+    border-color: var(--mimas-you);
+    background-color: var(--mimas-you);
+}
+
+.hud-track__pips--them .hud-pip--won {
+    border-color: var(--mimas-them);
+    background-color: var(--mimas-them);
+}
+
+.hud-track__round {
+    position: absolute;
+    left: 0;
+    right: 0;
+    -unity-text-align: middle-center;
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-11);
+    letter-spacing: var(--mimas-tracking-11);
+    color: var(--mimas-fg-3);
+    margin: 0;
+    padding: 0;
+}
+
+/* The line: a 2px hair, the lit half on top of it, the centre tick, the marker or the ember. */
+.hud-track__line {
     height: 14px;
-    margin-top: 8px;
+    margin-top: 14px;
+}
+
+.hud-track__hair {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 6px;
+    height: var(--mimas-bar);
+    background-color: var(--mimas-hair);
+}
+
+.hud-track__fill {
+    position: absolute;
+    top: 6px;
+    height: var(--mimas-bar);
+    left: 0;
+    width: 50%;
+    background-color: var(--mimas-you);
+    display: none;
+}
+
+.hud-track--theirs .hud-track__fill {
+    background-color: var(--mimas-them);
+}
+
+.hud-track--lit .hud-track__fill {
+    display: flex;
+}
+
+.hud-track__tick {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    width: 2px;
+    height: 14px;
+    margin-left: -1px;
+    background-color: var(--mimas-fg-3);
+}
+
+.hud-track__marker {
+    position: absolute;
+    top: 0;
+    left: 25%;
+    width: 14px;
+    height: 14px;
+    margin-left: -7px;
+    border-radius: 7px;
+    background-color: var(--mimas-you);
+    display: none;
+}
+
+.hud-track--theirs .hud-track__marker {
+    left: 75%;
+    background-color: var(--mimas-them);
+}
+
+.hud-track--lit .hud-track__marker {
+    display: flex;
+}
+
+/* The rope's last seconds: the marker gives way to the ember at the burning end. */
+.hud-track--burning .hud-track__marker {
+    display: none;
+}
+
+.hud-track__ember {
+    position: absolute;
+    top: 0;
+    width: 14px;
+    height: 14px;
+    margin-left: -7px;
+    align-items: center;
     justify-content: center;
     display: none;
 }
 
-.rope--visible {
+.hud-track--burning .hud-track__ember {
     display: flex;
 }
 
-.rope-track {
-    width: 100%;
-    height: 6px;
-    border-radius: 3px;
-    background-color: rgba(255, 255, 255, 0.1);
-    overflow: hidden;
-}
-
-.rope-fill {
-    height: 100%;
-    width: 100%;
-    background-color: var(--hud-rope);
-}
-
-.rope-ember {
+.hud-track__glow {
     position: absolute;
+    left: 0;
     top: 0;
-    left: 100%;
     width: 14px;
     height: 14px;
-    translate: -50% 0;
     border-radius: 7px;
-    background-color: var(--hud-ember);
+    background-color: var(--mimas-you);
+    opacity: 0.35;
 }
 
-/* ---- examine: the plate is Examine.uxml / Examine.uss, a layer over the HUD that moves nothing ---- */
+.hud-track--theirs .hud-track__glow {
+    background-color: var(--mimas-them);
+}
+
+.hud-track__spark {
+    width: 8px;
+    height: 8px;
+    border-radius: 4px;
+    background-color: var(--mimas-fg);
+}
+
+.hud-track__under {
+    flex-direction: row;
+    justify-content: flex-end;
+    margin-top: 10px;
+    height: 16px;
+}
+
+.hud-track__note {
+    flex-direction: row;
+    align-items: center;
+    display: none;
+}
+
+.hud-track__note--visible {
+    display: flex;
+}
+
+.hud-track__note-text {
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-11);
+    letter-spacing: var(--mimas-caps-tracking-wide);
+    color: var(--mimas-fg-2);
+    margin: 0 8px 0 0;
+    padding: 0;
+}
+
+.hud-track__dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 4px;
+    border-width: 1px;
+    border-color: var(--mimas-them);
+    background-color: var(--mimas-them);
+}
+
+.hud-track__dot--hollow {
+    background-color: var(--mimas-clear);
+}
+
+/* ---- the bar: action points and the lane rows (hud.md §3.2) --------------------------------------- */
+
+.hud-bar {
+    position: absolute;
+    left: var(--mimas-edge);
+    bottom: var(--mimas-edge);
+    flex-direction: row;
+    align-items: flex-end;
+}
+
+/* Their turn: not yours to act, so the whole bar steps back (language §5 state.their-turn). */
+.hud-bar--theirs {
+    opacity: 0.45;
+}
+
+.hud-ap {
+    flex-direction: column;
+    margin-right: 44px;
+}
+
+.hud-ap__caption {
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-10);
+    letter-spacing: var(--mimas-tracking-11);
+    color: var(--mimas-fg-3);
+    margin: 0 0 6px 0;
+    padding: 0;
+}
+
+.hud-ap__value {
+    flex-direction: row;
+    align-items: flex-end;
+    height: 42px;
+}
+
+.hud-ap__bolt {
+    width: 20px;
+    height: 20px;
+    margin: 0 10px 9px 0;
+    --glyph-color: var(--mimas-you);
+}
+
+.hud-ap__current {
+    -unity-font-definition: var(--mimas-font-display);
+    font-size: var(--mimas-text-38);
+    color: var(--mimas-fg);
+    margin: 0;
+    padding: 0;
+}
+
+.hud-ap__max {
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-14);
+    color: var(--mimas-fg-3);
+    margin: 0 0 8px 8px;
+    padding: 0;
+}
+
+.hud-ap__eggs {
+    flex-direction: row;
+    margin-top: 8px;
+}
+
+/* One egg per AP per turn (language §3 glyph.egg, drawn in USS): held, spent, and what the hovered or armed
+   action would spend (state.spends). */
+.hud-egg {
+    width: 12px;
+    height: 14px;
+    border-radius: 6px;
+    border-width: 1px;
+    border-color: var(--mimas-fg-3);
+    background-color: var(--mimas-clear);
+    margin-right: 6px;
+}
+
+.hud-egg--held {
+    border-color: var(--mimas-you);
+    background-color: var(--mimas-you);
+}
+
+.hud-egg--spends {
+    border-color: var(--mimas-you);
+    background-color: var(--mimas-you-28);
+}
+
+.hud-lanes {
+    flex-direction: column;
+}
+
+.hud-lane {
+    flex-direction: row;
+    align-items: center;
+    margin-top: 12px;
+}
+
+.hud-lane--empty {
+    display: none;
+}
+
+.hud-lane__caption {
+    width: 120px;
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-11);
+    letter-spacing: var(--mimas-tracking-11);
+    color: var(--mimas-fg-3);
+    margin: 0;
+    padding: 0;
+}
+
+.hud-lane__tiles {
+    flex-direction: row;
+}
+
+/* ---- a tile (hud.md §3.2, language §5) ------------------------------------------------------------ */
+
+.hud-tile {
+    width: var(--mimas-tile-size);
+    height: var(--mimas-tile-size);
+    margin-right: 12px;
+    background-color: var(--mimas-tile);
+    border-width: 1px;
+    border-color: var(--mimas-hair);
+    align-items: center;
+    justify-content: center;
+}
+
+.hud-tile:hover {
+    background-color: var(--mimas-hover);
+}
+
+.hud-tile__icon {
+    position: absolute;
+    left: 8px;
+    top: 6px;
+    right: 8px;
+    bottom: 10px;
+    -unity-background-scale-mode: scale-to-fit;
+}
+
+.hud-tile__letter {
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-17);
+    color: var(--mimas-fg);
+    margin: 0 0 6px 0;
+    padding: 0;
+}
+
+/* The cost as dots inside the tile, never a digit (language §3 glyph.cost). */
+.hud-tile__cost {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 5px;
+    flex-direction: row;
+    justify-content: center;
+}
+
+.hud-tile__dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 3px;
+    margin: 0 1.5px;
+    background-color: var(--mimas-you);
+}
+
+/* A boon changed it (diamond) or a Sigil added it (triangle): the violet edge and the mark. */
+.hud-tile__mark {
+    position: absolute;
+    right: -5px;
+    top: -5px;
+    width: 10px;
+    height: 10px;
+    --glyph-color: var(--mimas-changed);
+    display: none;
+}
+
+.hud-tile--changed,
+.hud-tile--added {
+    border-color: var(--mimas-changed);
+}
+
+.hud-tile--changed .hud-tile__mark,
+.hud-tile--added .hud-tile__mark {
+    display: flex;
+}
+
+/* Not yet seen by the opponent: a closed eye at the top-left (language §5 state.unseen-by-them). */
+.hud-tile__eye {
+    position: absolute;
+    left: 4px;
+    top: 4px;
+    width: 11px;
+    height: 11px;
+    --glyph-color: var(--mimas-fg-3);
+    display: none;
+}
+
+.hud-tile--unseen .hud-tile__eye {
+    display: flex;
+}
+
+/* Armed wins over the changed edge (spec H §7.4: the specificity trap). */
+.hud-tile.hud-tile--armed {
+    border-width: 2px;
+    border-color: var(--mimas-you);
+    background-color: var(--mimas-you-10);
+}
+
+.hud-tile--unaffordable {
+    opacity: 0.36;
+}
+
+.hud-tile--unaffordable .hud-tile__dot {
+    background-color: var(--mimas-fg-3);
+}
+
+/* ---- your boons (hud.md §3.3) --------------------------------------------------------------------- */
+
+.hud-boons {
+    position: absolute;
+    right: var(--mimas-edge);
+    top: 380px;
+    flex-direction: column;
+}
+
+.hud-boon {
+    width: 40px;
+    height: 40px;
+    border-radius: 20px;
+    border-width: 1px;
+    border-color: var(--mimas-hair);
+    background-color: var(--mimas-ink-55);
+    margin-bottom: 12px;
+    align-items: center;
+    justify-content: center;
+}
+
+.hud-boon:hover {
+    border-color: var(--mimas-fg-3);
+}
+
+.hud-boon__glyph {
+    width: 14px;
+    height: 14px;
+    --glyph-color: var(--mimas-you);
+}
+
+/* ---- End Turn and Resign (hud.md §3.4) ------------------------------------------------------------ */
+
+.hud-end {
+    position: absolute;
+    right: var(--mimas-edge);
+    bottom: var(--mimas-edge);
+    width: var(--mimas-button-w);
+    height: var(--mimas-button-h);
+    margin: 0;
+    padding: 0;
+    border-radius: 0;
+    border-width: 1px;
+    border-color: var(--mimas-you-55);
+    background-color: var(--mimas-ink-55);
+    align-items: center;
+    justify-content: center;
+}
+
+.hud-end:hover {
+    background-color: var(--mimas-you-10);
+    border-color: var(--mimas-you);
+}
+
+.hud-end:active {
+    background-color: var(--mimas-you-14);
+}
+
+.hud-end__label {
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-15);
+    letter-spacing: var(--mimas-tracking-15);
+    color: var(--mimas-fg);
+    margin: 0;
+    padding: 0;
+}
+
+/* Nothing left to spend: one click ends it (language §5 state.done). */
+.hud-end--done {
+    border-color: var(--mimas-you);
+    background-color: var(--mimas-you-18);
+}
+
+.hud-end--done .hud-end__label {
+    color: var(--mimas-you);
+}
+
+.hud-end--theirs,
+.hud-end--theirs:hover {
+    border-color: var(--mimas-hair);
+    background-color: var(--mimas-ink-55);
+}
+
+.hud-end--theirs .hud-end__label {
+    color: var(--mimas-fg-3);
+}
+
+.hud-resign {
+    position: absolute;
+    right: var(--mimas-edge);
+    bottom: 114px;
+    margin: 0;
+    padding: 0;
+    border-width: 0;
+    border-radius: 0;
+    background-color: var(--mimas-clear);
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-11);
+    letter-spacing: var(--mimas-tracking-11);
+    color: var(--mimas-fg-3);
+    -unity-text-align: middle-right;
+    display: none;
+}
+
+.hud-resign:hover,
+.hud-resign:active {
+    background-color: var(--mimas-clear);
+    color: var(--mimas-fg-2);
+}
+
+.hud-resign--visible {
+    display: flex;
+}
+
+/* The first click asks again, in their colour, for three seconds. */
+.hud-resign--armed,
+.hud-resign--armed:hover {
+    color: var(--mimas-them);
+}
+
+/* ---- unit tags (hud.md §3.5) ---------------------------------------------------------------------- */
+
+.unit-layer,
+.fly-layer {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+}
+
+.hud-tag {
+    position: absolute;
+    translate: -50% -100%;
+    flex-direction: column;
+    align-items: center;
+    opacity: 0.55;
+    transition-property: opacity;
+    transition-duration: 0.15s;
+}
+
+.hud-tag--emphasised {
+    opacity: 1;
+}
+
+.hud-tag--dead {
+    display: none;
+}
+
+.hud-tag__number {
+    flex-direction: row;
+    align-items: flex-end;
+    margin-bottom: 4px;
+}
+
+.hud-tag__hp {
+    -unity-font-definition: var(--mimas-font-display);
+    font-size: var(--mimas-text-19);
+    color: var(--mimas-fg);
+    margin: 0;
+    padding: 0;
+    text-shadow: 0 1px 3px var(--mimas-ink);
+}
+
+.hud-tag__max {
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-11);
+    color: var(--mimas-fg-3);
+    margin: 0 0 2px 5px;
+    padding: 0;
+    text-shadow: 0 1px 3px var(--mimas-ink);
+}
+
+.hud-tag__bar {
+    width: 84px;
+    height: var(--mimas-bar);
+    flex-direction: row;
+    background-color: var(--mimas-ink-50);
+}
+
+.hud-tag__fill {
+    height: var(--mimas-bar);
+    background-color: var(--mimas-you);
+}
+
+.hud-tag--theirs .hud-tag__fill {
+    background-color: var(--mimas-them);
+}
+
+.hud-tag--prop .hud-tag__fill {
+    background-color: var(--mimas-fg-2);
+}
+
+/* What an armed attack would take, at the fill's right end, in the damage colour. */
+.hud-tag__ghost {
+    height: var(--mimas-bar);
+    background-color: var(--mimas-amount);
+}
+
+.hud-tag__marks {
+    flex-direction: row;
+    margin-top: 5px;
+}
+
+.hud-tag__mark {
+    width: 9px;
+    height: 9px;
+    margin: 0 2px;
+    --glyph-color: var(--mimas-them);
+}
+
+.hud-tag__mark--unknown {
+    width: 10px;
+    height: 10px;
+    --glyph-color: var(--mimas-fg-3);
+    color: var(--mimas-fg-3);
+}
+
+.hud-tag__lineage {
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-10);
+    letter-spacing: var(--mimas-caps-tracking);
+    color: var(--mimas-fg-3);
+    margin: 3px 0 0 0;
+    padding: 0;
+    -unity-text-align: middle-center;
+}
 
 /* ex.ring: a 1px ring in the owner's colour around the examined unit's tag (language §5 state.selected). */
 .ex-ring {
     position: absolute;
-    left: -6px;
-    right: -6px;
+    left: -8px;
+    right: -8px;
     top: -5px;
-    bottom: -4px;
+    bottom: -5px;
     border-width: 1px;
     border-color: var(--mimas-you);
-    border-radius: 3px;
     display: none;
 }
 
-.unit-tag--theirs .ex-ring {
+.hud-tag--theirs .ex-ring {
     border-color: var(--mimas-them);
 }
 
-.unit-tag--examined .ex-ring {
+.hud-tag--examined .ex-ring {
     display: flex;
 }
 
-/* ---- action bar ------------------------------------------------------------------------------ */
+/* ---- flyovers and the cursor tag (hud.md §3.6) ---------------------------------------------------- */
 
-.action-bar {
+.hud-fly {
     position: absolute;
-    bottom: 20px;
-    left: 50%;
-    translate: -50% 0;
-    flex-direction: row;
-    align-items: flex-end;
-    padding: 6px 8px 8px 8px;
-    background-color: var(--hud-panel);
-    border-radius: 16px;
-    border-width: 1px;
-    border-color: var(--hud-edge);
-}
-
-.action-group {
-    flex-direction: column;
+    translate: -50% -100%;
     align-items: center;
-    padding: 0 6px;
 }
 
-.action-group-caption {
-    color: var(--hud-text-faint);
-    font-size: 9px;
-    letter-spacing: 3px;
-    -unity-font-style: bold;
-    margin: 0 0 5px 0;
-    padding: 0;
-}
-
-.action-group-row {
-    flex-direction: row;
-}
-
-.action-group-divider {
-    width: 1px;
-    height: 56px;
-    margin: 0 2px 4px 2px;
-    background-color: rgba(255, 255, 255, 0.1);
-}
-
-.action-slot {
-    width: 60px;
-    height: 60px;
-    margin: 0 3px;
-    border-radius: 12px;
-    border-width: 2px;
-    border-color: rgba(0, 0, 0, 0);
-    background-color: rgba(255, 255, 255, 0.06);
-    justify-content: center;
-    align-items: center;
-    transition-property: background-color, border-color, scale;
-    transition-duration: 0.1s;
-}
-
-.action-slot:hover {
-    background-color: rgba(255, 255, 255, 0.13);
-    scale: 1.05 1.05;
-}
-
-.action-slot--active {
-    border-color: var(--hud-accent);
-    background-color: var(--hud-accent-soft);
-}
-
-.action-slot--disabled {
-    opacity: 0.35;
-}
-
-.action-slot--disabled:hover {
-    background-color: rgba(255, 255, 255, 0.06);
-    scale: 1 1;
-}
-
-.action-slot--unaffordable {
-    opacity: 0.45;
-}
-
-.action-cost {
-    position: absolute;
-    right: 5px;
-    bottom: 3px;
-    color: var(--hud-text-dim);
-    font-size: 11px;
-    -unity-font-style: bold;
+.hud-fly__amount {
+    -unity-font-definition: var(--mimas-font-display);
+    font-size: var(--mimas-text-36);
+    color: var(--mimas-amount);
     margin: 0;
     padding: 0;
+    text-shadow: 0 2px 6px var(--mimas-ink);
 }
 
-.action-slot--unaffordable .action-cost {
-    color: var(--hud-ap-reserved);
-}
-
-.ap-row {
+.hud-fly__head {
     flex-direction: row;
     align-items: center;
-    height: 60px;
 }
 
-.ap-dot {
+.hud-fly__glyph {
     width: 12px;
     height: 12px;
-    margin: 0 3px;
-    border-radius: 6px;
-    background-color: var(--hud-ap);
-    border-width: 1px;
-    border-color: rgba(0, 0, 0, 0.4);
-    transition-property: background-color;
-    transition-duration: 0.1s;
+    margin-right: 8px;
+    --glyph-color: var(--mimas-them);
 }
 
-.ap-dot--empty {
-    background-color: var(--hud-ap-empty);
-}
-
-.ap-dot--reserved {
-    background-color: var(--hud-ap-reserved);
-}
-
-.action-icon {
-    width: 38px;
-    height: 38px;
-    -unity-background-scale-mode: scale-to-fit;
-}
-
-.action-glyph {
-    color: var(--hud-text);
-    font-size: 26px;
-    -unity-font-style: bold;
+.hud-fly__headline {
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-13);
+    letter-spacing: var(--mimas-caps-tracking-wide);
+    color: var(--mimas-fg);
     margin: 0;
     padding: 0;
+    text-shadow: 0 1px 4px var(--mimas-ink);
 }
 
-/* ---- tooltip --------------------------------------------------------------------------------- */
+.hud-fly__detail {
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-10);
+    letter-spacing: var(--mimas-caps-tracking-wide);
+    color: var(--mimas-fg-3);
+    margin: 4px 0 0 0;
+    padding: 0;
+    text-shadow: 0 1px 4px var(--mimas-ink);
+}
 
-.tooltip {
+.hud-cursor {
     position: absolute;
-    bottom: 118px;
-    left: 50%;
-    translate: -50% 0;
-    max-width: 340px;
-    padding: 8px 12px;
-    background-color: var(--hud-panel-solid);
-    border-radius: 8px;
-    border-width: 1px;
-    border-color: var(--hud-edge);
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-12);
+    letter-spacing: var(--mimas-caps-tracking-wide);
+    color: var(--mimas-fg);
+    background-color: var(--mimas-ink-82);
+    padding: 9px 14px 9px 14px;
+    margin: 0;
     display: none;
 }
 
-.tooltip--visible {
+.hud-cursor--visible {
     display: flex;
 }
 
-.tooltip-title {
-    color: var(--hud-text);
-    font-size: 14px;
-    -unity-font-style: bold;
-    margin: 0;
-    padding: 0;
-}
+/* ---- the draft (between-rounds.md §2) ------------------------------------------------------------- */
 
-.tooltip-detail {
-    color: var(--hud-accent);
-    font-size: 11px;
-    white-space: normal;
-    margin: 3px 0 0 0;
-    padding: 0;
-}
-
-.tooltip-body {
-    color: var(--hud-text-dim);
-    font-size: 12px;
-    white-space: normal;
-    margin: 4px 0 0 0;
-    padding: 0;
-}
-
-/* ---- end turn -------------------------------------------------------------------------------- */
-
-.end-turn {
+.dr-root {
     position: absolute;
-    right: 24px;
-    bottom: 24px;
-    margin: 0;
-    padding: 14px 28px;
-    align-items: center;
-    background-color: var(--hud-end);
-    border-radius: 12px;
-    border-width: 0;
-    transition-property: background-color, scale;
-    transition-duration: 0.1s;
-}
-
-.end-turn:hover {
-    background-color: var(--hud-end-hover);
-    scale: 1.03 1.03;
-}
-
-.end-turn:active {
-    scale: 0.97 0.97;
-}
-
-.end-turn:disabled {
-    opacity: 0.3;
-}
-
-.end-turn-label {
-    color: var(--hud-text);
-    font-size: 16px;
-    letter-spacing: 2px;
-    -unity-font-style: bold;
-    margin: 0;
-    padding: 0;
-}
-
-/* ---- resign ----------------------------------------------------------------------------------- */
-
-/* Quiet until you touch it, and it asks again before it does anything. */
-.resign {
-    position: absolute;
-    right: 24px;
-    bottom: 86px;
-    margin: 0;
-    padding: 8px 18px;
-    background-color: rgba(0, 0, 0, 0);
-    border-radius: 10px;
-    border-width: 1px;
-    border-color: var(--hud-edge);
-    color: var(--hud-text-faint);
-    font-size: 12px;
-    letter-spacing: 2px;
-    -unity-font-style: bold;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
     display: none;
-    transition-property: background-color, color;
+}
+
+.dr-root--open {
+    display: flex;
+}
+
+/* The board under ink at 80%: one element, and it dims the heroes too. */
+.dr-scrim {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--mimas-scrim);
+    opacity: 0;
+    transition-property: opacity;
+    transition-duration: 0.25s;
+}
+
+.dr-root--shown .dr-scrim {
+    opacity: 1;
+}
+
+.dr-headline {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 164px;
+    -unity-text-align: middle-center;
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-20);
+    letter-spacing: var(--mimas-tracking-20);
+    color: var(--mimas-fg);
+    margin: 0;
+    padding: 0;
+}
+
+.dr-next {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 204px;
+    -unity-text-align: middle-center;
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-11);
+    letter-spacing: var(--mimas-tracking-11);
+    color: var(--mimas-fg-3);
+    margin: 0;
+    padding: 0;
+}
+
+.dr-cards {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 300px;
+    flex-direction: row;
+    justify-content: center;
+}
+
+.dr-card {
+    width: var(--mimas-card-w);
+    height: var(--mimas-card-h);
+    margin: 0 22px;
+    padding: 0;
+    border-radius: 0;
+    border-width: 0;
+    background-color: var(--mimas-clear);
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    transition-property: translate, opacity;
     transition-duration: 0.12s;
 }
 
-.resign--visible {
-    display: flex;
+.dr-card:hover,
+.dr-card:active,
+.dr-card:focus {
+    background-color: var(--mimas-clear);
 }
 
-.resign:hover {
-    color: var(--hud-text-dim);
-    border-color: var(--hud-text-faint);
+/* USS has no box-shadow: an offset layer in the shadow token stands in for it (language §4 drift). */
+.dr-card__shadow {
+    position: absolute;
+    left: 8px;
+    right: -8px;
+    top: var(--mimas-shadow-offset);
+    bottom: -14px;
+    background-color: var(--mimas-shadow-panel);
+    opacity: 0.55;
 }
 
-/* Second click only: the label says so, and it reverts on its own after a few seconds. */
-.resign--confirm {
-    background-color: var(--hud-end);
-    border-color: var(--hud-end);
-    color: var(--hud-text);
+.dr-card__face {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--mimas-ink-2);
+    border-left-width: 2px;
+    border-color: var(--mimas-ink-2);
+    flex-direction: column;
 }
 
-.resign--confirm:hover {
-    background-color: var(--hud-end-hover);
-    color: var(--hud-text);
+.dr-card:hover .dr-card__face {
+    border-color: var(--mimas-hair);
 }
 
-.resign:disabled {
-    opacity: 0.25;
+.dr-card--selected {
+    translate: 0 -14px;
 }
 
-/* ---- the series line and the draft (design #draft; decided 22 Sep 2026, P1, P2) ---------------- */
+.dr-card--selected .dr-card__face,
+.dr-card--selected:hover .dr-card__face {
+    border-color: var(--mimas-you);
+}
 
-/* Which round of the series this is, and the score, above the turn owner. */
-.series-line {
-    margin: 0 0 4px 0;
+.dr-card--dim {
+    opacity: 0.45;
+}
+
+.dr-card__wash {
+    height: 130px;
+    flex-shrink: 0;
+    -unity-background-scale-mode: stretch-to-fill;
+    justify-content: flex-end;
+    padding: 0 24px 14px 24px;
+}
+
+.dr-card__kind {
+    flex-direction: row;
+    align-items: center;
+}
+
+.dr-card__kind-glyph {
+    width: 16px;
+    height: 16px;
+    margin-right: 10px;
+    --glyph-color: var(--mimas-you);
+}
+
+.dr-card__kind-text {
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-12);
+    letter-spacing: var(--mimas-tracking-11);
+    color: var(--mimas-you);
+    margin: 0;
     padding: 0;
-    color: var(--hud-text-dim);
-    font-size: 11px;
-    letter-spacing: 3px;
-    -unity-font-style: bold;
-    display: none;
 }
 
-.series-line--visible {
-    display: flex;
+.dr-card__body {
+    flex-grow: 1;
+    flex-direction: column;
+    padding: 18px 24px 0 24px;
 }
 
-/* The whole draft, over the board. Hidden unless a draft is open. */
-.draft-panel {
-    position: absolute;
-    left: 0;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    align-items: center;
-    justify-content: center;
-    display: none;
-}
-
-.draft-panel--visible {
-    display: flex;
-}
-
-/* What dims the board: one element, no shader change, and it darkens the heroes too. */
-.draft-scrim {
-    position: absolute;
-    left: 0;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(0, 0, 0, 0.72);
-}
-
-.draft-body {
-    align-items: center;
-    padding: 24px 28px;
-    max-width: 860px;
-}
-
-.draft-headline {
+.dr-card__name {
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-28);
+    letter-spacing: var(--mimas-caps-tracking);
+    color: var(--mimas-fg);
+    white-space: normal;
     margin: 0;
-    color: var(--hud-text);
-    font-size: 20px;
-    letter-spacing: 6px;
-    -unity-font-style: bold;
+    padding: 0;
+    -unity-text-align: upper-left;
 }
 
-.draft-next {
-    margin-top: 8px;
-    color: var(--hud-text-dim);
-    font-size: 13px;
-    letter-spacing: 2px;
-    -unity-font-style: bold;
+.dr-card__god {
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-11);
+    letter-spacing: var(--mimas-caps-tracking-wide);
+    color: var(--mimas-fg-3);
+    margin: 10px 0 0 0;
+    padding: 0;
+    -unity-text-align: upper-left;
 }
 
-.draft-cards {
+.dr-card__text {
+    -unity-font-definition: var(--mimas-font-body);
+    font-size: var(--mimas-text-15);
+    color: var(--mimas-fg-2);
+    white-space: normal;
+    margin: 18px 0 0 0;
+    padding: 0;
+    -unity-text-align: upper-left;
+}
+
+.dr-card__on {
+    position: absolute;
+    left: 24px;
+    right: 24px;
+    bottom: 26px;
     flex-direction: row;
-    margin-top: 20px;
+    align-items: center;
 }
 
-.draft-card {
-    width: 232px;
-    margin: 0 8px;
-    padding: 16px 16px 18px 16px;
-    background-color: var(--hud-panel-solid);
-    border-radius: 14px;
-    border-width: 2px;
-    border-color: var(--hud-edge);
-    transition-property: border-color, scale, background-color;
-    transition-duration: 0.1s;
+.dr-card__on-glyph {
+    width: 14px;
+    height: 14px;
+    margin-right: 10px;
+    --glyph-color: var(--mimas-fg-2);
 }
 
-.draft-card:hover {
-    scale: 1.02 1.02;
-    border-color: var(--hud-text-faint);
-}
-
-.draft-card--selected {
-    border-color: var(--hud-accent);
-    background-color: var(--hud-accent-soft);
-}
-
-/* One hue per kind, so the three are told apart before they are read. */
-.card-kind {
+.dr-card__on-text {
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-11);
+    letter-spacing: var(--mimas-tracking-11);
+    color: var(--mimas-fg-2);
     margin: 0;
-    font-size: 10px;
-    letter-spacing: 3px;
-    -unity-font-style: bold;
-    color: var(--hud-text-faint);
+    padding: 0;
 }
 
-.kind--blessing { color: rgb(255, 214, 120); }
-.kind--enchant { color: rgb(150, 210, 255); }
-.kind--sigil { color: rgb(200, 160, 255); }
-
-.card-name {
-    margin-top: 6px;
-    color: var(--hud-text);
-    font-size: 17px;
-    -unity-font-style: bold;
-    white-space: normal;
+/* The rope language on a 520 line, burning the whole 20 s. */
+.dr-timer {
+    position: absolute;
+    top: 846px;
+    left: 50%;
+    width: 520px;
+    height: 8px;
+    margin-left: -260px;
 }
 
-.card-god {
-    margin-top: 2px;
-    color: var(--hud-text-dim);
-    font-size: 11px;
-    letter-spacing: 2px;
-    -unity-font-style: bold;
+.dr-timer__hair {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 3px;
+    height: var(--mimas-bar);
+    background-color: var(--mimas-hair);
 }
 
-.card-effect {
-    margin-top: 12px;
-    color: var(--hud-text-dim);
-    font-size: 12px;
-    white-space: normal;
-}
-
-.card-attach {
-    margin-top: 12px;
-    color: var(--hud-accent);
-    font-size: 11px;
-    letter-spacing: 1px;
-    -unity-font-style: bold;
-}
-
-/* One bar for both seats: the draft has one deadline, not a turn each. */
-.draft-timer-track {
-    margin-top: 22px;
-    width: 420px;
-    height: 6px;
-    background-color: var(--hud-hp-empty);
-    border-radius: 3px;
-    overflow: hidden;
-}
-
-.draft-timer-fill {
-    height: 100%;
+.dr-timer__fill {
+    position: absolute;
+    left: 0;
+    top: 3px;
+    height: var(--mimas-bar);
     width: 100%;
-    background-color: var(--hud-accent);
+    background-color: var(--mimas-you);
 }
 
-.draft-footer {
-    flex-direction: row;
-    align-items: center;
-    margin-top: 16px;
-}
-
-/* Green when the other seat has chosen; invisible until then. */
-.draft-dot {
+.dr-timer__ember {
+    position: absolute;
+    top: 0;
+    left: 100%;
     width: 8px;
     height: 8px;
+    margin-left: -4px;
     border-radius: 4px;
-    background-color: var(--hud-hp);
-    margin-right: 8px;
+    background-color: var(--mimas-fg);
+}
+
+.dr-confirm {
+    position: absolute;
+    top: 874px;
+    left: 50%;
+    width: var(--mimas-button-w);
+    height: var(--mimas-button-h);
+    margin: 0 0 0 -115px;
+    padding: 0;
+    border-radius: 0;
+    border-width: 1px;
+    border-color: var(--mimas-you);
+    background-color: var(--mimas-you-14);
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-15);
+    letter-spacing: var(--mimas-tracking-15);
+    color: var(--mimas-fg);
+    -unity-text-align: middle-center;
+}
+
+.dr-confirm:hover {
+    background-color: var(--mimas-you-18);
+    border-color: var(--mimas-you);
+}
+
+.dr-confirm:disabled {
+    border-color: var(--mimas-hair);
+    background-color: var(--mimas-ink-55);
+    color: var(--mimas-fg-3);
+    opacity: 1;
+}
+
+.dr-status {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 948px;
+    -unity-text-align: middle-center;
+    -unity-font-definition: var(--mimas-font-body);
+    font-size: var(--mimas-text-12);
+    color: var(--mimas-fg-3);
+    margin: 0;
+    padding: 0;
     display: none;
 }
 
-.draft-dot--visible {
+.dr-status--visible {
     display: flex;
 }
 
-.draft-status {
-    color: var(--hud-text-dim);
-    font-size: 12px;
-    letter-spacing: 1px;
-    margin-right: 18px;
+/* ---- the round moments, in the band (between-rounds.md §3) --------------------------------------- */
+
+.mo-root {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    display: none;
 }
 
-.draft-confirm {
-    padding: 10px 26px;
-    background-color: var(--hud-panel-solid);
-    border-radius: 10px;
-    border-width: 1px;
-    border-color: var(--hud-accent);
-    color: var(--hud-text);
-    font-size: 13px;
-    letter-spacing: 2px;
-    -unity-font-style: bold;
-    transition-property: background-color, scale;
-    transition-duration: 0.1s;
+.mo-root--visible {
+    display: flex;
 }
 
-.draft-confirm:hover {
-    background-color: var(--hud-accent-soft);
-    scale: 1.03 1.03;
+/* Ink at 86% across the middle, 300 tall, fading over the outer 22% each side. */
+.mo-band {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 300px;
+    margin-top: -150px;
+    -unity-background-image-tint-color: var(--mimas-band);
+    -unity-background-scale-mode: stretch-to-fill;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
 }
 
-.draft-confirm:disabled {
-    opacity: 0.35;
-    border-color: var(--hud-edge);
-}
-
-/* ---- what a boon changed (ADR-034) ------------------------------------------------------------ */
-
-/* A small mark on a button whose cost, range or damage a boon moved. The number on it is already the
-   changed one; this only says why it is not the number on the item. */
-.action--modified {
-    border-color: rgb(255, 214, 120);
-}
-
-/* The god on the nameplate, once something has revealed it. */
-.tag-lineage {
-    margin-top: 2px;
-    color: var(--hud-text-dim);
-    font-size: 9px;
-    letter-spacing: 2px;
-    -unity-font-style: bold;
+.mo-kicker {
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-15);
+    letter-spacing: var(--mimas-tracking-15);
+    color: var(--mimas-fg-2);
+    margin: 0 0 10px 0;
+    padding: 0;
     -unity-text-align: middle-center;
+}
+
+.mo-kicker--result {
+    font-size: var(--mimas-text-20);
+    letter-spacing: var(--mimas-tracking-20);
+}
+
+.mo-title {
+    -unity-font-definition: var(--mimas-font-display);
+    font-size: var(--mimas-text-38);
+    letter-spacing: var(--mimas-tracking-38);
+    color: var(--mimas-fg);
+    margin: 0 0 12px 0;
+    padding: 0;
+    -unity-text-align: middle-center;
+}
+
+.mo-score {
+    flex-direction: row;
+    align-items: center;
+    margin: 0 0 12px 0;
+}
+
+.mo-score__mine,
+.mo-score__theirs {
+    -unity-font-definition: var(--mimas-font-display);
+    font-size: var(--mimas-text-38);
+    margin: 0;
+    padding: 0;
+}
+
+.mo-score__mine {
+    color: var(--mimas-you);
+}
+
+.mo-score__theirs {
+    color: var(--mimas-them);
+}
+
+.mo-score__dash {
+    -unity-font-definition: var(--mimas-font-display);
+    font-size: var(--mimas-text-20);
+    color: var(--mimas-fg-3);
+    margin: 0 20px;
+    padding: 0;
+}
+
+.mo-sub {
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-13);
+    letter-spacing: var(--mimas-tracking-11);
+    color: var(--mimas-fg-2);
+    margin: 0;
+    padding: 0;
+    -unity-text-align: middle-center;
+}
+
+/* A sentence rather than a caption: how a round ended, or why the match is lost. */
+.mo-sub--body {
+    -unity-font-definition: var(--mimas-font-body);
+    font-size: var(--mimas-text-12);
+    letter-spacing: 0;
+    color: var(--mimas-fg-3);
+}
+
+.mo--you {
+    color: var(--mimas-you);
+}
+
+.mo--them {
+    color: var(--mimas-them);
+}
+
+.mo--hidden {
+    display: none;
+}
+
+.mo-back {
+    width: var(--mimas-button-w);
+    height: var(--mimas-button-h);
+    margin: 28px 0 0 0;
+    padding: 0;
+    border-radius: 0;
+    border-width: 1px;
+    border-color: var(--mimas-you-55);
+    background-color: var(--mimas-ink-55);
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-15);
+    letter-spacing: var(--mimas-tracking-15);
+    color: var(--mimas-fg);
+    -unity-text-align: middle-center;
+}
+
+.mo-back:hover {
+    border-color: var(--mimas-you);
+    background-color: var(--mimas-you-14);
 }

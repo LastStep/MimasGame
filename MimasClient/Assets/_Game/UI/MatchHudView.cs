@@ -9,133 +9,140 @@ using Mimas.Core.Data;
 namespace Mimas.Client.UI
 {
     /// <summary>
-    /// The in-match HUD (ADR-015, ADR-019): sectioned action bar with action-point dots (bottom centre),
-    /// turn owner with a burning rope (top centre), the examine plate (right, drawn by <see cref="ExamineView"/>
-    /// from its own templates), End Turn (bottom right), plus the
-    /// world-anchored layer: one tag per unit (segmented hp bar, number, revealed passives) that fades until
-    /// relevant, an attack-preview tooltip over the hovered target, damage flyovers, and the result banner.
-    /// Reads everything from an <see cref="IMatchHudSource"/> and asks it for exactly three things: arm or
-    /// disarm an action, end the turn, close examine. Overlays are screen-space elements repositioned every
-    /// LateUpdate via <see cref="RuntimePanelUtils.CameraTransformWorldToPanel"/> (world-space UI Toolkit is
-    /// not trusted on WebGL2 yet). Layout lives in MatchHud.uxml / MatchHud.uss; this class fills slots and
-    /// toggles classes.
+    /// The in-match HUD in the ink language (docs/ui/hud.md, docs/ui/between-rounds.md; spec H §7): the turn track
+    /// top centre, action points and three captioned lane rows bottom left, your boons down the right edge,
+    /// Resign above End Turn bottom right, a tag over every body, the attack preview as the one hover panel over
+    /// the target, flyovers, the draft over the dimmed board and the round moments in the band. The examine plate
+    /// is <see cref="ExamineView"/>'s, a layer over all of it; the hover panel is shared by everything
+    /// (<see cref="HoverPanel"/>). Package D's behaviour is kept (ADR-019): nothing armed by default, a click arms,
+    /// the armed tile disarms, an unaffordable tile stays on the bar and does nothing.
+    /// <para>
+    /// Reads everything from an <see cref="IMatchHudSource"/> and never touches Core: every word, number and flag
+    /// was composed by the presenter (<c>MatchSession</c>, <c>HudModel</c>); this class picks classes, formats and
+    /// places. Overlays are screen-space elements repositioned every LateUpdate with
+    /// <see cref="RuntimePanelUtils.CameraTransformWorldToPanel"/> (world-space UI Toolkit is not trusted on
+    /// WebGL2 yet).
+    /// </para>
     /// </summary>
     [DisallowMultipleComponent]
     [RequireComponent(typeof(UIDocument))]
     public sealed class MatchHudView : MonoBehaviour
     {
-        /// <summary>Bar order and captions per category. Unknown categories are appended with their key upper-cased.</summary>
-        private static readonly string[][] Groups =
+        /// <summary>Lane order and captions (hud.md §3.2). An unknown category is appended with its key upper-cased.</summary>
+        private static readonly string[][] Lanes =
         {
-            new[] { AbilityCategories.Movement, "MOVE" },
-            new[] { AbilityCategories.Weapon, "WEAPONS" },
-            new[] { AbilityCategories.Spell, "SPELLS" },
+            new[] { AbilityCategories.Movement, "MOVEMENT" },
+            new[] { AbilityCategories.Weapon, "WEAPON" },
+            new[] { AbilityCategories.Spell, "SPELL" },
         };
-
-        private const int HpPerSegment = 4;
 
         /// <summary>How long the resign button stays armed before it goes back to asking.</summary>
         private const float ResignConfirmSeconds = 3f;
 
-        /// <summary>Longest opponent name the turn banner will show before it truncates.</summary>
-        private const int MaxOpponentNameLength = 16;
+        /// <summary>Longest name either end of the track shows before it truncates.</summary>
+        private const int MaxNameLength = 16;
 
         private const float FlyoverSeconds = 2f;
         private const float FlyoverRise = 36f;
+        private const long HoverDelayMs = 120;
 
-        [Tooltip("Any component implementing IMatchHudSource (today: LocalMatchSession).")]
+        /// <summary>The card's ground before its style resolves: language §1 <c>ink-2</c>; and bone for an unknown lineage's wash.</summary>
+        private static readonly Color InkTwo = new Color32(18, 18, 23, 255);
+        private static readonly Color Bone = new Color32(239, 233, 220, 255);
+
+        [Tooltip("Any component implementing IMatchHudSource (MatchSession).")]
         [SerializeField] private MonoBehaviour _sourceBehaviour;
 
         [Tooltip("Board input to shield from clicks that land on the HUD.")]
         [SerializeField] private BoardInputController _boardInput;
 
-        [Tooltip("Sprites matched to ability and modifier 'icon' keys by sprite name. Missing keys fall back to a letter glyph.")]
+        [Tooltip("Sprites matched to ability 'icon' keys by sprite name. A key with no sprite shows the action's letter.")]
         [SerializeField] private Sprite[] _icons;
 
         private readonly Dictionary<string, Sprite> _iconsByKey = new Dictionary<string, Sprite>(StringComparer.Ordinal);
-        private readonly List<VisualElement> _slots = new List<VisualElement>();
-        private readonly List<VisualElement> _apDots = new List<VisualElement>();
-        private readonly List<string> _groupOrder = new List<string>();
         private readonly StringBuilder _signature = new StringBuilder();
-        private readonly Dictionary<int, UnitTag> _unitTags = new Dictionary<int, UnitTag>();
-        private readonly List<int> _staleTags = new List<int>();
-        private readonly List<FlyoverInstance> _flyovers = new List<FlyoverInstance>();
+
+        // The one hover panel has one owner at a time: the plate, a tile, a boon or the preview.
+        private readonly object _tileHover = new object();
+        private readonly object _boonHover = new object();
+        private readonly object _previewHover = new object();
 
         private UIDocument _document;
         private IMatchHudSource _source;
         private Func<Vector2, bool> _pointerBlocker;
+        private bool _bound;
 
         private VisualElement _root;
-        private VisualElement _turnPanel;
-        private VisualElement _rope;
-        private VisualElement _ropeFill;
-        private VisualElement _ropeEmber;
-        private VisualElement _actionBar;
-        private VisualElement _tooltip;
-        private ExamineView _examineView;
-
-        /// <summary>The HUD's one hover panel (hover-mount), shared by the plate, the bar and the preview.</summary>
         private HoverPanel _hover;
-        private VisualElement _unitLayer;
-        private VisualElement _preview;
-        private VisualElement _previewLines;
-        private VisualElement _flyLayer;
-        private Label _turnOwner;
-        private Label _tooltipTitle;
-        private Label _tooltipDetail;
-        private Label _tooltipBody;
-        private Label _previewTitle;
-        private Label _previewTotal;
-        private Label _previewBlocked;
-        private Label _cursorTag;
-        private VisualElement _bannerPanel;
-        private Label _banner;
-        private Label _bannerDetail;
-        private Button _bannerButton;
-        private Label _statusLine;
-        private Button _resign;
+        private ExamineView _examineView;
+        private IVisualElementScheduledItem _pendingHover;
 
-        // The series line and the draft over the dimmed board (P1, P2).
-        private Label _seriesLine;
-        private VisualElement _draftPanel;
-        private Label _draftHeadline;
-        private Label _draftNext;
-        private VisualElement _draftCards;
-        private VisualElement _draftTimerFill;
-        private VisualElement _draftDot;
-        private Label _draftStatus;
-        private Button _draftConfirm;
+        // The track.
+        private VisualElement _track;
+        private Label _youName, _themName, _round;
+        private VisualElement _youPips, _themPips, _trackFill, _trackEmber;
+        private VisualElement _status, _picked;
+        private Label _statusText;
+        private int _pipCount = -1;
 
-        /// <summary>The card elements currently in the panel, in offer order.</summary>
-        private readonly List<VisualElement> _draftSlots = new List<VisualElement>();
+        // The bar.
+        private VisualElement _bar, _eggs, _lanes;
+        private Label _apCurrent, _apMax;
+        private readonly Dictionary<string, VisualElement> _laneTiles = new Dictionary<string, VisualElement>(StringComparer.Ordinal);
+        private readonly Dictionary<string, VisualElement> _laneRows = new Dictionary<string, VisualElement>(StringComparer.Ordinal);
+        private readonly List<VisualElement> _extraLanes = new List<VisualElement>();
+        private readonly List<TileView> _tiles = new List<TileView>();
+        private readonly List<VisualElement> _eggViews = new List<VisualElement>();
+        private string _barSignature;
+        private int _hoveredTile = -1;
 
-        private readonly System.Text.StringBuilder _draftKeys = new System.Text.StringBuilder();
+        // Boons, the buttons, the tags, the flyovers, the cursor.
+        private VisualElement _boons;
+        private string _boonsSignature;
+        private Button _resign, _end;
+        private Label _endLabel;
+        private float _resignArmedUntil;
+        private VisualElement _unitLayer, _flyLayer;
+        private Label _cursor;
+        private readonly Dictionary<int, TagView> _tags = new Dictionary<int, TagView>();
+        private readonly List<int> _staleTags = new List<int>();
+        private readonly List<FlyoverInstance> _flyovers = new List<FlyoverInstance>();
 
-        /// <summary>The ids the cards were built from, so a repaint does not rebuild them.</summary>
+        // The draft.
+        private VisualElement _drRoot, _drCards, _drTimerFill, _drTimerEmber;
+        private Label _drHeadline, _drNext, _drStatus;
+        private Button _drConfirm;
+        private readonly List<Button> _cards = new List<Button>();
+        private readonly List<Glyph> _cardKinds = new List<Glyph>();
         private string _draftSignature;
 
-        /// <summary>When the armed resign button gives up and goes back to asking.</summary>
-        private float _resignArmedUntil;
-        private Button _endTurn;
+        // The moments.
+        private VisualElement _moRoot, _moBand, _moScore;
+        private Label _moKicker, _moTitle, _moMine, _moTheirs, _moSub;
+        private Button _moBack;
 
-        private bool _bound;
-        private bool _ropeVisible;
-        private string _barSignature;
-        private int _hoveredSlot = -1;
+        private HudPreview _shownPreview;
 
-        private sealed class UnitTag
+        private sealed class TileView
         {
             public VisualElement Root;
-            public VisualElement Bar;
-            public Label Number;
-            public VisualElement Markers;
-            public Label Lineage;
+            public Label Letter;
+            public VisualElement Icon;
+            public VisualElement Cost;
+            public Glyph Mark;
+            public int Dots = -1;
+        }
 
-            /// <summary>ex.ring: the 1px ring in the owner's colour while this unit is examined.</summary>
-            public VisualElement Ring;
-            public readonly List<VisualElement> Segments = new List<VisualElement>();
-            public int MaxHp;
-            public string MarkerSignature;
+        private sealed class TagView
+        {
+            public VisualElement Root;
+            public Label Hp;
+            public Label Max;
+            public VisualElement Fill;
+            public VisualElement Ghost;
+            public VisualElement Marks;
+            public Label Lineage;
+            public string MarkSignature;
         }
 
         private sealed class FlyoverInstance
@@ -144,6 +151,8 @@ namespace Mimas.Client.UI
             public Vector3 WorldPosition;
             public float StartTime;
         }
+
+        // ---- lifecycle ------------------------------------------------------------------------------
 
         private void Awake()
         {
@@ -158,14 +167,8 @@ namespace Mimas.Client.UI
 
             _iconsByKey.Clear();
             if (_icons != null)
-            {
                 for (int i = 0; i < _icons.Length; i++)
-                {
-                    Sprite sprite = _icons[i];
-                    if (sprite == null) continue;
-                    _iconsByKey[sprite.name] = sprite;
-                }
-            }
+                    if (_icons[i] != null) _iconsByKey[_icons[i].name] = _icons[i];
 
             _pointerBlocker = IsPointerOverHud;
         }
@@ -199,38 +202,28 @@ namespace Mimas.Client.UI
         private void Update()
         {
             if (!_bound && !TryBind()) return;
-            UpdateRope();
-
-            // The armed resign button forgets on its own, and the way out of the result turns up a beat
-            // after it. Both are time passing rather than anything changing, so they are polled.
-            if (_resignArmedUntil > 0f && Time.time >= _resignArmedUntil) DisarmResign();
-
-            bool showBack = _source.Moment != null && _source.Moment.ShowBack;
-            if (showBack != _bannerButton.ClassListContains("banner-button--visible"))
-                _bannerButton.EnableInClassList("banner-button--visible", showBack);
-
+            UpdateTrack();
             UpdateDraftTimer();
-        }
 
-        /// <summary>
-        /// One bar for the draft's one deadline. A late message can leave it below zero: show nothing left
-        /// and wait for the server's timeout pick, which is on its way (§13).
-        /// </summary>
-        private void UpdateDraftTimer()
-        {
-            HudDraft draft = _source.Draft;
-            if (draft == null) return;
-            float total = draft.SecondsTotal > 0f ? draft.SecondsTotal : 1f;
-            float fraction = Mathf.Clamp01(draft.SecondsRemaining / total);
-            _draftTimerFill.style.width = Length.Percent(fraction * 100f);
+            // Time passing rather than anything changing: the armed resign forgets, and the way out of a result
+            // turns up a beat after it (the presenter flips the flag; the label can follow the room).
+            if (_resignArmedUntil > 0f && Time.time >= _resignArmedUntil) DisarmResign();
+            HudMoment moment = _source.Moment;
+            bool back = moment != null && moment.ShowBack;
+            SetDisplay(_moBack, back);
+            if (back)
+            {
+                string label = (moment.BackLabel ?? "Back to lobby").ToUpperInvariant();
+                if (_moBack.text != label) _moBack.text = label;
+            }
         }
 
         private void LateUpdate()
         {
             if (!_bound) return;
-            UpdateUnitTags();
+            UpdateTagPositions();
             UpdatePreviewPosition();
-            UpdateCursorTag();
+            UpdateCursor();
             UpdateFlyovers();
         }
 
@@ -241,538 +234,651 @@ namespace Mimas.Client.UI
             VisualElement root = _document.rootVisualElement;
             if (root == null) return false;
 
-            _root = root.Q<VisualElement>("hud-root");
-            _turnPanel = root.Q<VisualElement>("turn-panel");
-            _turnOwner = root.Q<Label>("turn-owner");
-            _rope = root.Q<VisualElement>("rope");
-            _ropeFill = root.Q<VisualElement>("rope-fill");
-            _ropeEmber = root.Q<VisualElement>("rope-ember");
-            _actionBar = root.Q<VisualElement>("action-bar");
-            _tooltip = root.Q<VisualElement>("tooltip");
-            _tooltipTitle = root.Q<Label>("tooltip-title");
-            _tooltipDetail = root.Q<Label>("tooltip-detail");
-            _tooltipBody = root.Q<Label>("tooltip-body");
-            VisualElement examineMount = root.Q<VisualElement>("examine-mount");
-            VisualElement hoverMount = root.Q<VisualElement>("hover-mount");
-            _endTurn = root.Q<Button>("end-turn");
-            _unitLayer = root.Q<VisualElement>("unit-layer");
-            _preview = root.Q<VisualElement>("preview");
-            _previewTitle = root.Q<Label>("preview-title");
-            _previewTotal = root.Q<Label>("preview-total");
-            _previewBlocked = root.Q<Label>("preview-blocked");
-            _previewLines = root.Q<VisualElement>("preview-lines");
-            _cursorTag = root.Q<Label>("cursor-tag");
-            _flyLayer = root.Q<VisualElement>("fly-layer");
-            _bannerPanel = root.Q<VisualElement>("banner-panel");
-            _banner = root.Q<Label>("banner");
-            _bannerDetail = root.Q<Label>("banner-detail");
-            _bannerButton = root.Q<Button>("banner-button");
-            _statusLine = root.Q<Label>("status-line");
-            _resign = root.Q<Button>("resign");
-            _seriesLine = root.Q<Label>("series-line");
-            _draftPanel = root.Q<VisualElement>("draft-panel");
-            _draftHeadline = root.Q<Label>("draft-headline");
-            _draftNext = root.Q<Label>("draft-next");
-            _draftCards = root.Q<VisualElement>("draft-cards");
-            _draftTimerFill = root.Q<VisualElement>("draft-timer-fill");
-            _draftDot = root.Q<VisualElement>("draft-dot");
-            _draftStatus = root.Q<Label>("draft-status");
-            _draftConfirm = root.Q<Button>("draft-confirm");
+            // The theme's fonts are loaded with the document: let their letter-spacing apply to every pair.
+            FontSpacing.RepairLoaded();
 
-            if (_root == null || _turnPanel == null || _turnOwner == null || _rope == null || _ropeFill == null || _ropeEmber == null
-                || _actionBar == null || _tooltip == null || _tooltipTitle == null || _tooltipDetail == null || _tooltipBody == null
-                || examineMount == null || hoverMount == null || _endTurn == null
-                || _unitLayer == null || _preview == null || _previewTitle == null || _previewTotal == null
-                || _previewBlocked == null || _previewLines == null || _cursorTag == null
-                || _flyLayer == null || _banner == null || _bannerPanel == null || _bannerDetail == null || _bannerButton == null
-                || _statusLine == null || _resign == null
-                || _seriesLine == null || _draftPanel == null || _draftHeadline == null || _draftNext == null
-                || _draftCards == null || _draftTimerFill == null || _draftDot == null || _draftStatus == null || _draftConfirm == null)
+            var missing = new List<string>();
+            _root = Find<VisualElement>(root, "hud-root", missing);
+            VisualElement floor = Find<VisualElement>(root, "hud.floor", missing);
+            VisualElement floorTop = Find<VisualElement>(root, "hud.floor.top", missing);
+            _unitLayer = Find<VisualElement>(root, "unit-layer", missing);
+            _flyLayer = Find<VisualElement>(root, "fly-layer", missing);
+            _cursor = Find<Label>(root, "hud.cursor", missing);
+
+            _track = Find<VisualElement>(root, "hud.track", missing);
+            _youName = Find<Label>(root, "hud.track.you.name", missing);
+            _themName = Find<Label>(root, "hud.track.them.name", missing);
+            _youPips = Find<VisualElement>(root, "hud.track.you.pips", missing);
+            _themPips = Find<VisualElement>(root, "hud.track.them.pips", missing);
+            _round = Find<Label>(root, "hud.track.round", missing);
+            Find<VisualElement>(root, "hud.track.line", missing);
+            _trackFill = Find<VisualElement>(root, "hud.track.fill", missing);
+            Find<VisualElement>(root, "hud.track.marker", missing);
+            _trackEmber = Find<VisualElement>(root, "hud.track.ember", missing);
+            _status = Find<VisualElement>(root, "hud.track.status", missing);
+            _statusText = Find<Label>(root, "hud.track.status.text", missing);
+            _picked = Find<VisualElement>(root, "hud.track.picked", missing);
+
+            _bar = Find<VisualElement>(root, "hud.bar", missing);
+            Find<VisualElement>(root, "hud.ap", missing);
+            Find<Label>(root, "hud.ap.caption", missing);
+            Find<VisualElement>(root, "hud.ap.value", missing);
+            _apCurrent = Find<Label>(root, "hud.ap.value.current", missing);
+            _apMax = Find<Label>(root, "hud.ap.value.max", missing);
+            _eggs = Find<VisualElement>(root, "hud.ap.eggs", missing);
+            _lanes = Find<VisualElement>(root, "hud.lanes", missing);
+            for (int i = 0; i < Lanes.Length; i++)
             {
-                Debug.LogError("[MatchHudView] MatchHud.uxml is missing one of the named elements.", this);
+                string category = Lanes[i][0];
+                _laneRows[category] = Find<VisualElement>(root, "hud.lane." + category, missing);
+                _laneTiles[category] = Find<VisualElement>(root, "hud.lane." + category + ".tiles", missing);
+            }
+
+            _boons = Find<VisualElement>(root, "hud.boons", missing);
+            _resign = Find<Button>(root, "hud.resign", missing);
+            _end = Find<Button>(root, "hud.end", missing);
+            _endLabel = Find<Label>(root, "hud.end.label", missing);
+
+            _drRoot = Find<VisualElement>(root, "dr.root", missing);
+            Find<VisualElement>(root, "dr.scrim", missing);
+            _drHeadline = Find<Label>(root, "dr.headline", missing);
+            _drNext = Find<Label>(root, "dr.next", missing);
+            _drCards = Find<VisualElement>(root, "dr.cards", missing);
+            Find<VisualElement>(root, "dr.timer", missing);
+            _drTimerFill = Find<VisualElement>(root, "dr.timer.fill", missing);
+            _drTimerEmber = Find<VisualElement>(root, "dr.timer.ember", missing);
+            _drConfirm = Find<Button>(root, "dr.confirm", missing);
+            _drStatus = Find<Label>(root, "dr.status", missing);
+
+            _moRoot = Find<VisualElement>(root, "mo.root", missing);
+            _moBand = Find<VisualElement>(root, "mo.band", missing);
+            _moKicker = Find<Label>(root, "mo.kicker", missing);
+            _moTitle = Find<Label>(root, "mo.title", missing);
+            _moScore = Find<VisualElement>(root, "mo.score", missing);
+            _moMine = Find<Label>(root, "mo.score.mine", missing);
+            _moTheirs = Find<Label>(root, "mo.score.theirs", missing);
+            _moSub = Find<Label>(root, "mo.sub", missing);
+            _moBack = Find<Button>(root, "mo.back", missing);
+
+            VisualElement examineMount = Find<VisualElement>(root, "examine-mount", missing);
+            VisualElement hoverMount = Find<VisualElement>(root, "hover-mount", missing);
+
+            if (missing.Count > 0)
+            {
+                Debug.LogError("[MatchHudView] MatchHud.uxml is missing: " + string.Join(", ", missing), this);
                 enabled = false;
                 return false;
             }
 
+            // The fades USS cannot draw, tinted by their tokens in MatchHud.uss (spec H §3).
+            floor.style.backgroundImage = new StyleBackground(Ramps.Vertical(false, 0.58f));
+            floorTop.style.backgroundImage = new StyleBackground(Ramps.Vertical(true, 0.5f));
+            _moBand.style.backgroundImage = new StyleBackground(Ramps.BothEnds());
+
             _hover = new HoverPanel(hoverMount);
             _examineView = new ExamineView(_root, examineMount, _hover, HandleExamineClose);
-            _actionBar.RegisterCallback<GeometryChangedEvent>(HandleActionBarGeometry);
 
-            _draftConfirm.clicked += HandleDraftConfirmClicked;
-            _endTurn.clicked += HandleEndTurnClicked;
+            _end.clicked += HandleEndClicked;
             _resign.clicked += HandleResignClicked;
-            _bannerButton.clicked += HandleBackToLobbyClicked;
+            _drConfirm.clicked += HandleConfirmClicked;
+            _moBack.clicked += HandleBackClicked;
             _bound = true;
+            // A rebind (the document reloading) gets a fresh tree: everything built in code is built again.
             _barSignature = null;
-            _ropeVisible = true;      // force the first UpdateRope to apply the real state
+            _boonsSignature = null;
+            _pipCount = -1;
+            _shownPreview = null;
             Refresh();
-            UpdateRope();
+            UpdateTrack();
             return true;
         }
 
         private void Unbind()
         {
             if (!_bound) return;
-            _endTurn.clicked -= HandleEndTurnClicked;
-            if (_examineView != null) { _examineView.Dispose(); _examineView = null; }
-            _hover = null;
+            _end.clicked -= HandleEndClicked;
             _resign.clicked -= HandleResignClicked;
-            _bannerButton.clicked -= HandleBackToLobbyClicked;
-            _draftConfirm.clicked -= HandleDraftConfirmClicked;
-            ClearDraftCards();
-            ClearSlots();
-            foreach (UnitTag tag in _unitTags.Values) tag.Root.RemoveFromHierarchy();
-            _unitTags.Clear();
+            _drConfirm.clicked -= HandleConfirmClicked;
+            _moBack.clicked -= HandleBackClicked;
+            if (_examineView != null) { _examineView.Dispose(); _examineView = null; }
+            CancelPendingHover();
+            _hover = null;
+            ClearBar();
+            ClearCards();
+            foreach (TagView tag in _tags.Values) tag.Root.RemoveFromHierarchy();
+            _tags.Clear();
             for (int i = 0; i < _flyovers.Count; i++) _flyovers[i].Root.RemoveFromHierarchy();
             _flyovers.Clear();
             _bound = false;
         }
 
-        // ---- state → visuals ------------------------------------------------------------------------
+        // ---- state -> visuals ---------------------------------------------------------------------------
 
-        /// <summary>Full repaint of everything except the rope and the world-anchored layer, which tick every frame.</summary>
+        /// <summary>Everything but the track's burn, the timers and the world-anchored layer, which tick every frame.</summary>
         private void Refresh()
         {
             if (!_bound) return;
 
-            bool mine = _source.IsMyTurn;
-            bool over = _source.Phase == HudPhase.Over;
-            _turnOwner.text = over ? "MATCH OVER" : (mine ? "YOUR TURN" : OpponentTurnLabel());
-            _turnPanel.EnableInClassList("turn-panel--theirs", !mine && !over);
-            _endTurn.SetEnabled(_source.CanEndTurn);
-            RefreshStatusLine();
-            RefreshResign();
+            // Between rounds, and while any moment holds the screen, the bar, the boons and the buttons step aside
+            // (the round card's boards and the results' draw only the track and the band).
+            _root.EnableInClassList("hud--between", _source.Phase != HudPhase.Round || _source.Moment != null);
 
-            RefreshActionBar();
-            RefreshExamine();
+            RefreshTrack();
+            RefreshBar();
+            RefreshBoons();
+            RefreshButtons();
+            _examineView.Render(_source.Examine);
             RefreshPreview();
-            RefreshBanner();
-            RefreshSeriesLine();
             RefreshDraft();
-            SyncUnitTags();
+            RefreshMoment();
+            SyncTags();
         }
 
-        private void RefreshSeriesLine()
+        // ---- the turn track (hud.md §3.1) ------------------------------------------------------------
+
+        private void RefreshTrack()
         {
-            string line = _source.RoundNumber > 0 && _source.Phase != HudPhase.Over
-                ? "ROUND " + _source.RoundNumber + " · " + _source.ScoreMine + " – " + _source.ScoreTheirs
-                : null;
-            bool visible = !string.IsNullOrEmpty(line);
-            _seriesLine.text = line ?? string.Empty;
-            _seriesLine.EnableInClassList("series-line--visible", visible);
+            HudPhase phase = _source.Phase;
+            _youName.text = Trim(_source.MyName, "YOU");
+            _themName.text = Trim(_source.OpponentName, "OPPONENT");
+            _round.text = phase == HudPhase.Draft ? "DRAFT"
+                : phase == HudPhase.Over ? "SERIES"
+                : _source.RoundNumber > 0 ? "ROUND " + _source.RoundNumber : string.Empty;
+
+            int perSide = Mathf.Max(0, _source.RoundsToWin);
+            if (perSide != _pipCount)
+            {
+                BuildPips(_youPips, perSide);
+                BuildPips(_themPips, perSide);
+                _pipCount = perSide;
+            }
+            FillPips(_youPips, _source.ScoreMine);
+            FillPips(_themPips, _source.ScoreTheirs);
+
+            // Under their end: their connection, or — between rounds — that they have chosen.
+            string status = _source.OpponentStatus;
+            bool hasStatus = !string.IsNullOrEmpty(status);
+            _statusText.text = hasStatus ? status.ToUpperInvariant() : string.Empty;
+            _status.EnableInClassList("hud-track__note--visible", hasStatus);
+            HudDraft draft = _source.Draft;
+            _picked.EnableInClassList("hud-track__note--visible", draft != null && draft.OpponentPicked);
+        }
+
+        private static void BuildPips(VisualElement container, int count)
+        {
+            container.Clear();
+            for (int i = 0; i < count; i++)
+            {
+                var pip = new VisualElement { pickingMode = PickingMode.Ignore };
+                pip.AddToClassList("hud-pip");
+                container.Add(pip);
+            }
+        }
+
+        private static void FillPips(VisualElement container, int won)
+        {
+            for (int i = 0; i < container.childCount; i++) container[i].EnableInClassList("hud-pip--won", i < won);
         }
 
         /// <summary>
-        /// The draft over the dimmed board. The cards are built once per offer set and then only restyled,
-        /// so hovering one and selecting another does not rebuild the panel under the pointer.
+        /// Lights the active half, and in the rope's last seconds burns it towards the centre with the ember at
+        /// its outer end (hud.md §3.1; spec H §7.5). Nothing is lit between rounds or while a result holds.
         /// </summary>
-        private void RefreshDraft()
+        private void UpdateTrack()
         {
-            HudDraft draft = _source.Draft;
-            bool visible = draft != null;
-            _draftPanel.EnableInClassList("draft-panel--visible", visible);
-            if (!visible)
-            {
-                if (_draftSignature != null) ClearDraftCards();
-                return;
-            }
+            if (_source == null || _track == null) return;
+            HudMoment moment = _source.Moment;
+            bool lit = _source.Phase == HudPhase.Round && (moment == null || moment.Kind == HudMomentKind.RoundStart);
+            bool mine = _source.IsMyTurn;
+            _track.EnableInClassList("hud-track--lit", lit);
+            _track.EnableInClassList("hud-track--mine", lit && mine);
+            _track.EnableInClassList("hud-track--theirs", lit && !mine);
 
-            _draftHeadline.text = draft.Headline ?? string.Empty;
-            _draftNext.text = draft.NextRoundLine ?? string.Empty;
+            float remaining = _source.TurnSecondsRemaining;
+            float rope = _source.RopeSeconds;
+            bool burning = lit && HudModel.IsBurning(remaining, rope, _source.TurnSecondsTotal);
+            _track.EnableInClassList("hud-track--burning", burning);
+            if (!lit) return;
 
-            _draftKeys.Length = 0;
-            for (int i = 0; i < draft.Cards.Count; i++) _draftKeys.Append(draft.Cards[i].Id).Append('|');
-            string signature = _draftKeys.ToString();
-            if (signature != _draftSignature)
-            {
-                BuildDraftCards(draft);
-                _draftSignature = signature;
-            }
+            float half = 50f * (burning ? HudModel.LitFraction(remaining, rope) : 1f);
+            _trackFill.style.left = Length.Percent(mine ? 50f - half : 50f);
+            _trackFill.style.width = Length.Percent(half);
+            if (!burning) return;
 
-            for (int i = 0; i < _draftSlots.Count; i++)
-            {
-                _draftSlots[i].EnableInClassList("draft-card--selected", i == draft.Selected);
-                _draftSlots[i].SetEnabled(!draft.Picked);
-            }
-
-            _draftDot.EnableInClassList("draft-dot--visible", draft.OpponentPicked);
-            _draftStatus.text = draft.Status ?? string.Empty;
-            _draftConfirm.text = draft.Picked ? "Kept" : "Confirm";
-            _draftConfirm.SetEnabled(!draft.Picked && draft.Selected >= 0);
+            _trackEmber.style.left = Length.Percent(mine ? 50f - half : 50f + half);
+            // The ember flickers faster as the rope gets short.
+            float f = half / 50f;
+            float pulse = 0.85f + 0.3f * Mathf.PingPong(Time.unscaledTime * (2f + (1f - f) * 4f), 1f);
+            _trackEmber.style.scale = new Scale(new Vector2(pulse, pulse));
         }
 
-        private void BuildDraftCards(HudDraft draft)
-        {
-            ClearDraftCards();
-            for (int i = 0; i < draft.Cards.Count; i++)
-            {
-                HudDraftCard card = draft.Cards[i];
-                int index = i;
+        // ---- the bar (hud.md §3.2) -------------------------------------------------------------------
 
-                var root = new VisualElement { name = "draft-card-" + i };
-                root.AddToClassList("draft-card");
-
-                var kind = new Label(card.Kind != null ? card.Kind.ToUpperInvariant() : "") { name = "card-kind" };
-                kind.AddToClassList("card-kind");
-                if (!string.IsNullOrEmpty(card.Kind)) kind.AddToClassList("kind--" + card.Kind.ToLowerInvariant());
-                kind.pickingMode = PickingMode.Ignore;
-                root.Add(kind);
-
-                var name = new Label(card.Name ?? "") { name = "card-name" };
-                name.AddToClassList("card-name");
-                name.pickingMode = PickingMode.Ignore;
-                root.Add(name);
-
-                string godLine = card.God;
-                if (!string.IsNullOrEmpty(card.Lineage)) godLine = godLine + " · " + card.Lineage;
-                var god = new Label(godLine ?? "") { name = "card-god" };
-                god.AddToClassList("card-god");
-                god.pickingMode = PickingMode.Ignore;
-                root.Add(god);
-
-                var effect = new Label(card.Effect ?? "") { name = "card-effect" };
-                effect.AddToClassList("card-effect");
-                effect.pickingMode = PickingMode.Ignore;
-                root.Add(effect);
-
-                var attach = new Label(card.Attach ?? "") { name = "card-attach" };
-                attach.AddToClassList("card-attach");
-                attach.pickingMode = PickingMode.Ignore;
-                root.Add(attach);
-
-                root.RegisterCallback<ClickEvent>(_ => _source.SelectDraftCard(index));
-                _draftCards.Add(root);
-                _draftSlots.Add(root);
-            }
-        }
-
-        private void ClearDraftCards()
-        {
-            for (int i = 0; i < _draftSlots.Count; i++) _draftSlots[i].RemoveFromHierarchy();
-            _draftSlots.Clear();
-            _draftSignature = null;
-        }
-
-        private void HandleDraftConfirmClicked()
-        {
-            _source.ConfirmDraft();
-        }
-
-        private void RefreshActionBar()
+        private void RefreshBar()
         {
             IReadOnlyList<HudAction> actions = _source.Actions;
 
-            // Rebuild the sections only when the set of actions changes; otherwise update slots in place
-            // so hover state and the tooltip survive a repaint.
+            // Rebuild only when the set of actions changes; otherwise restyle in place, so a hover survives a repaint.
             _signature.Length = 0;
             _signature.Append("ap").Append(_source.ApPerTurn).Append('|');
             for (int i = 0; i < actions.Count; i++) _signature.Append(actions[i].Category).Append(':').Append(actions[i].Id).Append('|');
             string signature = _signature.ToString();
             if (signature != _barSignature)
             {
-                BuildSections(actions);
+                BuildBar(actions);
                 _barSignature = signature;
             }
 
-            int active = _source.ActiveActionIndex;
-            for (int i = 0; i < actions.Count && i < _slots.Count; i++)
+            int armed = _source.ActiveActionIndex;
+            for (int i = 0; i < actions.Count && i < _tiles.Count; i++)
             {
                 HudAction action = actions[i];
-                VisualElement slot = _slots[i];
-                slot.EnableInClassList("action-slot--active", i == active);
-                slot.EnableInClassList("action-slot--disabled", !action.Enabled && action.Affordable);
-                slot.EnableInClassList("action-slot--unaffordable", !action.Affordable);
-                slot.EnableInClassList("action--modified", action.Modified);
-                ApplyIcon(slot.Q<VisualElement>("icon"), slot.Q<Label>("glyph"), action.Icon, action.Name);
-                slot.Q<Label>("cost").text = action.Cost.ToString();
+                TileView tile = _tiles[i];
+                tile.Root.EnableInClassList("hud-tile--armed", i == armed);
+                tile.Root.EnableInClassList("hud-tile--unaffordable", !action.Affordable);
+                tile.Root.EnableInClassList("hud-tile--added", action.Added);
+                tile.Root.EnableInClassList("hud-tile--changed", action.Modified && !action.Added);
+                tile.Root.EnableInClassList("hud-tile--unseen", action.UnseenByThem);
+                tile.Mark.Shape = action.Added ? "sigil" : "enchant";
+                ApplyIcon(tile, action);
+                if (tile.Dots != action.Cost) BuildDots(tile, action.Cost);
             }
 
-            RefreshApDots();
+            _bar.EnableInClassList("hud-bar--theirs", !_source.IsMyTurn);
+            _apCurrent.text = _source.ApCurrent.ToString();
+            _apMax.text = "/ " + _source.ApPerTurn;
+            RefreshEggs();
         }
 
-        /// <summary>Filled dots for remaining ap; the dots a hovered ability would spend turn red (Divinity-style reservation).</summary>
-        private void RefreshApDots()
+        private void BuildBar(IReadOnlyList<HudAction> actions)
+        {
+            ClearBar();
+
+            for (int i = 0; i < _source.ApPerTurn; i++)
+            {
+                var egg = new VisualElement { pickingMode = PickingMode.Ignore };
+                egg.AddToClassList("hud-egg");
+                _eggs.Add(egg);
+                _eggViews.Add(egg);
+            }
+
+            // Tiles in action order, so _tiles[i] is actions[i]; each into its lane's row.
+            for (int i = 0; i < actions.Count; i++)
+            {
+                string category = actions[i].Category ?? string.Empty;
+                VisualElement row;
+                if (!_laneTiles.TryGetValue(category, out row)) row = AddLane(category);
+                TileView tile = CreateTile(actions[i], i);
+                row.Add(tile.Root);
+                _tiles.Add(tile);
+            }
+            foreach (KeyValuePair<string, VisualElement> pair in _laneTiles)
+                _laneRows[pair.Key].EnableInClassList("hud-lane--empty", pair.Value.childCount == 0);
+        }
+
+        /// <summary>A category the book does not name gets its own row, captioned with its key upper-cased.</summary>
+        private VisualElement AddLane(string category)
+        {
+            var row = new VisualElement { name = "hud.lane." + category, pickingMode = PickingMode.Ignore };
+            row.AddToClassList("hud-lane");
+            var caption = new Label(string.IsNullOrEmpty(category) ? "OTHER" : category.ToUpperInvariant()) { pickingMode = PickingMode.Ignore };
+            caption.AddToClassList("hud-lane__caption");
+            row.Add(caption);
+            var tiles = new VisualElement { name = "hud.lane." + category + ".tiles", pickingMode = PickingMode.Ignore };
+            tiles.AddToClassList("hud-lane__tiles");
+            row.Add(tiles);
+            _lanes.Add(row);
+            _extraLanes.Add(row);
+            _laneRows[category] = row;
+            _laneTiles[category] = tiles;
+            return tiles;
+        }
+
+        private TileView CreateTile(HudAction action, int index)
+        {
+            var tile = new TileView
+            {
+                Root = new VisualElement { name = "hud.tile[" + action.Id + "]", pickingMode = PickingMode.Position, userData = index },
+            };
+            tile.Root.AddToClassList("hud-tile");
+            // The icon key rides on a class, so an art pass can bind a sprite to it (hud.md §7).
+            if (!string.IsNullOrEmpty(action.Icon)) tile.Root.AddToClassList("icon--" + action.Icon);
+
+            tile.Icon = new VisualElement { pickingMode = PickingMode.Ignore };
+            tile.Icon.AddToClassList("hud-tile__icon");
+            tile.Root.Add(tile.Icon);
+            tile.Letter = new Label { pickingMode = PickingMode.Ignore };
+            tile.Letter.AddToClassList("hud-tile__letter");
+            tile.Root.Add(tile.Letter);
+            tile.Cost = new VisualElement { pickingMode = PickingMode.Ignore };
+            tile.Cost.AddToClassList("hud-tile__cost");
+            tile.Root.Add(tile.Cost);
+            tile.Mark = new Glyph("enchant") { Filled = true };
+            tile.Mark.AddToClassList("hud-tile__mark");
+            tile.Root.Add(tile.Mark);
+            var eye = new Glyph("eye-closed");
+            eye.AddToClassList("hud-tile__eye");
+            tile.Root.Add(eye);
+
+            tile.Root.RegisterCallback<ClickEvent>(HandleTileClicked);
+            tile.Root.RegisterCallback<PointerEnterEvent>(HandleTileEnter);
+            tile.Root.RegisterCallback<PointerLeaveEvent>(HandleTileLeave);
+            return tile;
+        }
+
+        private static void BuildDots(TileView tile, int cost)
+        {
+            tile.Cost.Clear();
+            for (int d = 0; d < cost; d++)
+            {
+                var dot = new VisualElement { pickingMode = PickingMode.Ignore };
+                dot.AddToClassList("hud-tile__dot");
+                tile.Cost.Add(dot);
+            }
+            tile.Dots = cost;
+        }
+
+        private void ApplyIcon(TileView tile, HudAction action)
+        {
+            Sprite sprite = null;
+            bool art = action.Icon != null && _iconsByKey.TryGetValue(action.Icon, out sprite);
+            tile.Icon.style.backgroundImage = art ? new StyleBackground(sprite) : new StyleBackground(StyleKeyword.None);
+            tile.Letter.style.display = art ? DisplayStyle.None : DisplayStyle.Flex;
+            string name = action.Name ?? action.Id;
+            tile.Letter.text = string.IsNullOrEmpty(name) ? "?" : name.Substring(0, 1).ToUpperInvariant();
+        }
+
+        private void ClearBar()
+        {
+            for (int i = 0; i < _tiles.Count; i++) _tiles[i].Root.RemoveFromHierarchy();
+            _tiles.Clear();
+            for (int i = 0; i < _extraLanes.Count; i++)
+            {
+                VisualElement row = _extraLanes[i];
+                string key = row.name.Substring("hud.lane.".Length);
+                _laneRows.Remove(key);
+                _laneTiles.Remove(key);
+                row.RemoveFromHierarchy();
+            }
+            _extraLanes.Clear();
+            if (_eggs != null) _eggs.Clear();
+            _eggViews.Clear();
+            _hoveredTile = -1;
+            if (_hover != null) _hover.Hide(_tileHover);
+        }
+
+        /// <summary>Held eggs in <c>you</c>; the ones the hovered or armed action would spend, from the right of the held ones (state.spends).</summary>
+        private void RefreshEggs()
         {
             int current = _source.ApCurrent;
-            int reserve = 0;
             IReadOnlyList<HudAction> actions = _source.Actions;
-            if (_hoveredSlot >= 0 && _hoveredSlot < actions.Count && actions[_hoveredSlot].Affordable) reserve = actions[_hoveredSlot].Cost;
-
-            for (int i = 0; i < _apDots.Count; i++)
+            int focus = _hoveredTile >= 0 ? _hoveredTile : _source.ActiveActionIndex;
+            int spends = focus >= 0 && focus < actions.Count && actions[focus].Affordable ? actions[focus].Cost : 0;
+            for (int i = 0; i < _eggViews.Count; i++)
             {
-                bool filled = i < current;
-                bool reserved = filled && i >= current - reserve;
-                _apDots[i].EnableInClassList("ap-dot--empty", !filled);
-                _apDots[i].EnableInClassList("ap-dot--reserved", reserved);
+                bool held = i < current;
+                bool spending = held && i >= current - spends;
+                _eggViews[i].EnableInClassList("hud-egg--held", held && !spending);
+                _eggViews[i].EnableInClassList("hud-egg--spends", spending);
             }
         }
 
-        /// <summary>The plate is ExamineView's, a layer over the HUD; nothing here moves for it.</summary>
-        private void RefreshExamine()
+        private void HandleTileClicked(ClickEvent evt)
         {
-            _examineView.Render(_source.Examine);
+            var tile = evt.currentTarget as VisualElement;
+            if (tile == null || !(tile.userData is int index)) return;
+            _source.SelectAction(index);
         }
 
-        private void HandleActionBarGeometry(GeometryChangedEvent evt) => CentreActionBar();
-
-        /// <summary>
-        /// Centres the bar in pixels from its measured width. MatchHud.uss centres it with <c>translate: -50%</c>,
-        /// which UI Toolkit resolved once, while the bar held only its action-point group, and never again as
-        /// the sections were added: in the browser it sat ~220px right of centre.
-        /// </summary>
-        private void CentreActionBar()
+        private void HandleTileEnter(PointerEnterEvent evt)
         {
-            if (_actionBar == null) return;
-            float width = _actionBar.resolvedStyle.width;
-            if (float.IsNaN(width) || width <= 0f) return;
-            _actionBar.style.translate = new Translate(-width * 0.5f, 0f);
-        }
+            var element = evt.currentTarget as VisualElement;
+            if (element == null || !(element.userData is int index)) return;
+            IReadOnlyList<HudAction> actions = _source.Actions;
+            if (index < 0 || index >= actions.Count) return;
 
-        private void RefreshPreview()
-        {
-            HudPreview preview = _source.Preview;
-            if (preview == null)
+            _hoveredTile = index;
+            RefreshEggs();
+            CancelPendingHover();
+            _pendingHover = element.schedule.Execute(() =>
             {
-                _preview.RemoveFromClassList("preview--visible");
-                return;
-            }
+                _pendingHover = null;
+                IReadOnlyList<HudAction> now = _source.Actions;
+                if (index >= now.Count || _hover == null) return;
+                _hover.Show(_tileHover, TileHover(now[index]), true, HoverPlacement.Above, element.worldBound, _root.worldBound);
+            }).StartingIn(HoverDelayMs);
+        }
 
-            bool blocked = !string.IsNullOrEmpty(preview.BlockedReason);
-            _previewTitle.text = preview.AbilityName ?? string.Empty;
-            _previewTotal.text = preview.IsExact ? preview.Total.ToString() : preview.Total + "?";
-            _preview.EnableInClassList("preview--blocked", blocked);
-            _previewBlocked.text = preview.BlockedReason ?? string.Empty;
-            _previewLines.Clear();
-            for (int i = 0; i < preview.Lines.Count; i++)
+        private void HandleTileLeave(PointerLeaveEvent evt)
+        {
+            _hoveredTile = -1;
+            CancelPendingHover();
+            if (_hover != null) _hover.Hide(_tileHover);
+            RefreshEggs();
+            RefreshPreview();
+        }
+
+        /// <summary>The plate's panel for the same ability (ADR-040), plus one line when the opponent has not seen it.</summary>
+        private static HoverContent TileHover(HudAction action)
+        {
+            HoverContent c = action.Hover != null
+                ? HoverContents.Tile(action.Hover)
+                : new HoverContent { Letter = string.IsNullOrEmpty(action.Name) ? "?" : action.Name.Substring(0, 1), Name = action.Name, Text = action.Description };
+            if (action.UnseenByThem) c.Note = HoverContents.UnseenByThemNote;
+            return c;
+        }
+
+        private void CancelPendingHover()
+        {
+            if (_pendingHover == null) return;
+            _pendingHover.Pause();
+            _pendingHover = null;
+        }
+
+        // ---- your boons (hud.md §3.3) ----------------------------------------------------------------
+
+        private void RefreshBoons()
+        {
+            IReadOnlyList<HudBoon> boons = _source.MyBoons;
+            _signature.Length = 0;
+            for (int i = 0; i < boons.Count; i++) _signature.Append(boons[i].Id).Append(boons[i].Starting ? "*" : "").Append('|');
+            string signature = _signature.ToString();
+            if (signature == _boonsSignature) return;
+            _boonsSignature = signature;
+
+            if (_hover != null) _hover.Hide(_boonHover);
+            _boons.Clear();
+            for (int i = 0; i < boons.Count; i++)
             {
-                HudPreviewLine line = preview.Lines[i];
-                var row = new VisualElement { pickingMode = PickingMode.Ignore };
-                row.AddToClassList("preview-line");
-                row.EnableInClassList("preview-line--unknown", line.Unknown);
-                row.EnableInClassList("preview-line--plus", !line.Unknown && i > 0 && line.Amount > 0);
-                row.EnableInClassList("preview-line--minus", !line.Unknown && line.Amount < 0);
+                HudBoon boon = boons[i];
+                var circle = new VisualElement { name = "hud.boon[" + i + "]", pickingMode = PickingMode.Position };
+                circle.AddToClassList("hud-boon");
+                var glyph = new Glyph(HoverContents.KindShape(boon.Kind)) { Filled = boon.Starting };
+                glyph.AddToClassList("hud-boon__glyph");
+                circle.Add(glyph);
 
-                var label = new Label { text = line.Label ?? string.Empty, pickingMode = PickingMode.Ignore };
-                label.AddToClassList("preview-line-label");
-                row.Add(label);
-
-                string amount = line.Unknown ? "?" : (i == 0 ? line.Amount.ToString() : (line.Amount > 0 ? "+" + line.Amount : line.Amount.ToString()));
-                var value = new Label { text = amount, pickingMode = PickingMode.Ignore };
-                value.AddToClassList("preview-line-amount");
-                row.Add(value);
-
-                _previewLines.Add(row);
+                HudBoon captured = boon;
+                circle.RegisterCallback<PointerEnterEvent>(evt =>
+                {
+                    CancelPendingHover();
+                    _pendingHover = circle.schedule.Execute(() =>
+                    {
+                        _pendingHover = null;
+                        if (_hover != null)
+                            _hover.Show(_boonHover, HoverContents.Boon(captured), true, HoverPlacement.Left, circle.worldBound, _root.worldBound);
+                    }).StartingIn(HoverDelayMs);
+                });
+                circle.RegisterCallback<PointerLeaveEvent>(evt =>
+                {
+                    CancelPendingHover();
+                    if (_hover != null) _hover.Hide(_boonHover);
+                });
+                _boons.Add(circle);
             }
-            _preview.AddToClassList("preview--visible");
-            UpdatePreviewPosition();
         }
 
-        private void RefreshBanner()
-        {
-            HudMoment moment = _source.Moment;
-            bool visible = moment != null;
-            string banner = !visible ? null
-                : moment.Kind == HudMomentKind.RoundStart ? "ROUND " + moment.Round
-                : moment.Kind == HudMomentKind.RoundResult ? "ROUND " + moment.Round + (moment.IWon ? " WON" : " LOST")
-                : moment.Kind == HudMomentKind.MatchLost ? "MATCH LOST"
-                : moment.IWon ? "VICTORY" : "DEFEAT";
-            _banner.text = banner ?? string.Empty;
-            _bannerPanel.EnableInClassList("banner-panel--visible", visible);
-            _banner.EnableInClassList("banner--lost", visible && !moment.IWon && moment.Kind != HudMomentKind.RoundStart);
+        // ---- End Turn and Resign (hud.md §3.4) ---------------------------------------------------------
 
-            string detail = visible ? moment.Reason ?? moment.MapName : null;
-            _bannerDetail.text = string.IsNullOrEmpty(detail) ? string.Empty : detail.ToUpperInvariant();
-            _bannerButton.EnableInClassList("banner-button--visible", visible && moment.ShowBack);
-            if (visible && moment.BackLabel != null) _bannerButton.text = moment.BackLabel;
-        }
-
-        /// <summary>The opponent's connection, when there is anything to say about it. Offline there never is.</summary>
-        private void RefreshStatusLine()
+        private void RefreshButtons()
         {
-            string status = _source.OpponentStatus;
-            bool visible = !string.IsNullOrEmpty(status);
-            _statusLine.text = status ?? string.Empty;
-            _statusLine.EnableInClassList("status-line--visible", visible);
-        }
+            bool mine = _source.IsMyTurn;
+            _end.SetEnabled(_source.CanEndTurn);
+            _endLabel.text = mine ? "END TURN" : "THEIR TURN";
+            _end.EnableInClassList("hud-end--theirs", !mine);
+            _end.EnableInClassList("hud-end--done", mine && _source.CanEndTurn && HudModel.IsDone(true, _source.Actions));
 
-        private void RefreshResign()
-        {
             bool can = _source.CanResign;
-            _resign.EnableInClassList("resign--visible", can);
+            _resign.EnableInClassList("hud-resign--visible", can);
             _resign.SetEnabled(can);
             if (!can) DisarmResign();
         }
 
-        /// <summary>"ROHAN'S TURN", trimmed to something that fits. A long name must not push the panel about.</summary>
-        private string OpponentTurnLabel()
+        /// <summary>
+        /// First click arms it and says so, in their colour; the second concedes. It disarms itself after a few
+        /// seconds, because a resign button that stays armed is one you press by accident.
+        /// </summary>
+        private void HandleResignClicked()
         {
-            string name = _source.OpponentName;
-            if (string.IsNullOrEmpty(name)) return "OPPONENT'S TURN";
-            if (name.Length > MaxOpponentNameLength) name = name.Substring(0, MaxOpponentNameLength - 1) + "…";
-            return name.ToUpperInvariant() + "'S TURN";
-        }
-
-        private void UpdateRope()
-        {
-            float remaining = _source.TurnSecondsRemaining;
-            float ropeSeconds = _source.RopeSeconds;
-            if (ropeSeconds < 0.001f) ropeSeconds = 0.001f;
-
-            bool visible = _source.TurnSecondsTotal > 0f && remaining > 0f && remaining <= ropeSeconds;
-            if (visible != _ropeVisible)
+            if (!_source.CanResign) return;
+            if (Time.time < _resignArmedUntil)
             {
-                _ropeVisible = visible;
-                _rope.EnableInClassList("rope--visible", visible);
+                DisarmResign();
+                _source.Resign();
+                return;
             }
-            if (!visible) return;
-
-            float fraction = Mathf.Clamp01(remaining / ropeSeconds);
-            _ropeFill.style.width = Length.Percent(fraction * 100f);
-            _ropeEmber.style.left = Length.Percent(fraction * 100f);
-
-            // The ember flickers faster as the rope gets short.
-            float pulse = 0.85f + 0.3f * Mathf.PingPong(Time.unscaledTime * (2f + (1f - fraction) * 4f), 1f);
-            _ropeEmber.style.scale = new Scale(new Vector2(pulse, pulse));
+            _resignArmedUntil = Time.time + ResignConfirmSeconds;
+            _resign.text = "CLICK AGAIN TO RESIGN";
+            _resign.AddToClassList("hud-resign--armed");
         }
 
-        // ---- world-anchored layer -------------------------------------------------------------------
+        private void DisarmResign()
+        {
+            if (_resignArmedUntil <= 0f) return;
+            _resignArmedUntil = 0f;
+            _resign.text = "RESIGN";
+            _resign.RemoveFromClassList("hud-resign--armed");
+        }
 
-        /// <summary>Creates or updates one tag per unit; numbers and markers change rarely, positions every frame.</summary>
-        private void SyncUnitTags()
+        private void HandleEndClicked() => _source.EndTurn();
+
+        private void HandleExamineClose() => _source.CloseExamine();
+
+        // ---- tags (hud.md §3.5) ----------------------------------------------------------------------
+
+        private void SyncTags()
         {
             IReadOnlyList<HudUnit> units = _source.Units;
             for (int i = 0; i < units.Count; i++)
             {
                 HudUnit unit = units[i];
-                UnitTag tag;
-                if (!_unitTags.TryGetValue(unit.Id, out tag))
+                TagView tag;
+                if (!_tags.TryGetValue(unit.Id, out tag))
                 {
-                    tag = CreateUnitTag(unit);
-                    _unitTags[unit.Id] = tag;
+                    tag = CreateTag(unit);
+                    _tags[unit.Id] = tag;
                 }
 
-                if (tag.MaxHp != unit.MaxHp) BuildSegments(tag, unit.MaxHp);
+                int max = Mathf.Max(1, unit.MaxHp);
+                int hp = Mathf.Clamp(unit.Hp, 0, max);
+                int ghost = Mathf.Clamp(unit.GhostDamage, 0, hp);
+                tag.Hp.text = unit.Hp.ToString();
+                tag.Max.text = "/ " + unit.MaxHp;
+                tag.Fill.style.width = Length.Percent(100f * (hp - ghost) / max);
+                tag.Ghost.style.width = Length.Percent(100f * ghost / max);
+                tag.Root.EnableInClassList("hud-tag--emphasised", unit.Emphasised || ghost > 0);
+                tag.Root.EnableInClassList("hud-tag--dead", !unit.IsAlive);
+                tag.Root.EnableInClassList("hud-tag--examined", unit.Examined);
 
-                int shown = unit.Hp;
-                int ghost = Mathf.Clamp(unit.GhostDamage, 0, unit.Hp);
-                for (int s = 0; s < tag.Segments.Count; s++)
-                {
-                    int lo = s * HpPerSegment;
-                    bool filled = shown > lo;
-                    bool ghosted = filled && shown - ghost <= lo;
-                    tag.Segments[s].EnableInClassList("unit-seg--empty", !filled);
-                    tag.Segments[s].EnableInClassList("unit-seg--ghost", ghosted);
-                }
-
-                tag.Number.text = ghost > 0 ? (unit.Hp - ghost) + " ← " + unit.Hp : unit.Hp + " / " + unit.MaxHp;
-                tag.Number.EnableInClassList("unit-number--ghost", ghost > 0);
-                tag.Root.EnableInClassList("unit-tag--emphasised", unit.Emphasised || ghost > 0);
-                tag.Root.EnableInClassList("unit-tag--dead", !unit.IsAlive);
-                tag.Root.EnableInClassList("unit-tag--examined", unit.Examined);
-
-                // The god, once something has revealed it (design #lineage rule 3).
-                bool hasLineage = !string.IsNullOrEmpty(unit.LineageTag);
-                if (hasLineage) tag.Lineage.text = unit.LineageTag;
-                tag.Lineage.style.display = hasLineage ? DisplayStyle.Flex : DisplayStyle.None;
-
-                SyncMarkers(tag, unit);
+                bool hasLineage = !string.IsNullOrEmpty(unit.LineageTag) && !unit.IsMine && !unit.IsProp;
+                tag.Lineage.text = hasLineage ? unit.LineageTag.ToUpperInvariant() : string.Empty;
+                SetDisplay(tag.Lineage, hasLineage);
+                SyncMarks(tag, unit);
             }
 
-            // A destroyed prop leaves the list entirely (a dead hero only goes grey), so drop its tag with it.
-            if (_unitTags.Count == units.Count) return;
+            // A destroyed prop leaves the list entirely (a dead hero only hides), so drop its tag with it.
+            if (_tags.Count == units.Count) return;
             _staleTags.Clear();
-            foreach (KeyValuePair<int, UnitTag> pair in _unitTags)
+            foreach (KeyValuePair<int, TagView> pair in _tags)
             {
                 bool present = false;
-                for (int i = 0; i < units.Count; i++)
-                {
-                    if (units[i].Id != pair.Key) continue;
-                    present = true;
-                    break;
-                }
+                for (int i = 0; i < units.Count && !present; i++) present = units[i].Id == pair.Key;
                 if (!present) _staleTags.Add(pair.Key);
             }
             for (int i = 0; i < _staleTags.Count; i++)
             {
-                UnitTag tag;
-                if (!_unitTags.TryGetValue(_staleTags[i], out tag)) continue;
-                tag.Root.RemoveFromHierarchy();
-                _unitTags.Remove(_staleTags[i]);
+                _tags[_staleTags[i]].Root.RemoveFromHierarchy();
+                _tags.Remove(_staleTags[i]);
             }
             _staleTags.Clear();
         }
 
-        private UnitTag CreateUnitTag(HudUnit unit)
+        private TagView CreateTag(HudUnit unit)
         {
-            var tag = new UnitTag();
-            tag.Root = new VisualElement { name = "unit-" + unit.Id, pickingMode = PickingMode.Ignore, usageHints = UsageHints.DynamicTransform };
-            tag.Root.AddToClassList("unit-tag");
-            tag.Root.EnableInClassList("unit-tag--theirs", !unit.IsMine && !unit.IsProp);
-            tag.Root.EnableInClassList("unit-tag--prop", unit.IsProp);
+            string id = "hud.tag[" + unit.Id + "]";
+            var tag = new TagView { Root = new VisualElement { name = id, pickingMode = PickingMode.Ignore, usageHints = UsageHints.DynamicTransform } };
+            tag.Root.AddToClassList("hud-tag");
+            tag.Root.EnableInClassList("hud-tag--theirs", !unit.IsMine && !unit.IsProp);
+            tag.Root.EnableInClassList("hud-tag--prop", unit.IsProp);
 
-            tag.Bar = new VisualElement { pickingMode = PickingMode.Ignore };
-            tag.Bar.AddToClassList("unit-bar");
-            tag.Root.Add(tag.Bar);
+            var number = new VisualElement { name = id + ".number", pickingMode = PickingMode.Ignore };
+            number.AddToClassList("hud-tag__number");
+            tag.Hp = new Label { pickingMode = PickingMode.Ignore };
+            tag.Hp.AddToClassList("hud-tag__hp");
+            number.Add(tag.Hp);
+            tag.Max = new Label { pickingMode = PickingMode.Ignore };
+            tag.Max.AddToClassList("hud-tag__max");
+            number.Add(tag.Max);
+            tag.Root.Add(number);
 
-            tag.Ring = new VisualElement { name = "ex.ring", pickingMode = PickingMode.Ignore };
-            tag.Ring.AddToClassList("ex-ring");
-            tag.Root.Add(tag.Ring);
+            var bar = new VisualElement { name = id + ".bar", pickingMode = PickingMode.Ignore };
+            bar.AddToClassList("hud-tag__bar");
+            tag.Fill = new VisualElement { pickingMode = PickingMode.Ignore };
+            tag.Fill.AddToClassList("hud-tag__fill");
+            bar.Add(tag.Fill);
+            tag.Ghost = new VisualElement { pickingMode = PickingMode.Ignore };
+            tag.Ghost.AddToClassList("hud-tag__ghost");
+            bar.Add(tag.Ghost);
+            tag.Root.Add(bar);
 
-            tag.Number = new Label { pickingMode = PickingMode.Ignore };
-            tag.Number.AddToClassList("unit-number");
-            tag.Root.Add(tag.Number);
+            tag.Marks = new VisualElement { name = id + ".marks", pickingMode = PickingMode.Ignore };
+            tag.Marks.AddToClassList("hud-tag__marks");
+            tag.Root.Add(tag.Marks);
 
-            tag.Lineage = new Label { name = "tag-lineage", pickingMode = PickingMode.Ignore };
-            tag.Lineage.AddToClassList("tag-lineage");
-            tag.Lineage.style.display = DisplayStyle.None;
+            tag.Lineage = new Label { name = id + ".lineage", pickingMode = PickingMode.Ignore };
+            tag.Lineage.AddToClassList("hud-tag__lineage");
             tag.Root.Add(tag.Lineage);
 
-            tag.Markers = new VisualElement { pickingMode = PickingMode.Ignore };
-            tag.Markers.AddToClassList("unit-markers");
-            tag.Root.Add(tag.Markers);
+            // ex.ring (docs/ui/examine.md §3.5): the owner's ring while this unit is examined.
+            var ring = new VisualElement { name = "ex.ring", pickingMode = PickingMode.Ignore };
+            ring.AddToClassList("ex-ring");
+            tag.Root.Add(ring);
 
             _unitLayer.Add(tag.Root);
             return tag;
         }
 
-        private static void BuildSegments(UnitTag tag, int maxHp)
-        {
-            tag.Bar.Clear();
-            tag.Segments.Clear();
-            int count = Mathf.Max(1, (maxHp + HpPerSegment - 1) / HpPerSegment);
-            for (int i = 0; i < count; i++)
-            {
-                var seg = new VisualElement { pickingMode = PickingMode.Ignore };
-                seg.AddToClassList("unit-seg");
-                tag.Bar.Add(seg);
-                tag.Segments.Add(seg);
-            }
-            tag.MaxHp = maxHp;
-        }
-
-        private void SyncMarkers(UnitTag tag, HudUnit unit)
+        /// <summary>Theirs only: a filled kind glyph per revealed boon, a dashed "?" per unrevealed one, in grant order.</summary>
+        private void SyncMarks(TagView tag, HudUnit unit)
         {
             _signature.Length = 0;
-            for (int i = 0; i < unit.Markers.Count; i++) _signature.Append(unit.Markers[i].Id).Append('|');
+            for (int i = 0; i < unit.BoonMarks.Count; i++) _signature.Append(unit.BoonMarks[i].Kind ?? "?").Append('|');
             string signature = _signature.ToString();
-            if (signature == tag.MarkerSignature) return;
-            tag.MarkerSignature = signature;
+            if (signature == tag.MarkSignature) return;
+            tag.MarkSignature = signature;
 
-            tag.Markers.Clear();
-            for (int i = 0; i < unit.Markers.Count; i++)
+            tag.Marks.Clear();
+            for (int i = 0; i < unit.BoonMarks.Count; i++)
             {
-                HudMarker marker = unit.Markers[i];
-                var dot = new VisualElement { pickingMode = PickingMode.Ignore, tooltip = marker.Name };
-                dot.AddToClassList("unit-marker");
-                var glyph = new Label { pickingMode = PickingMode.Ignore };
-                glyph.AddToClassList("unit-marker-glyph");
-                dot.Add(glyph);
-                ApplyIcon(dot, glyph, marker.Icon, marker.Name);
-                tag.Markers.Add(dot);
+                string kind = unit.BoonMarks[i].Kind;
+                var mark = new Glyph(kind != null ? HoverContents.KindShape(kind) : GlyphPaths.Unknown) { Filled = kind != null };
+                mark.AddToClassList("hud-tag__mark");
+                if (kind == null) mark.AddToClassList("hud-tag__mark--unknown");
+                tag.Marks.Add(mark);
             }
+            SetDisplay(tag.Marks, unit.BoonMarks.Count > 0);
         }
 
-        private void UpdateUnitTags()
+        private void UpdateTagPositions()
         {
             Camera camera = _source.WorldCamera;
             if (camera == null || _root.panel == null) return;
@@ -780,66 +886,118 @@ namespace Mimas.Client.UI
             for (int i = 0; i < units.Count; i++)
             {
                 HudUnit unit = units[i];
-                UnitTag tag;
-                if (!_unitTags.TryGetValue(unit.Id, out tag) || unit.Anchor == null) continue;
-                Vector3 world = unit.Anchor.position + unit.AnchorOffset;
-                Vector2 panel = RuntimePanelUtils.CameraTransformWorldToPanel(_root.panel, world, camera);
+                TagView tag;
+                if (!_tags.TryGetValue(unit.Id, out tag) || unit.Anchor == null) continue;
+                Vector2 panel = RuntimePanelUtils.CameraTransformWorldToPanel(_root.panel, unit.Anchor.position + unit.AnchorOffset, camera);
                 tag.Root.style.left = panel.x;
                 tag.Root.style.top = panel.y;
             }
         }
 
+        // ---- the attack preview (hud.md §5) ----------------------------------------------------------
+
+        /// <summary>The one hover panel over the target's tag: the head, the total, the rules' lines, one "?" row; a refused shot leads with why.</summary>
+        private void RefreshPreview()
+        {
+            HudPreview preview = _source.Preview;
+            if (preview == null)
+            {
+                _shownPreview = null;
+                if (_hover != null) _hover.Hide(_previewHover);
+                return;
+            }
+            TagView tag;
+            if (_hover == null || !_tags.TryGetValue(preview.TargetUnitId, out tag)) return;
+            // A tile's own panel wins while the pointer is on the bar.
+            if (_hover.Owner == _tileHover) return;
+            if (preview == _shownPreview && _hover.Owner == _previewHover) return;
+
+            bool blocked = !string.IsNullOrEmpty(preview.BlockedReason);
+            string name = preview.AbilityName ?? string.Empty;
+            var c = new HoverContent
+            {
+                Letter = name.Length > 0 ? name.Substring(0, 1) : "?",
+                Name = name,
+                Type = "on " + (preview.TargetName ?? "them") + " · " + (preview.TrajectoryWord ?? "straight"),
+                Reason = blocked ? preview.BlockedReason : null,
+                Total = preview.Total.ToString(),
+                TotalInexact = !preview.IsExact,
+                TotalMuted = blocked,
+            };
+            for (int i = 0; i < preview.Lines.Count; i++)
+            {
+                HudPreviewLine line = preview.Lines[i];
+                c.Rows.Add(new HoverRow
+                {
+                    Label = line.Label,
+                    Amount = line.Unknown ? "?" : i == 0 ? line.Amount.ToString() : HoverContents.Signed(line.Amount),
+                    Unknown = line.Unknown,
+                });
+            }
+            _hover.Show(_previewHover, c, true, HoverPlacement.Over, tag.Root.worldBound, _root.worldBound);
+            _shownPreview = preview;
+        }
+
         private void UpdatePreviewPosition()
         {
             HudPreview preview = _source.Preview;
-            if (preview == null) return;
-            UnitTag tag;
-            if (!_unitTags.TryGetValue(preview.TargetUnitId, out tag)) return;
-            // Sit above the target's tag: same anchor, lifted by the tag's own height plus a gap.
-            _preview.style.left = tag.Root.style.left;
-            float top = tag.Root.style.top.value.value - tag.Root.resolvedStyle.height - 10f;
-            _preview.style.top = top;
+            if (_hover == null) return;
+            if (preview == null)
+            {
+                if (_hover.Owner == _previewHover) _hover.Hide(_previewHover);
+                return;
+            }
+            // The tile's panel went away while the target is still under the pointer: the preview comes back.
+            if (_hover.Owner == null) RefreshPreview();
+            TagView tag;
+            if (_hover.Owner == _previewHover && _tags.TryGetValue(preview.TargetUnitId, out tag))
+                _hover.Move(_previewHover, tag.Root.worldBound, _root.worldBound);
         }
 
-        /// <summary>
-        /// Pins the refusal label just past the pointer. Screen pixels are bottom-left origin and the panel is
-        /// top-left, so the y flips through the same helper the flyovers use.
-        /// </summary>
-        private void UpdateCursorTag()
+        // ---- flyovers and the cursor tag (hud.md §3.6) --------------------------------------------------
+
+        private void UpdateCursor()
         {
             string text = _source.CursorTag;
             bool visible = !string.IsNullOrEmpty(text);
-            _cursorTag.EnableInClassList("cursor-tag--visible", visible);
-            if (!visible) return;
-
-            IPanel panel = _root.panel;
-            if (panel == null) return;
-
-            _cursorTag.text = text;
-            Vector2 position = RuntimePanelUtils.ScreenToPanel(panel, _source.CursorScreenPosition);
-            _cursorTag.style.left = position.x + 16f;
-            _cursorTag.style.top = position.y + 16f;
+            _cursor.EnableInClassList("hud-cursor--visible", visible);
+            if (!visible || _root.panel == null) return;
+            string upper = text.ToUpperInvariant();
+            if (_cursor.text != upper) _cursor.text = upper;
+            // Screen pixels are bottom-left origin and the panel is top-left, so the y flips through the helper.
+            Vector2 position = RuntimePanelUtils.ScreenToPanel(_root.panel, _source.CursorScreenPosition);
+            _cursor.style.left = position.x + 16f;
+            _cursor.style.top = position.y + 16f;
         }
 
         private void SpawnFlyover(HudFlyover flyover)
         {
             if (!_bound || flyover == null) return;
-            var root = new VisualElement { pickingMode = PickingMode.Ignore, usageHints = UsageHints.DynamicTransform };
-            root.AddToClassList("fly");
-            var headline = new Label { text = flyover.Headline ?? string.Empty, pickingMode = PickingMode.Ignore };
-            headline.AddToClassList("fly-headline");
-            root.Add(headline);
-            if (!string.IsNullOrEmpty(flyover.Detail))
+            var root = new VisualElement { name = "hud.fly", pickingMode = PickingMode.Ignore, usageHints = UsageHints.DynamicTransform };
+            root.AddToClassList("hud-fly");
+            if (string.IsNullOrEmpty(flyover.Glyph))
             {
-                var detail = new Label { text = flyover.Detail, pickingMode = PickingMode.Ignore };
-                detail.AddToClassList("fly-detail");
-                root.Add(detail);
+                // Damage: the number, in amber, and when a hidden line changed it, the line that did.
+                root.Add(Text(flyover.Headline, "hud-fly__amount"));
+                if (!string.IsNullOrEmpty(flyover.Detail)) root.Add(Text(flyover.Detail.ToUpperInvariant(), "hud-fly__detail"));
+            }
+            else
+            {
+                // A reveal: their kind glyph or emblem, the name, the lineage and kind.
+                var head = new VisualElement { pickingMode = PickingMode.Ignore };
+                head.AddToClassList("hud-fly__head");
+                var glyph = new Glyph(GlyphPaths.Has(flyover.Glyph) ? flyover.Glyph : HoverContents.KindShape(flyover.Glyph)) { Filled = true };
+                glyph.AddToClassList("hud-fly__glyph");
+                head.Add(glyph);
+                head.Add(Text((flyover.Headline ?? string.Empty).ToUpperInvariant(), "hud-fly__headline"));
+                root.Add(head);
+                if (!string.IsNullOrEmpty(flyover.Detail)) root.Add(Text(flyover.Detail.ToUpperInvariant(), "hud-fly__detail"));
             }
             _flyLayer.Add(root);
             _flyovers.Add(new FlyoverInstance { Root = root, WorldPosition = flyover.WorldPosition, StartTime = Time.time });
         }
 
-        /// <summary>Scale-pop on spawn, drift upwards, fade out; pooled nowhere because a match has a handful of hits.</summary>
+        /// <summary>Scale-pop on spawn, drift upwards, fade out; a match has a handful of them, so nothing is pooled.</summary>
         private void UpdateFlyovers()
         {
             if (_flyovers.Count == 0) return;
@@ -868,207 +1026,242 @@ namespace Mimas.Client.UI
             }
         }
 
-        // ---- action bar sections --------------------------------------------------------------------
+        // ---- the draft (between-rounds.md §2) --------------------------------------------------------
 
-        private void BuildSections(IReadOnlyList<HudAction> actions)
+        /// <summary>The cards are built once per offer set and then only restyled, so a hover never rebuilds them under the pointer.</summary>
+        private void RefreshDraft()
         {
-            ClearSlots();
-            _actionBar.Clear();
-            _apDots.Clear();
-
-            // Action points first.
-            var apGroup = new VisualElement { name = "group-ap", pickingMode = PickingMode.Ignore };
-            apGroup.AddToClassList("action-group");
-            var apCaption = new Label { text = "ACTION POINTS", pickingMode = PickingMode.Ignore };
-            apCaption.AddToClassList("action-group-caption");
-            apGroup.Add(apCaption);
-            var apRow = new VisualElement { pickingMode = PickingMode.Ignore };
-            apRow.AddToClassList("ap-row");
-            for (int i = 0; i < _source.ApPerTurn; i++)
+            HudDraft draft = _source.Draft;
+            bool open = draft != null;
+            if (open != _drRoot.ClassListContains("dr-root--open"))
             {
-                var dot = new VisualElement { pickingMode = PickingMode.Ignore };
-                dot.AddToClassList("ap-dot");
-                apRow.Add(dot);
-                _apDots.Add(dot);
+                _drRoot.EnableInClassList("dr-root--open", open);
+                if (open) _drRoot.schedule.Execute(() => _drRoot.AddToClassList("dr-root--shown")).StartingIn(16);
+                else _drRoot.RemoveFromClassList("dr-root--shown");
             }
-            apGroup.Add(apRow);
-            _actionBar.Add(apGroup);
-
-            _groupOrder.Clear();
-            for (int g = 0; g < Groups.Length; g++) _groupOrder.Add(Groups[g][0]);
-            for (int i = 0; i < actions.Count; i++)
+            if (!open)
             {
-                string category = actions[i].Category ?? string.Empty;
-                if (!_groupOrder.Contains(category)) _groupOrder.Add(category);
-            }
-
-            // Slots are created in action order so _slots[i] always matches actions[i].
-            var slotsByIndex = new VisualElement[actions.Count];
-            for (int g = 0; g < _groupOrder.Count; g++)
-            {
-                string category = _groupOrder[g];
-                bool any = false;
-                for (int i = 0; i < actions.Count; i++) if ((actions[i].Category ?? string.Empty) == category) { any = true; break; }
-                if (!any) continue;
-
-                var divider = new VisualElement { pickingMode = PickingMode.Ignore };
-                divider.AddToClassList("action-group-divider");
-                _actionBar.Add(divider);
-
-                var group = new VisualElement { name = "group-" + category, pickingMode = PickingMode.Ignore };
-                group.AddToClassList("action-group");
-
-                var caption = new Label { text = CaptionFor(category), pickingMode = PickingMode.Ignore };
-                caption.AddToClassList("action-group-caption");
-                group.Add(caption);
-
-                var row = new VisualElement { pickingMode = PickingMode.Ignore };
-                row.AddToClassList("action-group-row");
-                group.Add(row);
-
-                for (int i = 0; i < actions.Count; i++)
-                {
-                    if ((actions[i].Category ?? string.Empty) != category) continue;
-                    VisualElement slot = CreateSlot(i);
-                    row.Add(slot);
-                    slotsByIndex[i] = slot;
-                }
-
-                _actionBar.Add(group);
-            }
-
-            for (int i = 0; i < slotsByIndex.Length; i++) _slots.Add(slotsByIndex[i]);
-        }
-
-        private static string CaptionFor(string category)
-        {
-            for (int g = 0; g < Groups.Length; g++) if (Groups[g][0] == category) return Groups[g][1];
-            return string.IsNullOrEmpty(category) ? "OTHER" : category.ToUpperInvariant();
-        }
-
-        private VisualElement CreateSlot(int index)
-        {
-            var slot = new VisualElement { name = "slot-" + index, pickingMode = PickingMode.Position, userData = index };
-            slot.AddToClassList("action-slot");
-
-            var icon = new VisualElement { name = "icon", pickingMode = PickingMode.Ignore };
-            icon.AddToClassList("action-icon");
-            slot.Add(icon);
-
-            var glyph = new Label { name = "glyph", pickingMode = PickingMode.Ignore };
-            glyph.AddToClassList("action-glyph");
-            slot.Add(glyph);
-
-            var cost = new Label { name = "cost", pickingMode = PickingMode.Ignore };
-            cost.AddToClassList("action-cost");
-            slot.Add(cost);
-
-            slot.RegisterCallback<ClickEvent>(HandleSlotClicked);
-            slot.RegisterCallback<PointerEnterEvent>(HandleSlotEnter);
-            slot.RegisterCallback<PointerLeaveEvent>(HandleSlotLeave);
-            return slot;
-        }
-
-        private void ClearSlots()
-        {
-            for (int i = 0; i < _slots.Count; i++) if (_slots[i] != null) _slots[i].RemoveFromHierarchy();
-            _slots.Clear();
-            _hoveredSlot = -1;
-            HideTooltip();
-        }
-
-        private void ApplyIcon(VisualElement icon, Label glyph, string iconKey, string fallbackName)
-        {
-            Sprite sprite;
-            if (iconKey != null && _iconsByKey.TryGetValue(iconKey, out sprite))
-            {
-                icon.style.backgroundImage = new StyleBackground(sprite);
-                glyph.style.display = DisplayStyle.None;
-            }
-            else
-            {
-                icon.style.backgroundImage = StyleKeyword.None;
-                glyph.style.display = DisplayStyle.Flex;
-                glyph.text = string.IsNullOrEmpty(fallbackName) ? "?" : fallbackName.Substring(0, 1).ToUpperInvariant();
-            }
-        }
-
-        // ---- events ---------------------------------------------------------------------------------
-
-        private void HandleSlotClicked(ClickEvent evt)
-        {
-            var slot = evt.currentTarget as VisualElement;
-            if (slot == null || !(slot.userData is int index)) return;
-            _source.SelectAction(index);
-        }
-
-        private void HandleSlotEnter(PointerEnterEvent evt)
-        {
-            var slot = evt.currentTarget as VisualElement;
-            if (slot == null || !(slot.userData is int index)) return;
-
-            IReadOnlyList<HudAction> actions = _source.Actions;
-            if (index < 0 || index >= actions.Count) return;
-
-            HudAction action = actions[index];
-            _hoveredSlot = index;
-            _tooltipTitle.text = (action.Name ?? action.Id) + "   ·   " + action.Cost + " AP";
-            _tooltipDetail.text = action.Detail ?? string.Empty;
-            _tooltipDetail.style.display = string.IsNullOrEmpty(action.Detail) ? DisplayStyle.None : DisplayStyle.Flex;
-            _tooltipBody.text = action.Description ?? string.Empty;
-            _tooltipBody.style.display = string.IsNullOrEmpty(action.Description) ? DisplayStyle.None : DisplayStyle.Flex;
-            _tooltip.AddToClassList("tooltip--visible");
-            RefreshApDots();
-        }
-
-        private void HandleSlotLeave(PointerLeaveEvent evt)
-        {
-            _hoveredSlot = -1;
-            HideTooltip();
-            RefreshApDots();
-        }
-
-        private void HideTooltip()
-        {
-            if (_tooltip != null) _tooltip.RemoveFromClassList("tooltip--visible");
-        }
-
-        /// <summary>
-        /// First click arms it and says so; the second concedes. It disarms itself after a few seconds,
-        /// because a resign button that stays armed is a resign button you press by accident.
-        /// </summary>
-        private void HandleResignClicked()
-        {
-            if (!_source.CanResign) return;
-
-            if (Time.time < _resignArmedUntil)
-            {
-                DisarmResign();
-                _source.Resign();
+                if (_draftSignature != null) ClearCards();
                 return;
             }
 
-            _resignArmedUntil = Time.time + ResignConfirmSeconds;
-            _resign.text = "CONFIRM RESIGN";
-            _resign.AddToClassList("resign--confirm");
+            _drHeadline.text = (draft.Headline ?? string.Empty).ToUpperInvariant();
+            _drNext.text = (draft.NextRoundLine ?? string.Empty).ToUpperInvariant();
+
+            _signature.Length = 0;
+            for (int i = 0; i < draft.Cards.Count; i++) _signature.Append(draft.Cards[i].Id).Append('|');
+            string signature = _signature.ToString();
+            if (signature != _draftSignature)
+            {
+                BuildCards(draft);
+                _draftSignature = signature;
+            }
+
+            for (int i = 0; i < _cards.Count; i++)
+            {
+                bool selected = i == draft.Selected;
+                _cards[i].EnableInClassList("dr-card--selected", selected);
+                _cards[i].EnableInClassList("dr-card--dim", draft.Picked && !selected);
+                // None clickable after the pick — without disabling them, whose theme style would fade the kept card too.
+                _cards[i].pickingMode = draft.Picked ? PickingMode.Ignore : PickingMode.Position;
+                _cards[i].focusable = !draft.Picked;
+                _cardKinds[i].Filled = selected;
+            }
+
+            _drConfirm.text = draft.Picked ? "KEPT" : "CONFIRM";
+            _drConfirm.SetEnabled(!draft.Picked && draft.Selected >= 0);
+            bool status = draft.Picked && !string.IsNullOrEmpty(draft.Status);
+            _drStatus.text = status ? draft.Status : string.Empty;
+            _drStatus.EnableInClassList("dr-status--visible", status);
         }
 
-        private void DisarmResign()
+        private void BuildCards(HudDraft draft)
         {
-            if (_resignArmedUntil <= 0f) return;
-            _resignArmedUntil = 0f;
-            _resign.text = "RESIGN";
-            _resign.RemoveFromClassList("resign--confirm");
+            ClearCards();
+            for (int i = 0; i < draft.Cards.Count; i++)
+            {
+                HudDraftCard card = draft.Cards[i];
+                int index = i;
+                string id = "dr.card[" + i + "]";
+
+                var root = new Button { name = id, text = string.Empty };
+                root.AddToClassList("dr-card");
+                root.clicked += () => _source.SelectDraftCard(index);
+
+                var shadow = new VisualElement { pickingMode = PickingMode.Ignore };
+                shadow.AddToClassList("dr-card__shadow");
+                root.Add(shadow);
+
+                var face = new VisualElement { pickingMode = PickingMode.Ignore };
+                face.AddToClassList("dr-card__face");
+                root.Add(face);
+
+                // The top 130: the lineage's painting, fading into the card's ink-2.
+                var wash = new VisualElement { name = id + ".wash", pickingMode = PickingMode.Ignore };
+                wash.AddToClassList("dr-card__wash");
+                wash.style.backgroundImage = new StyleBackground(CardPainting(card));
+                var kind = new VisualElement { name = id + ".kind", pickingMode = PickingMode.Ignore };
+                kind.AddToClassList("dr-card__kind");
+                var kindGlyph = new Glyph(HoverContents.KindShape(card.Kind));
+                kindGlyph.AddToClassList("dr-card__kind-glyph");
+                kind.Add(kindGlyph);
+                kind.Add(Text((card.Kind ?? string.Empty).ToUpperInvariant(), "dr-card__kind-text"));
+                wash.Add(kind);
+                face.Add(wash);
+
+                var body = new VisualElement { pickingMode = PickingMode.Ignore };
+                body.AddToClassList("dr-card__body");
+                body.Add(Named(Text((card.Name ?? string.Empty).ToUpperInvariant(), "dr-card__name"), id + ".name"));
+                string god = card.God + (string.IsNullOrEmpty(card.Lineage) ? string.Empty : " · " + card.Lineage);
+                body.Add(Named(Text((god ?? string.Empty).ToUpperInvariant(), "dr-card__god"), id + ".god"));
+                body.Add(Named(Text(card.Effect, "dr-card__text"), id + ".text"));
+                face.Add(body);
+
+                // At the foot: where it lands, with the slot's glyph (the Blessing circle when it lands on you).
+                var on = new VisualElement { name = id + ".on", pickingMode = PickingMode.Ignore };
+                on.AddToClassList("dr-card__on");
+                var slot = new Glyph(card.Slot != null ? HoverContents.SlotShape(card.Slot) : "blessing");
+                slot.AddToClassList("dr-card__on-glyph");
+                on.Add(slot);
+                on.Add(Text((card.Attach ?? string.Empty).ToUpperInvariant(), "dr-card__on-text"));
+                face.Add(on);
+
+                _drCards.Add(root);
+                _cards.Add(root);
+                _cardKinds.Add(kindGlyph);
+            }
         }
 
-        private void HandleBackToLobbyClicked()
+        private static Texture2D CardPainting(HudDraftCard card)
         {
-            _source.BackToLobby();
+            Color dark, light;
+            bool known = ColorUtility.TryParseHtmlString(card.HueDark ?? string.Empty, out dark)
+                & ColorUtility.TryParseHtmlString(card.HueLight ?? string.Empty, out light);
+            if (!known)
+            {
+                dark = Color.Lerp(InkTwo, Bone, 0.05f);
+                light = Color.Lerp(InkTwo, Bone, 0.10f);
+            }
+            return Ramps.Painting(dark, light, InkTwo);
         }
 
-        private void HandleEndTurnClicked() => _source.EndTurn();
+        private void ClearCards()
+        {
+            for (int i = 0; i < _cards.Count; i++) _cards[i].RemoveFromHierarchy();
+            _cards.Clear();
+            _cardKinds.Clear();
+            _draftSignature = null;
+        }
 
-        private void HandleExamineClose() => _source.CloseExamine();
+        /// <summary>The draft's one deadline, as the rope: the line burns from the right with the ember at its end.</summary>
+        private void UpdateDraftTimer()
+        {
+            HudDraft draft = _source != null ? _source.Draft : null;
+            if (draft == null || _drTimerFill == null) return;
+            float total = draft.SecondsTotal > 0f ? draft.SecondsTotal : 1f;
+            float fraction = Mathf.Clamp01(draft.SecondsRemaining / total);
+            _drTimerFill.style.width = Length.Percent(fraction * 100f);
+            _drTimerEmber.style.left = Length.Percent(fraction * 100f);
+        }
+
+        private void HandleConfirmClicked() => _source.ConfirmDraft();
+
+        // ---- the round moments (between-rounds.md §3) ----------------------------------------------
+
+        /// <summary>One band, four kinds, coloured by who won or moves first — never by the words.</summary>
+        private void RefreshMoment()
+        {
+            HudMoment m = _source.Moment;
+            _moRoot.EnableInClassList("mo-root--visible", m != null);
+            if (m == null) return;
+
+            const string you = "mo--you", them = "mo--them";
+            switch (m.Kind)
+            {
+                case HudMomentKind.RoundStart:
+                    Show(_moKicker, "ROUND " + m.Round, null);
+                    _moKicker.RemoveFromClassList("mo-kicker--result");
+                    Show(_moTitle, (m.MapName ?? string.Empty).ToUpperInvariant(), null);
+                    SetDisplay(_moScore, false);
+                    Show(_moSub, m.IMoveFirst ? "YOU MOVE FIRST" : "THEY MOVE FIRST", m.IMoveFirst ? you : them);
+                    _moSub.RemoveFromClassList("mo-sub--body");
+                    break;
+
+                case HudMomentKind.RoundResult:
+                    Show(_moKicker, "ROUND " + m.Round + " TO " + (m.WinnerName ?? string.Empty).ToUpperInvariant(), m.IWon ? you : them);
+                    _moKicker.AddToClassList("mo-kicker--result");
+                    SetDisplay(_moTitle, false);
+                    SetDisplay(_moScore, true);
+                    _moMine.text = m.ScoreMine.ToString();
+                    _moTheirs.text = m.ScoreTheirs.ToString();
+                    Show(_moSub, m.Reason, null);
+                    _moSub.AddToClassList("mo-sub--body");
+                    break;
+
+                case HudMomentKind.SeriesResult:
+                    SetDisplay(_moKicker, false);
+                    Show(_moTitle, m.IWon ? "VICTORY" : "DEFEAT", m.IWon ? you : them);
+                    SetDisplay(_moScore, false);
+                    Show(_moSub, ("series " + m.ScoreMine + " – " + m.ScoreTheirs + " · " + m.Reason).ToUpperInvariant(), null);
+                    _moSub.RemoveFromClassList("mo-sub--body");
+                    break;
+
+                default:
+                    SetDisplay(_moKicker, false);
+                    Show(_moTitle, "MATCH LOST", null);
+                    SetDisplay(_moScore, false);
+                    Show(_moSub, m.Reason, null);
+                    _moSub.AddToClassList("mo-sub--body");
+                    break;
+            }
+            SetDisplay(_moBack, m.ShowBack);
+            if (m.ShowBack) _moBack.text = (m.BackLabel ?? "Back to lobby").ToUpperInvariant();
+        }
+
+        private static void Show(Label label, string text, string colourClass)
+        {
+            label.text = text ?? string.Empty;
+            label.EnableInClassList("mo--you", colourClass == "mo--you");
+            label.EnableInClassList("mo--them", colourClass == "mo--them");
+            SetDisplay(label, !string.IsNullOrEmpty(text));
+        }
+
+        private void HandleBackClicked() => _source.BackToLobby();
+
+        // ---- helpers --------------------------------------------------------------------------------
+
+        private static string Trim(string name, string fallback)
+        {
+            if (string.IsNullOrEmpty(name)) return fallback;
+            if (name.Length > MaxNameLength) name = name.Substring(0, MaxNameLength - 1) + "…";
+            return name.ToUpperInvariant();
+        }
+
+        private static void SetDisplay(VisualElement element, bool visible)
+        {
+            var want = new StyleEnum<DisplayStyle>(visible ? DisplayStyle.Flex : DisplayStyle.None);
+            if (element.style.display != want) element.style.display = want;
+        }
+
+        private static Label Text(string text, string cls)
+        {
+            var label = new Label(text ?? string.Empty) { pickingMode = PickingMode.Ignore };
+            label.AddToClassList(cls);
+            return label;
+        }
+
+        private static T Named<T>(T element, string name) where T : VisualElement
+        {
+            element.name = name;
+            return element;
+        }
+
+        private static T Find<T>(VisualElement root, string name, List<string> missing) where T : VisualElement
+        {
+            T found = root.Q<T>(name);
+            if (found == null) missing.Add(name);
+            return found;
+        }
 
         /// <summary>True when a pickable HUD element sits under the given screen position (bottom-left origin).</summary>
         private bool IsPointerOverHud(Vector2 screenPosition)
@@ -1076,8 +1269,7 @@ namespace Mimas.Client.UI
             if (!_bound || _root == null) return false;
             IPanel panel = _root.panel;
             if (panel == null) return false;
-            Vector2 panelPosition = RuntimePanelUtils.ScreenToPanel(panel, screenPosition);
-            return panel.Pick(panelPosition) != null;
+            return panel.Pick(RuntimePanelUtils.ScreenToPanel(panel, screenPosition)) != null;
         }
     }
 }

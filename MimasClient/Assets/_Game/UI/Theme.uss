@@ -31,6 +31,9 @@
     --mimas-you-18: rgba(95, 211, 200, 0.18);
     --mimas-you-28: rgba(95, 211, 200, 0.28);
 
+    /* `you` at 55%: the edge of End Turn and the Confirm/Back buttons (§1 "tile edges (at 55%)"). */
+    --mimas-you-55: rgba(95, 211, 200, 0.55);
+
     /* Ink at the alphas the HUD lays over the board: a tag's bar ground (50%), End Turn and the boon circles (55%),
        the cursor tag (82%). */
     --mimas-ink-50: rgba(11, 11, 14, 0.50);
@@ -79,9 +82,19 @@
     --mimas-text-11: 11px;
     --mimas-text-10: 10px;
 
-    /* display-caps letter-spacing, 0.14–0.28em of the size, as pixels at the size it is used. */
-    --mimas-caps-tracking-wide: 2px;
-    --mimas-caps-tracking: 1px;
+    /* display-caps letter-spacing (language §2: 0.14–0.28em). UI Toolkit's text generator in 6000.4 reads
+       letter-spacing in hundredths of an em whatever the unit says — measured 23 Sep 2026 (T-0013): a label
+       at 15px with `letter-spacing: 100px` gains 15px per gap — so these values are em × 100: 16px is 0.16em.
+       Until then they were written as pixels (1px, 2px) and drew as almost nothing. */
+    --mimas-caps-tracking: 8px;
+    --mimas-caps-tracking-wide: 14px;
+
+    /* The HUD's wider tracking (docs/ui/hud.md, between-rounds.md), also em × 100: captions 0.28em, the track's
+       names and End Turn 0.24em, headlines 0.28em, the band's titles 0.30em. */
+    --mimas-tracking-11: 28px;
+    --mimas-tracking-15: 24px;
+    --mimas-tracking-20: 28px;
+    --mimas-tracking-38: 30px;
 
     /* ---- §4 space and shape ---- */
     --mimas-plate-w: 420px;

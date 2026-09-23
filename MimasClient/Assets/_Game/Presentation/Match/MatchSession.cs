@@ -1399,28 +1399,11 @@ namespace Mimas.Client.Presentation
             for (int i = 0; i < _hudUnits.Count; i++)
             {
                 HudUnit hud = _hudUnits[i];
-                hud.Markers.Clear();
                 Mimas.Core.Match.UnitView unit = View.FindUnit(hud.Id);
                 if (unit == null) continue;
-                for (int m = 0; m < unit.Modifiers.Count; m++)
-                {
-                    KnownEntry entry = unit.Modifiers[m];
-                    if (!entry.Revealed) continue;
-                    ModifierDef def;
-                    if (!_catalog.Modifiers.TryGet(entry.Id, out def)) continue;
-                    hud.Markers.Add(new HudMarker { Id = def.Id, Name = def.Name, Icon = def.Icon });
-                }
 
-                // A revealed boon earns its own mark, and the lineage its tag — read from the view rather
-                // than only from the event, so a reconnect shows what was learned while we were away.
-                for (int b = 0; b < unit.Boons.Count; b++)
-                {
-                    KnownEntry entry = unit.Boons[b];
-                    if (!entry.Revealed) continue;
-                    BoonDef def;
-                    if (!_catalog.Boons.TryGet(entry.Id, out def)) continue;
-                    hud.Markers.Add(new HudMarker { Id = def.Id, Name = def.Name, Icon = def.Icon });
-                }
+                // The lineage's tag and the boon marks are read from the view rather than only from the events,
+                // so a reconnect shows what was learned while we were away.
                 if (unit.LineageId != null)
                 {
                     LineageDef lineage;

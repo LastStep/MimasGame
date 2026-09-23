@@ -333,14 +333,6 @@ namespace Mimas.Client.Presentation
         public bool CostChanged, RangeChanged, DamageChanged;
     }
 
-    /// <summary>A revealed passive drawn as a small icon under a unit's bar.</summary>
-    public sealed class HudMarker
-    {
-        public string Id;
-        public string Name;
-        public string Icon;
-    }
-
     /// <summary>One of the three cards a draft offers (design: #draft; decided 22 Sep 2026, P1).</summary>
     public sealed class HudDraftCard
     {
@@ -401,7 +393,7 @@ namespace Mimas.Client.Presentation
     }
 
     /// <summary>
-    /// One unit's floating overlay: hit points, action points and revealed passives, anchored to a
+    /// One unit's floating overlay: hit points, the enemy's boon marks and lineage, anchored to a
     /// transform in the world. The session mutates the numbers as events play; the HUD repositions the
     /// element every frame from <see cref="Anchor"/>.
     /// </summary>
@@ -433,7 +425,6 @@ namespace Mimas.Client.Presentation
 
         public Transform Anchor;
         public Vector3 AnchorOffset;
-        public List<HudMarker> Markers = new List<HudMarker>();
 
         /// <summary>The enemy's only: one mark per boon they hold, in grant order — its kind once revealed, a "?" until then.</summary>
         public List<HudBoonMark> BoonMarks = new List<HudBoonMark>();

@@ -1,90 +1,136 @@
-<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" xsi="http://www.w3.org/2001/XMLSchema-instance" engine="UnityEngine.UIElements" editor="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" xmlns:mimas="Mimas.Client.UI" xsi="http://www.w3.org/2001/XMLSchema-instance" engine="UnityEngine.UIElements" editor="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
+    <!--
+        The match HUD in the ink language (docs/ui/hud.md, docs/ui/between-rounds.md; spec H §7). Every element
+        of the books' inventories is here by its id as its name; rows that repeat (tiles, boons, tags, cards) are
+        built by MatchHudView under the named containers with the same ids ("hud.tile[arrow-shot]",
+        "hud.boon[0]", "hud.tag[1]", "dr.card[2]"). Styling is by class only: an id with dots cannot be a USS
+        selector. Order is depth: the world-anchored tags lowest, then the floors, the bar and the buttons, the
+        draft and the band, the turn track above them (it stays on top between rounds), the examine plate over
+        all of that, and the one hover panel last.
+    -->
     <Style src="MatchHud.uss" />
     <ui:Template name="Examine" src="Examine.uxml" />
     <ui:Template name="HoverPanel" src="HoverPanel.uxml" />
     <ui:VisualElement name="hud-root" class="hud-root" picking-mode="Ignore">
 
-        <!-- Under everything: one floating tag per unit (hp bar, number, passives), anchored to the world each frame. -->
+        <!-- One tag per unit (hud.tag[u]): a light number over a 2px bar, theirs with a mark per boon. -->
         <ui:VisualElement name="unit-layer" class="unit-layer" picking-mode="Ignore" />
 
-        <!-- Attack preview: line items anchored above the hovered target. -->
-        <ui:VisualElement name="preview" class="preview" picking-mode="Ignore">
-            <ui:VisualElement class="preview-header" picking-mode="Ignore">
-                <ui:Label name="preview-title" class="preview-title" text="Fire Bolt" picking-mode="Ignore" />
-                <ui:Label name="preview-total" class="preview-total" text="11" picking-mode="Ignore" />
-            </ui:VisualElement>
-            <ui:Label name="preview-blocked" class="preview-blocked" text="No line of sight" picking-mode="Ignore" />
-            <ui:VisualElement name="preview-lines" class="preview-lines" picking-mode="Ignore" />
-        </ui:VisualElement>
+        <!-- The ink floors under the bar and the track, so bone type reads over any tile (hud.md §2). -->
+        <ui:VisualElement name="hud.floor.top" class="hud-floor hud-floor--top" picking-mode="Ignore" />
+        <ui:VisualElement name="hud.floor" class="hud-floor hud-floor--bottom" picking-mode="Ignore" />
 
-        <!-- Damage flyovers spawn here. -->
+        <!-- Damage and reveal flyovers spawn here (hud.fly). -->
         <ui:VisualElement name="fly-layer" class="fly-layer" picking-mode="Ignore" />
 
-        <!-- Rides next to the pointer while aiming: why this shot cannot be taken. -->
-        <ui:Label name="cursor-tag" class="cursor-tag" text="Out of range" picking-mode="Ignore" />
+        <!-- Beside the pointer while aiming at nothing hittable. -->
+        <ui:Label name="hud.cursor" class="hud-cursor" text="OUT OF RANGE" picking-mode="Ignore" />
 
-        <!-- Top centre: whose turn. No numbers; a rope burns down for the last seconds (ADR-015). -->
-        <ui:VisualElement name="turn-panel" class="turn-panel">
-            <!-- Which round of the series this is, and the score, your own first (P2). -->
-            <ui:Label name="series-line" class="series-line" text="ROUND 2 · 0 – 1" picking-mode="Ignore" />
-            <ui:Label name="turn-owner" class="turn-owner" text="YOUR TURN" />
-            <ui:VisualElement name="rope" class="rope" picking-mode="Ignore">
-                <ui:VisualElement name="rope-track" class="rope-track" picking-mode="Ignore">
-                    <ui:VisualElement name="rope-fill" class="rope-fill" picking-mode="Ignore" />
+        <!-- Bottom left: action points, then the three captioned lane rows of tiles (hud.md §3.2). -->
+        <ui:VisualElement name="hud.bar" class="hud-bar" picking-mode="Ignore">
+            <ui:VisualElement name="hud.ap" class="hud-ap" picking-mode="Ignore">
+                <ui:Label name="hud.ap.caption" class="hud-ap__caption" text="ACTION POINTS" picking-mode="Ignore" />
+                <ui:VisualElement name="hud.ap.value" class="hud-ap__value" picking-mode="Ignore">
+                    <mimas:Glyph class="hud-ap__bolt" shape="bolt" />
+                    <ui:Label name="hud.ap.value.current" class="hud-ap__current" text="1" picking-mode="Ignore" />
+                    <ui:Label name="hud.ap.value.max" class="hud-ap__max" text="/ 3" picking-mode="Ignore" />
                 </ui:VisualElement>
-                <ui:VisualElement name="rope-ember" class="rope-ember" picking-mode="Ignore" />
+                <ui:VisualElement name="hud.ap.eggs" class="hud-ap__eggs" picking-mode="Ignore" />
             </ui:VisualElement>
-            <!-- Only online, and only when there is something to say: the opponent is gone, and for how long. -->
-            <ui:Label name="status-line" class="status-line" text="Opponent disconnected · 47 s" picking-mode="Ignore" />
+            <ui:VisualElement name="hud.lanes" class="hud-lanes" picking-mode="Ignore">
+                <ui:VisualElement name="hud.lane.movement" class="hud-lane" picking-mode="Ignore">
+                    <ui:Label class="hud-lane__caption" text="MOVEMENT" picking-mode="Ignore" />
+                    <ui:VisualElement name="hud.lane.movement.tiles" class="hud-lane__tiles" picking-mode="Ignore" />
+                </ui:VisualElement>
+                <ui:VisualElement name="hud.lane.weapon" class="hud-lane" picking-mode="Ignore">
+                    <ui:Label class="hud-lane__caption" text="WEAPON" picking-mode="Ignore" />
+                    <ui:VisualElement name="hud.lane.weapon.tiles" class="hud-lane__tiles" picking-mode="Ignore" />
+                </ui:VisualElement>
+                <ui:VisualElement name="hud.lane.spell" class="hud-lane" picking-mode="Ignore">
+                    <ui:Label class="hud-lane__caption" text="SPELL" picking-mode="Ignore" />
+                    <ui:VisualElement name="hud.lane.spell.tiles" class="hud-lane__tiles" picking-mode="Ignore" />
+                </ui:VisualElement>
+            </ui:VisualElement>
         </ui:VisualElement>
 
-        <!-- Centre: match result, how it ended, and the way out of it. -->
-        <ui:VisualElement name="banner-panel" class="banner-panel" picking-mode="Ignore">
-            <ui:Label name="banner" class="banner" text="VICTORY" picking-mode="Ignore" />
-            <ui:Label name="banner-detail" class="banner-detail" text="by elimination" picking-mode="Ignore" />
-            <ui:Button name="banner-button" class="banner-button" text="Back to lobby" />
-        </ui:VisualElement>
+        <!-- Right edge: your boons as glyph circles, oldest to latest (hud.md §3.3). -->
+        <ui:VisualElement name="hud.boons" class="hud-boons" picking-mode="Ignore" />
 
-        <!-- Bottom centre: action points, then one section per category, filled at runtime from IMatchHudSource. -->
-        <ui:VisualElement name="tooltip" class="tooltip" picking-mode="Ignore">
-            <ui:Label name="tooltip-title" class="tooltip-title" text="Move" />
-            <ui:Label name="tooltip-detail" class="tooltip-detail" text="Lobbed · no sight needed · range 1-5" />
-            <ui:Label name="tooltip-body" class="tooltip-body" text="Walk to an adjacent tile." />
-        </ui:VisualElement>
-        <ui:VisualElement name="action-bar" class="action-bar" />
-
-        <!-- Bottom right: pass the turn early, and give it up entirely. -->
-        <ui:Button name="end-turn" class="end-turn">
-            <ui:Label name="end-turn-label" class="end-turn-label" text="END TURN" picking-mode="Ignore" />
+        <!-- Bottom right: Resign above End Turn (hud.md §3.4). -->
+        <ui:Button name="hud.resign" class="hud-resign" text="RESIGN" />
+        <ui:Button name="hud.end" class="hud-end">
+            <ui:Label name="hud.end.label" class="hud-end__label" text="END TURN" picking-mode="Ignore" />
         </ui:Button>
 
-        <!-- Two clicks, because conceding by accident is the worst possible misclick. -->
-        <ui:Button name="resign" class="resign" text="RESIGN" />
+        <!-- Between rounds: the draft over the dimmed board (between-rounds.md §2). Cards are built into dr.cards. -->
+        <ui:VisualElement name="dr.root" class="dr-root" picking-mode="Ignore">
+            <ui:VisualElement name="dr.scrim" class="dr-scrim" />
+            <ui:Label name="dr.headline" class="dr-headline" text="ROUND 2 TO GUEST-2869 · 1 – 1" picking-mode="Ignore" />
+            <ui:Label name="dr.next" class="dr-next" text="CHOOSE ONE BOON · ROUND 3 ON OPEN FIELD" picking-mode="Ignore" />
+            <ui:VisualElement name="dr.cards" class="dr-cards" picking-mode="Ignore" />
+            <ui:VisualElement name="dr.timer" class="dr-timer" picking-mode="Ignore">
+                <ui:VisualElement class="dr-timer__hair" picking-mode="Ignore" />
+                <ui:VisualElement name="dr.timer.fill" class="dr-timer__fill" picking-mode="Ignore" />
+                <ui:VisualElement name="dr.timer.ember" class="dr-timer__ember" picking-mode="Ignore" />
+            </ui:VisualElement>
+            <ui:Button name="dr.confirm" class="dr-confirm" text="CONFIRM" />
+            <ui:Label name="dr.status" class="dr-status" text="Waiting for Guest-2869…" picking-mode="Ignore" />
+        </ui:VisualElement>
 
-        <!-- Between rounds: the draft over the dimmed board (P1). The scrim is what dims it — no shader
-             change, and it darkens the heroes too. Three cards are built in code into draft-cards. -->
-        <ui:VisualElement name="draft-panel" class="draft-panel">
-            <ui:VisualElement name="draft-scrim" class="draft-scrim" />
-            <ui:VisualElement name="draft-body" class="draft-body">
-                <ui:Label name="draft-headline" class="draft-headline" text="ROUND 1 LOST · 0 – 1" picking-mode="Ignore" />
-                <ui:Label name="draft-next" class="draft-next" text="Choose one boon · Round 2 on Board" picking-mode="Ignore" />
-                <ui:VisualElement name="draft-cards" class="draft-cards" />
-                <ui:VisualElement name="draft-timer-track" class="draft-timer-track" picking-mode="Ignore">
-                    <ui:VisualElement name="draft-timer-fill" class="draft-timer-fill" picking-mode="Ignore" />
+        <!-- The round moments, always in the band across the middle (between-rounds.md §3). -->
+        <ui:VisualElement name="mo.root" class="mo-root" picking-mode="Ignore">
+            <ui:VisualElement name="mo.band" class="mo-band" picking-mode="Ignore">
+                <ui:Label name="mo.kicker" class="mo-kicker" text="ROUND 3" picking-mode="Ignore" />
+                <ui:Label name="mo.title" class="mo-title" text="OPEN FIELD" picking-mode="Ignore" />
+                <ui:VisualElement name="mo.score" class="mo-score" picking-mode="Ignore">
+                    <ui:Label name="mo.score.mine" class="mo-score__mine" text="1" picking-mode="Ignore" />
+                    <ui:Label name="mo.score.dash" class="mo-score__dash" text="–" picking-mode="Ignore" />
+                    <ui:Label name="mo.score.theirs" class="mo-score__theirs" text="1" picking-mode="Ignore" />
                 </ui:VisualElement>
-                <ui:VisualElement class="draft-footer">
-                    <ui:VisualElement name="draft-dot" class="draft-dot" picking-mode="Ignore" />
-                    <ui:Label name="draft-status" class="draft-status" text="" picking-mode="Ignore" />
-                    <ui:Button name="draft-confirm" class="draft-confirm" text="Confirm" />
+                <ui:Label name="mo.sub" class="mo-sub" text="YOU MOVE FIRST" picking-mode="Ignore" />
+                <ui:Button name="mo.back" class="mo-back" text="BACK TO ROOM" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- Top centre: the turn track (hud.md §3.1). Your end left, theirs right; no numbers, no clock. -->
+        <ui:VisualElement name="hud.track" class="hud-track" picking-mode="Ignore">
+            <ui:VisualElement class="hud-track__head" picking-mode="Ignore">
+                <ui:VisualElement class="hud-track__end" picking-mode="Ignore">
+                    <ui:Label name="hud.track.you.name" class="hud-track__name hud-track__name--you" text="ROHAN" picking-mode="Ignore" />
+                    <ui:VisualElement name="hud.track.you.pips" class="hud-track__pips hud-track__pips--you" picking-mode="Ignore" />
+                </ui:VisualElement>
+                <ui:Label name="hud.track.round" class="hud-track__round" text="ROUND 3" picking-mode="Ignore" />
+                <ui:VisualElement class="hud-track__end hud-track__end--them" picking-mode="Ignore">
+                    <ui:VisualElement name="hud.track.them.pips" class="hud-track__pips hud-track__pips--them" picking-mode="Ignore" />
+                    <ui:Label name="hud.track.them.name" class="hud-track__name hud-track__name--them" text="GUEST-2869" picking-mode="Ignore" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+            <ui:VisualElement name="hud.track.line" class="hud-track__line" picking-mode="Ignore">
+                <ui:VisualElement class="hud-track__hair" picking-mode="Ignore" />
+                <ui:VisualElement name="hud.track.fill" class="hud-track__fill" picking-mode="Ignore" />
+                <ui:VisualElement class="hud-track__tick" picking-mode="Ignore" />
+                <ui:VisualElement name="hud.track.marker" class="hud-track__marker" picking-mode="Ignore" />
+                <ui:VisualElement name="hud.track.ember" class="hud-track__ember" picking-mode="Ignore">
+                    <ui:VisualElement class="hud-track__glow" picking-mode="Ignore" />
+                    <ui:VisualElement class="hud-track__spark" picking-mode="Ignore" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+            <ui:VisualElement class="hud-track__under" picking-mode="Ignore">
+                <ui:VisualElement name="hud.track.status" class="hud-track__note" picking-mode="Ignore">
+                    <ui:Label name="hud.track.status.text" class="hud-track__note-text" text="GUEST-2869 DISCONNECTED · 47 S" picking-mode="Ignore" />
+                    <ui:VisualElement class="hud-track__dot hud-track__dot--hollow" picking-mode="Ignore" />
+                </ui:VisualElement>
+                <ui:VisualElement name="hud.track.picked" class="hud-track__note" picking-mode="Ignore">
+                    <ui:Label class="hud-track__note-text" text="HAS CHOSEN" picking-mode="Ignore" />
+                    <ui:VisualElement class="hud-track__dot" picking-mode="Ignore" />
                 </ui:VisualElement>
             </ui:VisualElement>
         </ui:VisualElement>
 
-        <!-- Right: the examine plate (docs/ui/examine.md), driven by ExamineView. Last but one in the tree, so
-             it is a layer over the whole HUD: it covers End Turn rather than moving it. -->
+        <!-- Right: the examine plate (docs/ui/examine.md), a layer over the boons column and End Turn. -->
         <ui:Instance template="Examine" name="examine-mount" picking-mode="Ignore" />
 
-        <!-- The one hover panel, over everything (docs/ui/language.md §6). -->
+        <!-- The one hover panel, over everything (language §6): the plate's, the bar's, the boons', the preview. -->
         <ui:Instance template="HoverPanel" name="hover-mount" picking-mode="Ignore" />
 
     </ui:VisualElement>

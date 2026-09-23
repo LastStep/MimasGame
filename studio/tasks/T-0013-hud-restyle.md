@@ -28,6 +28,8 @@ allows_assets:
   - 'MimasClient/Assets/_Game/Presentation/Match/HudModel.cs.meta'
   - 'MimasClient/Assets/_Game/Editor/HudPreview.cs.meta'
   - 'MimasClient/Assets/_Game/Tests/EditMode/HudModelTests.cs.meta'
+  # Added during the build (spec rule 7): the runtime repair that lets letter-spacing apply to kerned pairs.
+  - 'MimasClient/Assets/_Game/UI/FontSpacing.cs.meta'
   # Spec §11: captures land under Assets/_Shots (never a Temp folder); the folder .meta already exists.
   - 'MimasClient/Assets/_Shots/**'
 # Rungs by number (studio/game.yaml): 0 asset safety, 1 core build, 2 core tests, 5 server integration.
