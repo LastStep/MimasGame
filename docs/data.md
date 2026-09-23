@@ -427,6 +427,10 @@ only ever see `MatchState.ViewFor(player)` (`PlayerView`) and events passed thro
 `BoonOverlay` — stat contributions, attached modifiers, overrides resolved to ability ids, added elements
 and tags, Sigil grants — with every entry tagged by the boon that put it there. `Unit.PublicStats` is base
 + items (what gear explains, public); `Unit.Stats` adds the boon stats and floors them by `rules.boons`.
+`Unit.StatLines(key, into)` says how a stat is made, in a fixed order: the rules base, each item in slot
+order, each boon in grant order, raw amounts (a floor is applied by `Stats`, not by the lines), zeros left
+out. On a mirror the overlay holds only revealed boons, so a hidden boon is never listed (the examine
+plate's stat hover, T-0011).
 Abilities are innate, then each item's, then each Sigil's grant in boon order. **`MatchState.ResolveAbility`
 is the only ability lookup**: it hands back the catalogue's definition with the unit's overlay applied
 (numbers floored: cost at `minCost`, range at 1, `minRange` inside the band, apex / climb / jump at 0;

@@ -984,7 +984,7 @@ r=+4        . . . , .</code></pre>
 <ul>
   <li>Thin segmented hp bar plus number under every unit, faded until hovered or an action is armed.</li>
   <li>AP dots on the action bar; hovering an ability tints the dots it would spend; each button shows its cost; unaffordable buttons desaturate.</li>
-  <li>Action bar bottom-centre, sectioned movement / weapon / spell (item icons mark which item an ability belongs to, proposed). End Turn bottom-right. Turn owner and rope top-centre. Examine panel left.</li>
+  <li>Action bar bottom-centre, sectioned movement / weapon / spell (item icons mark which item an ability belongs to, proposed). End Turn bottom-right. Turn owner and rope top-centre. Examine panel right (23 Sep 2026: the plate is full height on the right, and End Turn steps left while it is open).</li>
   <li>Attack preview: ghosted hp delta on the target's bar plus a line-item tooltip with a "?" row for unrevealed modifiers.</li>
   <li>Feedback: damage flyover; when actual differs from preview, a second line names the revealed modifier whose icon then stays on the unit.</li>
   <li>Nothing is armed by default; clicking a unit with nothing armed opens examine.</li>
@@ -993,8 +993,8 @@ r=+4        . . . , .</code></pre>
   <li>An ability whose cost, range or damage a boon changed shows the changed number with a small mark; an attack's detail line leads with the elements it carries.</li>
 </ul>
 <h4 id="examine">Examine</h4>
-<p>Inspect any unit, tile or item: for enemies, items are shown by name with their innate stats, abilities as "?" until revealed. For tiles: terrain, height, modifiers.</p>
-<p><b>Boons</b> (22 Sep 2026): your own are listed under the gear and passives with their kind and their god, and your lineage sits under your name. The enemy's are one <code>?</code> row per boon they hold — the count is public, the identity is not — under <code>Unknown lineage</code>, each becoming a name and a god as reveals happen.</p>
+<p><span class="badge proposed">proposed</span> The examine plate is designed in the UI book: <code>docs/ui/examine.md</code> (the screen, element by element) and <code>docs/ui/language.md</code> (the tokens, faces, glyphs and the hover panel). Those two pages are its design; this section only points at them. Built by T-0011 on 23 Sep 2026.</p>
+<p><b>What changed on 23 Sep 2026</b> (Rohan, six rounds on the canvas): one paper plate on the right, a single column (painting and name · vitals · stats · boons · equipment); stats as base then the net of known boons, green or red, with a grey <code>?</code> on the enemy's lane stats while a boon of theirs is unrevealed; actions as named tiles, violet-edged when a boon changed or added them; one hover panel for everything; a click off the plate only closes it; standing height in the vitals. The enemy's boons stay one <code>?</code> row each until revealed, and their abilities dashed <code>?</code> tiles until used (<a href="#hidden-info">hidden-info</a>).</p>
 <h4 id="audio-vfx">Audio and VFX</h4>
 <p>FMOD music that stays out of the way; distinct SFX per ability category and per element; VFX via Shuriken and Shader Graph (no VFX Graph on WebGL2).</p>
 <h4>Art direction</h4>

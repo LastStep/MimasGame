@@ -1,6 +1,6 @@
 # Mimas interface language
 
-_Status: **proposed** (Rohan, 23 Sep 2026, from the examine-panel design session). Source of the look:
+_Status: **built** for every token `Theme.uss` declares (T-0011, 23 Sep 2026); chosen by Rohan on 23 Sep 2026 in the examine-panel design session. Source of the look:
 `artifacts/UI Drafts/canvas_Titan Inspiration-260923_0720.png` and the Disco Elysium reference. Mock canvas:
 https://claude.ai/artifact/K9qZcJQ115G5G685sdMAwy (page 2 "Examine", the "Final · the rules" sheet).
 This page is the single place a colour, a face, a glyph or a spacing is defined. Every screen page under
@@ -24,20 +24,20 @@ except the painting.
 
 | Token | Meaning | Ink surface | Paper surface | USS | Status |
 |---|---|---|---|---|---|
-| `ink` | every plate, the void behind the HUD | `#0b0b0e` | — | `--mimas-ink` | proposed |
-| `ink-2` | a raised plate (hover panel) | `#121217` | — | `--mimas-ink-2` | proposed |
-| `paper` | the examine plate | — | `#e9e2d2` | `--mimas-paper` | proposed |
-| `fg` | all primary type | `#efe9dc` (bone) | `#16151a` | `--mimas-fg` | proposed |
-| `fg-2` | secondary type, captions | bone at 62% | ink at 64% | `--mimas-fg-2` | proposed |
-| `fg-3` | tertiary: labels, "/ max", unseen | bone at 34% | ink at 42% | `--mimas-fg-3` | proposed |
-| `hair` | the only stroke: bars, tile edges | bone at 14% | ink at 16% | `--mimas-hair` | proposed |
-| `tile` | the ground of an action tile | black at 32% | ink at 6% | `--mimas-tile` | proposed |
-| `you` | your accent: bars, pips, section labels, tile edges (at 55%) | `#5fd3c8` | `#1f7f78` | `--mimas-you` | proposed |
-| `them` | the enemy's accent, same uses | `#ff4b3e` | `#c8321f` | `--mimas-them` | proposed |
-| `amount` | a damage number, anywhere | `#e9b45c` | same | `--mimas-amount` | proposed |
-| `changed` | a number a boon changed; an action a boon added | `#a99cff` | `#5a48c8` | `--mimas-changed` | proposed |
-| `up` | a stat above its base | `#8fdc7a` | `#2f7d3a` | `--mimas-up` | proposed |
-| `down` | a stat below its base | `#ff6a5c` | `#c8321f` | `--mimas-down` | proposed |
+| `ink` | every plate, the void behind the HUD | `#0b0b0e` | — | `--mimas-ink` | built |
+| `ink-2` | a raised plate (hover panel) | `#121217` | — | `--mimas-ink-2` | built |
+| `paper` | the examine plate | — | `#e9e2d2` | `--mimas-paper` | built |
+| `fg` | all primary type | `#efe9dc` (bone) | `#16151a` | `--mimas-fg` | built |
+| `fg-2` | secondary type, captions | bone at 62% | ink at 64% | `--mimas-fg-2` | built |
+| `fg-3` | tertiary: labels, "/ max", unseen | bone at 34% | ink at 42% | `--mimas-fg-3` | built |
+| `hair` | the only stroke: bars, tile edges | bone at 14% | ink at 16% | `--mimas-hair` | built |
+| `tile` | the ground of an action tile | black at 32% | ink at 6% | `--mimas-tile` | built |
+| `you` | your accent: bars, pips, section labels, tile edges (at 55%) | `#5fd3c8` | `#1f7f78` | `--mimas-you` | built |
+| `them` | the enemy's accent, same uses | `#ff4b3e` | `#c8321f` | `--mimas-them` | built |
+| `amount` | a damage number, anywhere | `#e9b45c` | same | `--mimas-amount` | built |
+| `changed` | a number a boon changed; an action a boon added | `#a99cff` | `#5a48c8` | `--mimas-changed` | built |
+| `up` | a stat above its base | `#8fdc7a` | `#2f7d3a` | `--mimas-up` | built |
+| `down` | a stat below its base | `#ff6a5c` | `#c8321f` | `--mimas-down` | built |
 
 Lineage hues are **painting colours, not UI colours**: they tint the portrait wash and the item squares
 and never a bar or a label. Greek `#1d4f5c` / `#7fb7b0`, Norse `#3a3f52` / `#8e98b8`, Hindu `#6a3a12` /
@@ -52,10 +52,10 @@ Two faces on ink, three on paper. Nothing else. All numbers that carry weight ar
 
 | Token | Face, weight | Where | Size (px) | USS | Status |
 |---|---|---|---|---|---|
-| `display` | Josefin Sans 300 | every large number (health, AP, stat base) | 34 / 24 | `--mimas-font-display` | proposed |
-| `display-caps` | Josefin Sans 400, letter-spacing 0.14–0.28em, uppercase | names and captions on ink; tile labels everywhere | 26 / 13.5 / 9 / 7.5 / 6.5 | same face | proposed |
-| `serif` | Cormorant Garamond 700 / 600 / italic | names, item names, section labels, the lineage line, on paper only | 32 / 17 / 16 / 15 | `--mimas-font-serif` | proposed |
-| `body` | Sora 400 / 600 | every sentence: descriptions, hover text, notes | 12 / 11.5 / 10.5 / 10 | `--mimas-font-body` | proposed |
+| `display` | Josefin Sans 300 | every large number (health, AP, stat base) | 34 / 24 | `--mimas-font-display` | built: 300 (unmodified file: the font has a Reserved Font Name) |
+| `display-caps` | Josefin Sans 400, letter-spacing 0.14–0.28em, uppercase | names and captions on ink; tile labels everywhere | 26 / 13.5 / 9 / 7.5 / 6.5 | `--mimas-font-caps` | built: 400 |
+| `serif` | Cormorant Garamond 700 / 600 / italic | names, item names, section labels, the lineage line, on paper only | 32 / 17 / 16 / 15 | `--mimas-font-serif`, `-serif-semibold`, `-serif-italic` | built: 700, 600 and 500 italic, Latin subset |
+| `body` | Sora 400 / 600 | every sentence: descriptions, hover text, notes | 12 / 11.5 / 10.5 / 10 | `--mimas-font-body` | built: 400 only, Latin subset (600 not needed yet; italic is synthesised for the flavour line) |
 
 Scale, top to bottom: **34 · 32 · 26 · 24 · 17 · 16 · 15 · 13.5 · 12 · 11.5 · 10.5 · 10 · 9 · 7.5 · 6.5**.
 A new size is a decision, not a tweak.
@@ -70,20 +70,20 @@ Shapes carry meaning so it survives any colour, the art, and colour-blindness.
 
 | Token | Shape | Means | Source | Status |
 |---|---|---|---|---|
-| `glyph.health` | heart, stroke | health | `Icons/heart` | proposed |
-| `glyph.ap` | bolt, stroke | action points | `Icons/bolt` | proposed |
-| `glyph.egg` | egg, hollow / filled | one AP, spent / held | drawn in USS (border-radius), no asset | proposed |
+| `glyph.health` | heart, stroke | health | `Icons/heart` | built (`Glyphs.cs`) |
+| `glyph.ap` | bolt, stroke | action points | `Icons/bolt` | built (`Glyphs.cs`) |
+| `glyph.egg` | egg, hollow / filled | one AP, spent / held | drawn in USS (border-radius), no asset | drift: drawn by `Glyphs.cs` (Painter2D), not USS |
 | `glyph.cost` | 5px dot ×n | an action's AP cost | drawn in USS | proposed |
-| `glyph.blessing` | circle | Blessing (filled when it is the starting one) | `Icons/kind-blessing` | proposed |
-| `glyph.enchant` | diamond | Enchant | `Icons/kind-enchant` | proposed |
-| `glyph.sigil` | triangle | Sigil | `Icons/kind-sigil` | proposed |
-| `glyph.weapon` | sword | weapon lane, weapon slot | `Icons/lane-weapon` | proposed |
-| `glyph.spell` | spark | spell lane | `Icons/lane-spell` | proposed |
-| `glyph.crown` `glyph.boots` `glyph.armour` | crown, boot, shield | the other three slots (fallback under item art) | `Icons/slot-*` | proposed |
-| `glyph.lobbed` `glyph.straight` | arc, arrow | trajectory | `Icons/traj-*` | proposed |
-| `glyph.sight` `glyph.nosight` | eye, eye struck | needs sight / no sight needed | `Icons/sight-*` | proposed |
-| `glyph.unknown` | dashed circle with `?` | a thing of theirs you have not seen | drawn in USS | proposed |
-| `glyph.emblem.<lineage>` | laurel, hammer, lotus (placeholders) | the lineage | `lineages/*.json` `icon` key, already in data | proposed |
+| `glyph.blessing` | circle | Blessing (filled when it is the starting one) | `Icons/kind-blessing` | built (`Glyphs.cs`) |
+| `glyph.enchant` | diamond | Enchant | `Icons/kind-enchant` | built (`Glyphs.cs`) |
+| `glyph.sigil` | triangle | Sigil | `Icons/kind-sigil` | built (`Glyphs.cs`) |
+| `glyph.weapon` | sword | weapon lane, weapon slot | `Icons/lane-weapon` | built (`Glyphs.cs`) |
+| `glyph.spell` | spark | spell lane | `Icons/lane-spell` | built (`Glyphs.cs`) |
+| `glyph.crown` `glyph.boots` `glyph.armour` | crown, boot, shield | the other three slots (fallback under item art) | `Icons/slot-*` | built (`Glyphs.cs`) |
+| `glyph.lobbed` `glyph.straight` | arc, arrow | trajectory | `Icons/traj-*` | built (`Glyphs.cs`) |
+| `glyph.sight` `glyph.nosight` | eye, eye struck | needs sight / no sight needed | `Icons/sight-*` | built (`Glyphs.cs`) |
+| `glyph.unknown` | dashed circle with `?` | a thing of theirs you have not seen | drawn in USS | drift: drawn by `Glyphs.cs` (Painter2D), not USS |
+| `glyph.emblem.<lineage>` | laurel, hammer, lotus (placeholders) | the lineage | `lineages/*.json` `icon` key, already in data | built (`Glyphs.cs`) |
 | action icons | one per ability | the action, identical on the bar, in examine and in the hover | `abilities/*.json` `icon` key, already in data | built (bar) |
 
 All stroke icons: 24-unit grid, 1.4–1.8 stroke, round caps. **Asset gap**: the Icons folder does not exist;
@@ -93,15 +93,15 @@ today the action bar draws a letter. Vector (SVG import) preferred so one file s
 
 | Token | Value | Used for | USS | Status |
 |---|---|---|---|---|
-| `plate.width` | 380 | the examine plate; the hover panel is 300 | `--mimas-plate-w` | proposed |
-| `plate.pad` | 22 top/bottom, 20 sides | plate padding | `--mimas-plate-pad` | proposed |
-| `gap.section` | 18 | between sections; a section is a caption plus this air, **no line** | `--mimas-gap-section` | proposed |
-| `gap.item` | 12 | between items in equipment | `--mimas-gap-item` | proposed |
-| `gap.row` | 4–5 | between rows in a list | `--mimas-gap-row` | proposed |
-| `tile` | 40 square, 1px edge, 8 apart, label beneath | an action tile | `--mimas-tile-size` | proposed |
-| `bar` | 2px tall | health bar; the fill is the owner's colour | `--mimas-bar` | proposed |
-| `radius` | 0 | nothing is rounded except eggs, dots and the `?` | — | proposed |
-| `shadow.panel` | `0 14px 34px` black at 60% | the hover panel only | `--mimas-shadow-panel` | proposed |
+| `plate.width` | 380 | the examine plate; the hover panel is 300 | `--mimas-plate-w` | built |
+| `plate.pad` | 22 top/bottom, 20 sides | plate padding | `--mimas-plate-pad` | built |
+| `gap.section` | 18 | between sections; a section is a caption plus this air, **no line** | `--mimas-gap-section` | built |
+| `gap.item` | 12 | between items in equipment | `--mimas-gap-item` | built |
+| `gap.row` | 4–5 | between rows in a list | `--mimas-gap-row` | built |
+| `tile` | 40 square, 1px edge, 8 apart, label beneath | an action tile | `--mimas-tile-size` | built |
+| `bar` | 2px tall | health bar; the fill is the owner's colour | `--mimas-bar` | built |
+| `radius` | 0 | nothing is rounded except eggs, dots and the `?` | — | built |
+| `shadow.panel` | `0 14px 34px` black at 60% | the hover panel only | `--mimas-shadow-panel` | drift: USS has no `box-shadow`; an offset layer in this colour stands in |
 
 No hairline dividers, no boxed sections, no borders around groups. If two things need separating, use
 space or a caption. The one edge allowed is the hover panel's 2px left edge in the owner's colour.
@@ -152,3 +152,4 @@ reveals). Nothing in the list repeats what the panel says: **names in the list, 
 ## Change log
 
 - 2026-09-23 · written from the examine session; status proposed.
+- 2026-09-23 · built by T-0011: every §1, §2, §4 token in `MimasClient/Assets/_Game/UI/Theme.uss`; glyphs drawn by `Glyphs.cs`; fonts as dynamic TextCore assets under `UI/Fonts/`. Two drifts noted in the rows: no USS box-shadow, and the egg and unknown glyphs drawn in code rather than USS.

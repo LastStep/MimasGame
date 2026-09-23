@@ -1,6 +1,6 @@
 # Examine · the character panel
 
-_Status: **proposed** (chosen by Rohan on 23 Sep 2026: the manuscript plate at its round-3 state). Design
+_Status: **built** (T-0011, 23 Sep 2026; chosen by Rohan on 23 Sep 2026: the manuscript plate at its round-3 state). Design
 anchors: `#examine`, `#hidden-info`, `#stats`, `#equipment`, `#boons`, `#abilities`, `#presentation`. Language:
 `docs/ui/language.md`. Mock: https://claude.ai/artifact/K9qZcJQ115G5G685sdMAwy, page 2 "Examine", top row:
 "Manuscript · round 3 · chosen", with round 1, the enemy, and "Final · manuscript in context" beside it.
@@ -37,7 +37,7 @@ Each `id` becomes the UXML element `name`. A builder creates exactly these; a ve
 
 | id | Shows | Data | Asset | States | Hover panel |
 |---|---|---|---|---|---|
-| `ex.portrait` | the painting: portrait wash in the lineage hue, emblem huge and faint behind, fading into paper over 210px | `view.LineageId` → `catalog.GetLineage(...).hueDark/hueLight` (**gap**), `.icon` | portrait art per hero/gear (**gap**, placeholder = wash + emblem) | enemy lineage unknown → neutral grey wash, no emblem | none |
+| `ex.portrait` | the painting: portrait wash in the lineage hue, emblem huge and faint behind, fading into paper over 210px (drift: the emblem is drawn in the light hue at 50%, as in the pinned render, not at 6%) | `view.LineageId` → `catalog.GetLineage(...).hueDark/hueLight` (**gap**), `.icon` | portrait art per hero/gear (**gap**, placeholder = wash + emblem) | enemy lineage unknown → neutral grey wash, no emblem | none |
 | `ex.name` | player name, `serif` 32 | room seat name (`client`, from the session block) | — | — | none |
 | `ex.lineage` | "Greek · your hero" / "Norse · the enemy", `serif` italic 15 | `view.LineageId`, `view.IsMine`; `null` → "Unknown lineage" | — | — | none |
 | `ex.close` | ✕ | — | `glyph.close` | — | none |
@@ -65,7 +65,7 @@ An hp or AP Blessing is public from round start (design `#stats` rule), so those
 
 | id | Shows | Data | Asset | States | Hover panel |
 |---|---|---|---|---|---|
-| `ex.boon[i]` | kind glyph · name · "on Longbow" when it sits on an item | `view.Boons[i]` (`KnownEntry`, grant order) → `catalog.GetBoon(id)` for name, kind, `requires.slot` → the item it landed on | `glyph.blessing/enchant/sigil` | `Revealed == false` → `state.unrevealed`, always last | boon panel: kind · lineage · on what; one sentence; flavour "God answers those who pray…" |
+| `ex.boon[i]` | kind glyph · name · "Longbow" when it sits on an item (built as `ex.boon[0]`, `ex.boon[1]`, …) | `view.Boons[i]` (`KnownEntry`, grant order) → `catalog.GetBoon(id)` for name, kind, `requires.slot` → the item it landed on | `glyph.blessing/enchant/sigil` | `Revealed == false` → `state.unrevealed`, always last | boon panel: kind · lineage · on what; one sentence; flavour "God answers those who pray…" |
 
 Order is **oldest to latest**: the starting Blessing, then each draft. `view.Boons` is already in grant
 order; for the enemy, revealed entries are shown in the order they were revealed (**gap**, §5) and the
@@ -76,7 +76,7 @@ unrevealed count last as `?` rows.
 | id | Shows | Data | Asset | States | Hover panel |
 |---|---|---|---|---|---|
 | `ex.item[slot]` | item square 28 · name (`serif` 17) · its stat line in `up` ("+2 Strength") | `view.ItemIds` → `catalog.GetItemForSlot(slot, id)`: name, `Stats` | item art square (**gap**, placeholder = lineage-hued square), slot glyph fallback | — | item panel: slot · kind; description; its stats as a tile; "Nike's Jab on this item" under Changes; for theirs "You have seen 1 of its 2 abilities" |
-| `ex.item[slot].tile[j]` | 40px tile with the action icon, name in caps 6.5 beneath, **no numbers** | `view.Abilities` filtered by `SourceItemId == item` (plus innate Walk under boots) → `catalog.GetAttack(id)` / `GetMovement(id)`: name, icon | action icon (**gap**: today a letter) | `state.changed` when `BoonOverlay.OverridesFor(id)` touches cost/range/minRange/damage (the bar already computes this: `MatchSession.IsChangedByABoon`); `state.added` when `Unit.BoonOfAbility(id) != null` (a Sigil grant); `state.unseen` when `KnownEntry.Revealed == false` | attack / movement panel (§4) |
+| `ex.item[slot].tile[j]` | 40px tile with the action icon, name in caps 6.5 beneath, **no numbers** (built as `ex.item[weapon].tile[0]`; the icon key rides on an `icon--<key>` class) | `view.Abilities` filtered by `SourceItemId == item` (plus innate Walk under boots) → `catalog.GetAttack(id)` / `GetMovement(id)`: name, icon | action icon (**gap**: today a letter) | `state.changed` when `BoonOverlay.OverridesFor(id)` touches cost/range/minRange/damage (the bar already computes this: `MatchSession.IsChangedByABoon`); `state.added` when `Unit.BoonOfAbility(id) != null` (a Sigil grant); `state.unseen` when `KnownEntry.Revealed == false` | attack / movement panel (§4) |
 
 The boon that changed or added an action is **not named under the item**; the tile edge is the whole
 tell. Actions are ordered as the item gained them: the item's own abilities first, then Sigil grants.
@@ -86,7 +86,7 @@ Armour, which has no abilities, shows one grey line: "turns 2 of every blow".
 
 | id | Shows | Data |
 |---|---|---|
-| `ex.ring` | 1px ring in the owner colour around the examined unit | `client` selection |
+| `ex.ring` | 1px ring in the owner colour around the examined unit | `client` selection (drawn around the unit's nameplate, not on the board mesh) |
 | `ex.scrim` | invisible full-window catcher behind the plate that closes it | `client` |
 | `ex.wash` | 200px gradient to ink at 45% on the board's edge next to the plate | none |
 
@@ -154,3 +154,4 @@ colour tokens for you/them/changed used, not literals.
 - 2026-09-23 · written from the examine session (rounds 1–6 on the canvas); status proposed.
 - 2026-09-23 · open questions 1 and 2 answered by Rohan; `ex.vitals.height` added; render pinned; spec and
   T-0011 written.
+- 2026-09-23 · built by T-0011: `Examine.uxml` / `Examine.uss`, `HoverPanel.uxml` / `HoverPanel.uss`, `ExamineView`, `ExamineModelBuilder`; gap 1 closed by `Unit.StatLines`, gap 3 by client memory (open question 4 stands), gap 4 by the lineage hues, gap 5 by seat names, gap 6 by `ex.vitals.height`. Drifts are noted in their rows.

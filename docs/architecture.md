@@ -74,10 +74,15 @@ Two scenes: **Lobby** (build index 0) and **Arena** (1).
 |---|---|
 | `Net/NetClient` | The one socket, alive across scene loads. Owns the connection, the guest identity and `match.start`; knows nothing about matches or rules |
 | `UI/LobbyView` | Name, `Play vs bot` / `Create room` / `Join room`, then the room: code, seats, loadout preset, Ready |
-| `Presentation/MatchSession` | The presenter: board, HUD, aiming, playback, facing. Does not know whether the match is local |
+| `Presentation/MatchSession` | The presenter: board, HUD, aiming, playback, facing. Does not know whether the match is local. It also owns the series' presentation: the score line in the turn panel, the round cards, the draft over the dimmed board (built from `SessionView.MyOffers`, sent back as `SubmitDraftPick`), the series banner, and the boon and lineage reveals |
 | `Presentation/IMatchDriver` | Where the match comes from. `LocalMatchDriver` (the truth, the bot, the ADR-015 clock) or `OnlineMatchDriver` (the mirror, the server's clock) — ADR-028. Both carry a `SessionView` beside the round; `Rules` and `View` are **null between rounds**, and a `NextRound` event tells the presenter to reload the Arena for the next one |
 | `Presentation/LocalSessionHost` | The practice series, `DontDestroyOnLoad`, so one `Session` and one bot outlive the Arena reload that every round after the first causes (P7). `LocalMatchDriver` is the per-scene adapter over it |
-| `Presentation/MatchSession` | The presenter also owns the series' presentation: the score line in the turn panel, the round cards, the draft over the dimmed board (built from `SessionView.MyOffers`, sent back as `SubmitDraftPick`), the series banner, and the boon and lineage reveals |
+| `Presentation/ExamineModelBuilder` | The examine plate's model (`HudExamine`) from the `PlayerView`: stats as base and net, boons oldest to latest, items with their action tiles, every string composed. Rebuilds the unit with `Unit.FromView` so the plate holds only what the viewer was shown, even in practice where the driver's state is the truth. Static; EditMode-tested |
+| `UI/Theme.uss` | Every `--mimas-*` token of the UI book (`docs/ui/language.md`), declared once on `:root`, ink and paper values; imported first by `MatchHud.uss` and `Lobby.uss` (ADR-037) |
+| `UI/Examine.uxml`, `UI/Examine.uss` | The examine plate (`docs/ui/examine.md`): every element of the book's inventory by its id as the element name; tokens only. Instanced from `MatchHud.uxml` |
+| `UI/HoverPanel.uxml`, `UI/HoverPanel.uss` | The one hover panel of the language (§6), one instance, over everything |
+| `UI/ExamineView` | Binds the plate to a `HudExamine`, owns the hover panel, the scrim that makes an off-plate click only close, the slide, and the painting and wash textures (USS has no gradients). Made by `MatchHudView`, which keeps the document |
+| `UI/Glyphs` | `Glyph` and `DashedFrame`: the language's glyphs drawn with `Painter2D` from SVG path strings, colour from `--glyph-color`; no icon files |
 
 **Core comes into the client for the mirror.** `OnlineMatchDriver` rebuilds a `MatchState` from the
 `PlayerView` on every message and asks it every preview question, so the online game and the practice
