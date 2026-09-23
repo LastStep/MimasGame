@@ -811,4 +811,42 @@ namespace Mimas.Core.Tests
             Assert.Throws<ArgumentException>(() => new ModifierDef("x", "x", ModifierTriggers.TakeDamage, 0));
         }
     }
+
+    /// <summary>The two presentation hues on a lineage (spec E §5; docs/ui/language.md §1).</summary>
+    public class LineageHueParsingTests
+    {
+        private const string Bare = @"{ ""version"": 1, ""id"": ""x"", ""startingBlessing"": ""x-b"", ""pool"": [ ""x-p"" ]";
+
+        [Fact]
+        public void Lineage_ShippedFiles_CarryBothHues()
+        {
+            var expected = new Dictionary<string, (string dark, string light)>
+            {
+                { "greek", ("#1d4f5c", "#7fb7b0") },
+                { "norse", ("#3a3f52", "#8e98b8") },
+                { "hindu", ("#6a3a12", "#e0a35a") },
+            };
+            foreach (var pair in expected)
+            {
+                var lineage = LineageDef.FromJson(RepoData.Read($"lineages/{pair.Key}.json"));
+                Assert.Equal(pair.Value.dark, lineage.HueDark);
+                Assert.Equal(pair.Value.light, lineage.HueLight);
+            }
+        }
+
+        [Fact]
+        public void Lineage_MissingHues_ReadAsNull()
+        {
+            var lineage = LineageDef.FromJson(Bare + " }");
+            Assert.Null(lineage.HueDark);
+            Assert.Null(lineage.HueLight);
+        }
+
+        [Fact]
+        public void Lineage_MalformedHue_IsRejected()
+        {
+            Assert.Throws<MapLoadException>(() => LineageDef.FromJson(Bare + @", ""hueDark"": ""teal"" }"));
+            Assert.Throws<MapLoadException>(() => LineageDef.FromJson(Bare + @", ""hueLight"": ""#12345"" }"));
+        }
+    }
 }

@@ -13,6 +13,8 @@
     "name": { "type": "string", "minLength": 1, "description": "Display name; defaults to the id." },
     "description": { "type": "string", "description": "One line of flavour: 'Pray to Agni, Vayu and Indra.'" },
     "icon": { "type": "string" },
+    "hueDark": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$", "description": "Presentation: the dark hue of the lineage's painting (portrait wash, item squares). Never a UI colour. docs/ui/language.md §1." },
+    "hueLight": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$", "description": "Presentation: the light hue of the lineage's painting." },
     "startingBlessing": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$", "description": "A boons/*.json id of kind blessing belonging to this lineage." },
     "pool": {
       "type": "array",

@@ -6,5 +6,7 @@
   "description": "Pray to Apollo, Athena and Hermes.",
   "startingBlessing": "athena-guard",
   "pool": ["apollo-eye", "zeus-favour", "hera-resolve", "apollo-bowstring", "athena-plating", "hermes-sandals", "zeus-bolt", "hermes-heels", "nike-jab"],
-  "icon": "greek"
+  "icon": "greek",
+  "hueDark": "#1d4f5c",
+  "hueLight": "#7fb7b0"
 }

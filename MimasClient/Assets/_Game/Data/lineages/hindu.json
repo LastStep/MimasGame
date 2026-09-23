@@ -6,5 +6,7 @@
   "description": "Pray to Agni, Vayu and Indra.",
   "startingBlessing": "vayu-breath",
   "pool": ["agni-warmth", "indra-wrath", "hanuman-heart", "agni-crown", "indra-mail", "vayu-haste", "agni-spark", "vayu-wings", "indra-storm"],
-  "icon": "hindu"
+  "icon": "hindu",
+  "hueDark": "#6a3a12",
+  "hueLight": "#e0a35a"
 }

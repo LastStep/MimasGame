@@ -357,8 +357,13 @@ Sigils grant an ability no item does: `dash`, `hammerfall`, `wind-step`, and par
 { "version": 1, "id": "hindu", "name": "Hindu", "description": "Pray to Agni, Vayu and Indra.",
   "startingBlessing": "vayu-breath",
   "pool": ["agni-warmth", "indra-wrath", "agni-crown", "indra-mail", "agni-spark", "vayu-wings"],
-  "icon": "hindu" }
+  "icon": "hindu", "hueDark": "#6a3a12", "hueLight": "#e0a35a" }
 ```
+
+| Key | Required | Meaning |
+|---|---|---|
+| `hueDark` | no | Presentation only: the dark hue of the lineage's painting (the examine plate's portrait wash, item squares), `#rrggbb`. Never a bar or label colour (`docs/ui/language.md` §1). Missing → the view falls back to a neutral grey |
+| `hueLight` | no | The light hue of the same painting, `#rrggbb` |
 
 `startingBlessing` (a `blessing` of this lineage; granted at select, appended to the build by the session)
 and `pool[]` (unique boon ids of this lineage the draft draws from). Link rules: the starting Blessing

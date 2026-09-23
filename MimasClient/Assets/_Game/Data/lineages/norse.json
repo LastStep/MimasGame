@@ -6,5 +6,7 @@
   "description": "Pray to Thor, Odin and Skadi.",
   "startingBlessing": "thor-vigour",
   "pool": ["berserker-blood", "skadi-hide", "thor-might", "thor-charge", "ymir-hide", "tyr-edge", "thor-hammerfall", "odin-leap", "tyr-strike"],
-  "icon": "norse"
+  "icon": "norse",
+  "hueDark": "#3a3f52",
+  "hueLight": "#8e98b8"
 }
