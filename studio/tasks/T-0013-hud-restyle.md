@@ -5,10 +5,10 @@ project: mimas
 feature: F-hud-restyle
 milestone: M4
 lane: full
-status: approved
+status: running
 owner: builder
 model: opus
-worktree:
+worktree: main
 depends_on: []
 plan: docs/specs/2026-09-23-hud-restyle.md
 allows_assets:
@@ -45,7 +45,7 @@ done_when:
   - "Web build ≤ 13 MB with the size before and after; smoke green on three engines; console clean; EditMode and Core tests up by the spec's counts, none softened"
   - "Docs: design #hud, #draft, #examine, #hidden-info; the UI book statuses; architecture; networking; STATE; run report"
 created: 2026-09-23
-started:
+started: 2026-09-23
 finished:
 cost_usd: 0
 blocked_by:
