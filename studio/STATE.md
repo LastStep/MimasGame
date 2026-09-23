@@ -1,8 +1,8 @@
 ---
 project: mimas
 milestone: M2
-updated: 2026-09-23
-updated_by: opus — the HUD restyle designed with Rohan (canvas rounds 1–3), spec written, T-0013 approved, T-0014 at plan
+updated: 2026-09-24
+updated_by: opus — T-0013 built (HUD in ink, seen flags); Web build, smoke and batch EditMode wait on the Editor being closed
 ---
 
 # Where Mimas stands
@@ -75,7 +75,7 @@ surface; the bar and the plate share the tile model). **T-0013** (match HUD, bet
 wire field) can land before the 10 Oct playtest; **T-0014** (lobby and room) follows it. Rohan **approved T-0013** the same
 evening; T-0014 waits until he has seen T-0013 built. **M3-5 (three maps vs two) is decided after the M2 playtest** (Rohan, 23 Sep).
 
-**461 Core tests, 58 server tests, 24 EditMode tests.** The Web build is **12.57 MiB** (was 12.38) against the 13 MB
+**473 Core tests, 60 server tests, 34 EditMode tests** (T-0013). The Web build is **12.57 MiB** (was 12.38) against the 13 MB
 ratchet (fonts included). T-0010's run report: `studio/runs/R-2026-09-22-T-0010-build.md`.
 
 ## The one thing to do next
@@ -127,7 +127,7 @@ tick.
 | **T-0010** | **Boons in the game** — the room hosts the session, lineage row, draft over the board, presentation of boons and reveals, practice-mode session, nine boons | **verify — FAILED 23 Sep on evidence, not code.** Five captures from one Editor practice game make it pass; list in `R-2026-09-23-verify-boons` | builder, small |
 | T-0009 | Boons groundwork in Core | **verified PASS 23 Sep** (ledger rows are ticked with T-0010, per F-boons) | done pending T-0010 |
 | **T-0012** | **The camera** — Q/E turn, WASD pan with a limit, wheel zoom, Space home, V side-on ↔ behind you | **verify** — built 23 Sep, run report `R-2026-09-23-T-0012` | Rohan plays, then verifier |
-| **T-0013** | **The match HUD in ink** — layout A, turn track, cost dots, closed-eye mark (one wire field), preview panel, ink draft cards, the band, ink examine plate, ink void | **approved** 23 Sep — spec `docs/specs/2026-09-23-hud-restyle.md` | builder (Opus), next fresh session |
+| **T-0013** | **The match HUD in ink** — layout A, turn track, cost dots, closed-eye mark (one wire field), preview panel, ink draft cards, the band, ink examine plate, ink void | **running — built 24 Sep** (11 commits `d309c8f`…`4f2ba31`, ladder green, captures in `artifacts/t0013/shots/`). **Left, with the Editor closed:** restore `UI/Fonts`, batch EditMode, Web build + size, smoke ×3; then `verify`. Run report `R-2026-09-23-T-0013` | builder |
 | **T-0014** | **The lobby and the room in ink** — two seats facing, gear tiles | **plan** — same spec §8; depends on T-0013; Rohan approves after seeing T-0013 built | builder, after T-0013 |
 | **T-0011** | **The examine panel** — manuscript plate, one hover panel, `--mimas-*` tokens, `Unit.StatLines`, lineage hues, fonts | **verify** — built 23 Sep, run report `R-2026-09-23-T-0011` | verifier needed |
 | T-0008 | Finish M2 in the browser | verify — deployed and measured live 21 Sep | verifier needed |
