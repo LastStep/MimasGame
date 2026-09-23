@@ -20,6 +20,12 @@ namespace Mimas.Core.Match
 
         public bool Revealed => Id != null;
 
+        /// <summary>
+        /// On the viewer's own unit only: whether the opponent has already seen this entry (design #hidden-info
+        /// rule 9, ADR-039). Always false on an enemy unit's entries.
+        /// </summary>
+        public bool SeenByOpponent { get; }
+
         public KnownEntry(string id)
         {
             Id = id;
@@ -29,6 +35,13 @@ namespace Mimas.Core.Match
         {
             Id = id;
             SourceItemId = sourceItemId;
+        }
+
+        public KnownEntry(string id, string sourceItemId, bool seenByOpponent)
+        {
+            Id = id;
+            SourceItemId = sourceItemId;
+            SeenByOpponent = seenByOpponent;
         }
     }
 
@@ -72,10 +85,14 @@ namespace Mimas.Core.Match
         /// <summary>Boons in grant order; hidden entries have a null id, so the <em>count</em> of picks is public and their identity is not (design: #draft rule 5).</summary>
         public IReadOnlyList<KnownEntry> Boons => _boons;
 
+        /// <summary>On the viewer's own unit only: whether the opponent knows its lineage (ADR-039). False on an enemy unit.</summary>
+        public bool LineageSeenByOpponent { get; }
+
         public UnitView(int id, int owner, IReadOnlyList<string> itemIds, Hex position, int hp, int maxHp, int ap, int apPerTurn, bool isMine,
             List<KnownEntry> abilities, List<KnownEntry> modifiers, int bodyHeight = 0, int aimHeight = 0,
-            string lineageId = null, List<KnownEntry> boons = null)
+            string lineageId = null, List<KnownEntry> boons = null, bool lineageSeenByOpponent = false)
         {
+            LineageSeenByOpponent = lineageSeenByOpponent;
             BodyHeight = bodyHeight;
             AimHeight = aimHeight;
             Id = id;
@@ -219,6 +236,10 @@ namespace Mimas.Core.Match
             if (state == null) throw new ArgumentNullException(nameof(state));
             if (viewer < 0 || viewer >= MatchSetup.PlayerCount) throw new ArgumentOutOfRangeException(nameof(viewer));
 
+            // What the opponent has seen of the viewer's own unit rides on the viewer's own entries (ADR-039):
+            // the owner cannot rebuild it, because reveals about their unit are only ever told to the other side.
+            int opponent = 1 - viewer;
+
             var units = new List<UnitView>(state.Units.Count);
             for (int i = 0; i < state.Units.All.Count; i++)
             {
@@ -239,7 +260,8 @@ namespace Mimas.Core.Match
                     }
                     string id = unit.AbilityIds[next++];
                     bool known = mine || state.Knows(viewer, unit.Id, id);
-                    abilities.Add(new KnownEntry(known ? id : null, unit.AbilitySourceOf(id)));
+                    bool seen = mine && state.Knows(opponent, unit.Id, id);
+                    abilities.Add(new KnownEntry(known ? id : null, unit.AbilitySourceOf(id), seen));
                 }
 
                 int modifierTotal = unit.ModifierIds.Count + unit.HiddenModifierCount;
@@ -256,7 +278,8 @@ namespace Mimas.Core.Match
                     ModifierDef def;
                     bool hidden = state.Catalog.Modifiers.TryGet(id, out def) && def.IsHidden;
                     bool known = mine || !hidden || state.Knows(viewer, unit.Id, id);
-                    modifiers.Add(new KnownEntry(known ? id : null));
+                    bool seen = mine && (!hidden || state.Knows(opponent, unit.Id, id));     // a public modifier is seen by construction
+                    modifiers.Add(new KnownEntry(known ? id : null, null, seen));
                 }
 
                 int boonTotal = unit.BoonIds.Count + unit.HiddenBoonCount;
@@ -271,13 +294,15 @@ namespace Mimas.Core.Match
                     }
                     string id = unit.BoonIds[next++];
                     bool known = mine || state.KnowsBoon(viewer, unit.Id, id);
-                    boons.Add(new KnownEntry(known ? id : null));
+                    bool seen = mine && state.KnowsBoon(opponent, unit.Id, id);
+                    boons.Add(new KnownEntry(known ? id : null, null, seen));
                 }
 
                 string lineage = unit.LineageId != null && (mine || state.KnowsLineage(viewer, unit.Id, unit.LineageId)) ? unit.LineageId : null;
+                bool lineageSeen = mine && unit.LineageId != null && state.KnowsLineage(opponent, unit.Id, unit.LineageId);
 
                 units.Add(new UnitView(unit.Id, unit.Owner, unit.ItemIds, unit.Position, unit.Hp, unit.MaxHp, unit.Ap, unit.ApPerTurn, mine,
-                    abilities, modifiers, unit.BodyHeight, unit.AimHeight, lineage, boons));
+                    abilities, modifiers, unit.BodyHeight, unit.AimHeight, lineage, boons, lineageSeen));
             }
 
             var props = new List<PropView>(state.Props.Count);

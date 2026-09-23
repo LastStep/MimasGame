@@ -353,17 +353,31 @@ namespace Mimas.Core.Protocol
                 var items = new JArray();
                 for (int k = 0; k < u.ItemIds.Count; k++) items.Add(u.ItemIds[k]);
 
+                // "seen" / "lineageSeen" (ADR-039) are written on the viewer's own unit only: an enemy unit's
+                // JSON carries no key for them at all.
                 var abilities = new JArray();
                 for (int a = 0; a < u.Abilities.Count; a++)
-                    abilities.Add(new JObject { ["id"] = u.Abilities[a].Id, ["source"] = u.Abilities[a].SourceItemId });
+                {
+                    var entry = new JObject { ["id"] = u.Abilities[a].Id, ["source"] = u.Abilities[a].SourceItemId };
+                    if (u.IsMine) entry["seen"] = u.Abilities[a].SeenByOpponent;
+                    abilities.Add(entry);
+                }
 
                 var modifiers = new JArray();
                 for (int m = 0; m < u.Modifiers.Count; m++)
-                    modifiers.Add(new JObject { ["id"] = u.Modifiers[m].Id });
+                {
+                    var entry = new JObject { ["id"] = u.Modifiers[m].Id };
+                    if (u.IsMine) entry["seen"] = u.Modifiers[m].SeenByOpponent;
+                    modifiers.Add(entry);
+                }
 
                 var boons = new JArray();
                 for (int b = 0; b < u.Boons.Count; b++)
-                    boons.Add(new JObject { ["id"] = u.Boons[b].Id });
+                {
+                    var entry = new JObject { ["id"] = u.Boons[b].Id };
+                    if (u.IsMine) entry["seen"] = u.Boons[b].SeenByOpponent;
+                    boons.Add(entry);
+                }
 
                 var uo = new JObject { ["id"] = u.Id, ["owner"] = u.Owner };
                 uo["items"] = items;
@@ -379,6 +393,7 @@ namespace Mimas.Core.Protocol
                 uo["modifiers"] = modifiers;
                 uo["lineage"] = u.LineageId;
                 uo["boons"] = boons;
+                if (u.IsMine) uo["lineageSeen"] = u.LineageSeenByOpponent;
                 units.Add(uo);
             }
 
@@ -428,6 +443,9 @@ namespace Mimas.Core.Protocol
                 var items = new List<string>(itemArr.Count);
                 for (int k = 0; k < itemArr.Count; k++) items.Add(itemArr[k].Value<string>());
 
+                // The seen flags (ADR-039) are required on the viewer's own unit and never read on an enemy's.
+                bool mine = Bool(u, "mine", "unit");
+
                 var abilityArr = Require(u, "abilities", "unit") as JArray;
                 if (abilityArr == null) throw new WireException("unit.abilities must be an array.");
                 var abilities = new List<KnownEntry>(abilityArr.Count);
@@ -435,7 +453,8 @@ namespace Mimas.Core.Protocol
                 {
                     var entry = abilityArr[a] as JObject;
                     if (entry == null) throw new WireException($"unit.abilities[{a}] must be an object.");
-                    abilities.Add(new KnownEntry(NullableStr(entry, "id", "ability"), NullableStr(entry, "source", "ability")));
+                    abilities.Add(new KnownEntry(NullableStr(entry, "id", "ability"), NullableStr(entry, "source", "ability"),
+                        mine && Bool(entry, "seen", "ability")));
                 }
 
                 var modifierArr = Require(u, "modifiers", "unit") as JArray;
@@ -445,7 +464,7 @@ namespace Mimas.Core.Protocol
                 {
                     var entry = modifierArr[m] as JObject;
                     if (entry == null) throw new WireException($"unit.modifiers[{m}] must be an object.");
-                    modifiers.Add(new KnownEntry(NullableStr(entry, "id", "modifier")));
+                    modifiers.Add(new KnownEntry(NullableStr(entry, "id", "modifier"), null, mine && Bool(entry, "seen", "modifier")));
                 }
 
                 var boonArr = Require(u, "boons", "unit") as JArray;
@@ -455,13 +474,13 @@ namespace Mimas.Core.Protocol
                 {
                     var entry = boonArr[b] as JObject;
                     if (entry == null) throw new WireException($"unit.boons[{b}] must be an object.");
-                    boons.Add(new KnownEntry(NullableStr(entry, "id", "boon")));
+                    boons.Add(new KnownEntry(NullableStr(entry, "id", "boon"), null, mine && Bool(entry, "seen", "boon")));
                 }
 
                 units.Add(new UnitView(Int(u, "id", "unit"), Int(u, "owner", "unit"), items, ReadHex(Require(u, "pos", "unit")),
-                    Int(u, "hp", "unit"), Int(u, "maxHp", "unit"), Int(u, "ap", "unit"), Int(u, "apPerTurn", "unit"), Bool(u, "mine", "unit"),
+                    Int(u, "hp", "unit"), Int(u, "maxHp", "unit"), Int(u, "ap", "unit"), Int(u, "apPerTurn", "unit"), mine,
                     abilities, modifiers, Int(u, "body", "unit"), Int(u, "aim", "unit"),
-                    NullableStr(u, "lineage", "unit"), boons));
+                    NullableStr(u, "lineage", "unit"), boons, mine && Bool(u, "lineageSeen", "unit")));
             }
 
             var propArr = Require(o, "props", "view") as JArray;

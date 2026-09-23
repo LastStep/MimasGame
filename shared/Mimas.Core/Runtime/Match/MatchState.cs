@@ -260,11 +260,24 @@ namespace Mimas.Core.Match
             }
 
             // Everything the viewer has been shown about the opponent is knowledge they keep: without this the
-            // mirror would re-hide a revealed ability the moment it rebuilt.
+            // mirror would re-hide a revealed ability the moment it rebuilt. And what the opponent has seen of the
+            // viewer's own unit (ADR-039) goes back into the opponent's side of the set, so the mirror's own view
+            // carries the same flags the server sent.
+            int opponent = 1 - view.Viewer;
             for (int i = 0; i < view.Units.Count; i++)
             {
                 UnitView u = view.Units[i];
-                if (u.Owner == view.Viewer) continue;
+                if (u.Owner == view.Viewer)
+                {
+                    for (int a = 0; a < u.Abilities.Count; a++)
+                        if (u.Abilities[a].Revealed && u.Abilities[a].SeenByOpponent) state._revealed.Add(opponent, u.Id, u.Abilities[a].Id);
+                    for (int m = 0; m < u.Modifiers.Count; m++)
+                        if (u.Modifiers[m].Revealed && u.Modifiers[m].SeenByOpponent) state._revealed.Add(opponent, u.Id, u.Modifiers[m].Id);
+                    for (int b = 0; b < u.Boons.Count; b++)
+                        if (u.Boons[b].Revealed && u.Boons[b].SeenByOpponent) state._revealed.Add(opponent, u.Id, BoonKey + u.Boons[b].Id);
+                    if (u.LineageId != null && u.LineageSeenByOpponent) state._revealed.Add(opponent, u.Id, LineageKey + u.LineageId);
+                    continue;
+                }
                 for (int a = 0; a < u.Abilities.Count; a++)
                     if (u.Abilities[a].Revealed) state._revealed.Add(view.Viewer, u.Id, u.Abilities[a].Id);
                 for (int m = 0; m < u.Modifiers.Count; m++)
