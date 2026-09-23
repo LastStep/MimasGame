@@ -1,6 +1,6 @@
 /*
  * The match HUD in the ink language (docs/ui/hud.md, docs/ui/between-rounds.md; spec H §7). Every colour, face,
- * size and gap is a --mimas-* token from Theme.uss: no literal colour and no --hud-* variable. Pixel positions
+ * size and gap is a --mimas-* token from Theme.uss: no literal colour and none of the old HUD palette. Pixel positions
  * are the book's, at the 1920×1080 the panel scales from (1280×720 draws them at two thirds). No panel, no box,
  * no divider (language §4): things are separated by space and captions, and the floors under the bar and the
  * track are generated fades tinted here.

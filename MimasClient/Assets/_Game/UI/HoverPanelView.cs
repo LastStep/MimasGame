@@ -271,10 +271,16 @@ namespace Mimas.Client.UI
                 x = Mathf.Max(x, _window.xMin + WindowMargin);
             }
 
+            // Whole panel pixels, and only when it really moved: at a scaled window (1280×720 draws this at two
+            // thirds) a fractional position re-rounds the panel's own size, whose change re-runs Place — a layout
+            // loop UI Toolkit reports as "struggling" every frame (found at 720, 23 Sep 2026).
             Vector2 origin = _container.worldBound.position;
-            _root.style.left = x - origin.x;
-            _root.style.top = y - origin.y;
+            float left = Mathf.Round(x - origin.x), top = Mathf.Round(y - origin.y);
+            if (float.IsNaN(_placedLeft) || Mathf.Abs(left - _placedLeft) >= 1f) { _root.style.left = left; _placedLeft = left; }
+            if (float.IsNaN(_placedTop) || Mathf.Abs(top - _placedTop) >= 2f) { _root.style.top = top; _placedTop = top; }
         }
+
+        private float _placedLeft = float.NaN, _placedTop = float.NaN;
 
         private static VisualElement NumberTile(HoverNumber n)
         {
