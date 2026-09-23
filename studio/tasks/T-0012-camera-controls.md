@@ -5,7 +5,7 @@ project: mimas
 feature: F-camera
 milestone: M4
 lane: full
-status: running
+status: verify
 owner: builder
 model: opus
 worktree:
@@ -34,7 +34,7 @@ done_when:
   - "Docs: design #camera, ADR-038, Presentation README, STATE, run report"
 created: 2026-09-23
 started: 2026-09-23
-finished:
+finished: 2026-09-23
 cost_usd: 0
 blocked_by:
 ---
