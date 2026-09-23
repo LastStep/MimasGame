@@ -1,8 +1,9 @@
 /*
- * The examine plate (docs/ui/examine.md, spec E §7.3). Paper, ink type, serif names; no hairlines, no
- * boxed sections: a section is a caption and 18px of air (E3). Every colour, face and size is a --mimas-*
- * token from Theme.uss; this file holds no literal colour and no font file. The owner's accent is
- * --ex-accent, set once by ex--mine / ex--theirs.
+ * The examine plate (docs/ui/examine.md, spec E §7.3, spec H §7.9). Ink, like every other surface since the
+ * HUD session (ADR-040): bone type, names and captions in capitals; no hairlines, no boxed sections: a
+ * section is a caption and 18px of air (E3). Every colour, face and size is a --mimas-* token from
+ * Theme.uss; this file holds no literal colour and no font file. The owner's accent is --ex-accent, set
+ * once by ex--mine / ex--theirs.
  */
 
 .ex-root {
@@ -14,11 +15,11 @@
 }
 
 .ex--mine {
-    --ex-accent: var(--mimas-paper-you);
+    --ex-accent: var(--mimas-you);
 }
 
 .ex--theirs {
-    --ex-accent: var(--mimas-paper-them);
+    --ex-accent: var(--mimas-them);
 }
 
 /* ---- the wash ---------------------------------------------------------------------------------- */
@@ -47,7 +48,7 @@
     top: 0;
     bottom: 0;
     width: var(--mimas-plate-w);
-    background-color: var(--mimas-paper);
+    background-color: var(--mimas-ink);
     padding-top: var(--mimas-plate-pad);
     padding-bottom: 0;
     padding-left: var(--mimas-plate-pad-x);
@@ -101,18 +102,20 @@
 }
 
 .ex-name {
-    -unity-font-definition: var(--mimas-font-serif);
-    font-size: var(--mimas-text-36);
-    color: var(--mimas-paper-fg);
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-28);
+    letter-spacing: var(--mimas-caps-tracking-wide);
+    color: var(--mimas-fg);
     margin: 0;
     padding: 0;
 }
 
 .ex-lineage {
-    -unity-font-definition: var(--mimas-font-serif-italic);
-    font-size: var(--mimas-text-17);
-    color: var(--mimas-paper-fg-2);
-    margin: 0;
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-12);
+    letter-spacing: var(--mimas-caps-tracking-wide);
+    color: var(--ex-accent);
+    margin: 4px 0 0 0;
     padding: 0;
 }
 
@@ -129,11 +132,11 @@
 .ex-close-glyph {
     width: 14px;
     height: 14px;
-    --glyph-color: var(--mimas-paper-fg-3);
+    --glyph-color: var(--mimas-fg-3);
 }
 
 .ex-close:hover .ex-close-glyph {
-    --glyph-color: var(--mimas-paper-fg);
+    --glyph-color: var(--mimas-fg);
 }
 
 /* ---- the scrolling body ------------------------------------------------------------------------ */
@@ -173,7 +176,7 @@
 }
 
 .ex-body .unity-scroller--vertical .unity-base-slider__dragger {
-    background-color: var(--mimas-paper-hair);
+    background-color: var(--mimas-hair);
     border-width: 0;
     width: 2px;
     left: 0;
@@ -185,7 +188,7 @@
 
 /* Rows that open the hover panel get the faint hover ground (language §5 state.hover). */
 .ex-row:hover {
-    background-color: var(--mimas-paper-hover);
+    background-color: var(--mimas-hover);
 }
 
 /* ---- vitals ------------------------------------------------------------------------------------ */
@@ -220,7 +223,7 @@
 .ex-vital-value {
     -unity-font-definition: var(--mimas-font-display);
     font-size: var(--mimas-text-38);
-    color: var(--mimas-paper-fg);
+    color: var(--mimas-fg);
     margin: 0;
     padding: 0;
     min-width: 22px;
@@ -229,7 +232,7 @@
 .ex-vital-max {
     -unity-font-definition: var(--mimas-font-caps);
     font-size: var(--mimas-text-12);
-    color: var(--mimas-paper-fg-3);
+    color: var(--mimas-fg-3);
     margin: 6px 0 0 8px;
     padding: 0;
 }
@@ -238,7 +241,7 @@
     flex-grow: 1;
     height: var(--mimas-bar);
     margin-left: 18px;
-    background-color: var(--mimas-paper-hair);
+    background-color: var(--mimas-hair);
 }
 
 .ex-bar-fill {
@@ -268,13 +271,13 @@
     width: 16px;
     height: 16px;
     margin-right: 6px;
-    --glyph-color: var(--mimas-paper-fg-3);
+    --glyph-color: var(--mimas-fg-3);
 }
 
 .ex-height-value {
     -unity-font-definition: var(--mimas-font-display);
     font-size: var(--mimas-text-20);
-    color: var(--mimas-paper-fg);
+    color: var(--mimas-fg);
     margin: 0;
     padding: 0;
 }
@@ -283,7 +286,7 @@
     -unity-font-definition: var(--mimas-font-caps);
     font-size: var(--mimas-text-11);
     letter-spacing: var(--mimas-caps-tracking);
-    color: var(--mimas-paper-fg-3);
+    color: var(--mimas-fg-3);
     margin: 3px 0 0 6px;
     padding: 0;
 }
@@ -291,7 +294,7 @@
 .ex-description {
     -unity-font-definition: var(--mimas-font-body);
     font-size: var(--mimas-text-14);
-    color: var(--mimas-paper-fg-2);
+    color: var(--mimas-fg-2);
     white-space: normal;
     margin: 0;
     margin-bottom: var(--mimas-gap-section);
@@ -316,9 +319,9 @@
 /* ---- section captions: a caption and air, never a line ----------------------------------------- */
 
 .ex-caption {
-    -unity-font-definition: var(--mimas-font-serif-semibold);
-    font-size: var(--mimas-text-17);
-    letter-spacing: var(--mimas-caps-tracking);
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-11);
+    letter-spacing: var(--mimas-caps-tracking-wide);
     color: var(--ex-accent);
     margin: 0 0 4px 0;
     padding: 0;
@@ -346,7 +349,7 @@
 .ex-stat-base {
     -unity-font-definition: var(--mimas-font-display);
     font-size: var(--mimas-text-28);
-    color: var(--mimas-paper-fg);
+    color: var(--mimas-fg);
     margin: 0;
     padding: 0;
 }
@@ -359,15 +362,15 @@
 }
 
 .ex-stat-net--up {
-    color: var(--mimas-paper-up);
+    color: var(--mimas-up);
 }
 
 .ex-stat-net--down {
-    color: var(--mimas-paper-down);
+    color: var(--mimas-down);
 }
 
 .ex-stat-net--hidden {
-    color: var(--mimas-paper-fg-3);
+    color: var(--mimas-fg-3);
 }
 
 .ex-stat-label {
@@ -380,14 +383,14 @@
     width: 11px;
     height: 11px;
     margin-right: 5px;
-    --glyph-color: var(--mimas-paper-fg-3);
+    --glyph-color: var(--mimas-fg-3);
 }
 
 .ex-stat-caption {
     -unity-font-definition: var(--mimas-font-caps);
     font-size: var(--mimas-text-11);
     letter-spacing: var(--mimas-caps-tracking);
-    color: var(--mimas-paper-fg-3);
+    color: var(--mimas-fg-3);
     margin: 0;
     padding: 0;
     white-space: normal;
@@ -416,9 +419,10 @@
 }
 
 .ex-boon-name {
-    -unity-font-definition: var(--mimas-font-serif-semibold);
-    font-size: var(--mimas-text-19);
-    color: var(--mimas-paper-fg);
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-14);
+    letter-spacing: var(--mimas-caps-tracking);
+    color: var(--mimas-fg);
     flex-grow: 1;
     margin: 0;
     padding: 0;
@@ -427,17 +431,17 @@
 .ex-boon-on {
     -unity-font-definition: var(--mimas-font-body);
     font-size: var(--mimas-text-12);
-    color: var(--mimas-paper-fg-3);
+    color: var(--mimas-fg-3);
     margin: 0;
     padding: 0;
 }
 
 .ex-boon--unrevealed .ex-boon-glyph {
-    --glyph-color: var(--mimas-paper-fg-3);
+    --glyph-color: var(--mimas-fg-3);
 }
 
 .ex-boon--unrevealed .ex-boon-name {
-    color: var(--mimas-paper-fg-3);
+    color: var(--mimas-fg-3);
 }
 
 .glyph-question {
@@ -482,14 +486,15 @@
 .ex-item-slot-glyph {
     width: 14px;
     height: 14px;
-    --glyph-color: var(--mimas-paper);
+    --glyph-color: var(--mimas-ink);
     opacity: 0.7;
 }
 
 .ex-item-name {
-    -unity-font-definition: var(--mimas-font-serif-semibold);
-    font-size: var(--mimas-text-20);
-    color: var(--mimas-paper-fg);
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-15);
+    letter-spacing: var(--mimas-caps-tracking);
+    color: var(--mimas-fg);
     flex-grow: 1;
     margin: 0;
     padding: 0;
@@ -498,7 +503,7 @@
 .ex-item-stat {
     -unity-font-definition: var(--mimas-font-body);
     font-size: var(--mimas-text-12);
-    color: var(--mimas-paper-up);
+    color: var(--mimas-up);
     margin: 0;
     padding: 0;
 }
@@ -506,7 +511,7 @@
 .ex-item-note {
     -unity-font-definition: var(--mimas-font-body);
     font-size: var(--mimas-text-12);
-    color: var(--mimas-paper-fg-3);
+    color: var(--mimas-fg-3);
     margin: 2px 0 0 40px;
     padding: 0;
 }
@@ -527,9 +532,9 @@
 .ex-tile-box {
     width: var(--mimas-tile-size);
     height: var(--mimas-tile-size);
-    background-color: var(--mimas-paper-tile);
+    background-color: var(--mimas-tile);
     border-width: 1px;
-    border-color: var(--mimas-paper-hair);
+    border-color: var(--mimas-hair);
     align-items: center;
     justify-content: center;
 }
@@ -537,7 +542,7 @@
 .ex-tile-letter {
     -unity-font-definition: var(--mimas-font-caps);
     font-size: var(--mimas-text-15);
-    color: var(--mimas-paper-fg-2);
+    color: var(--mimas-fg-2);
     margin: 0;
     padding: 0;
 }
@@ -546,7 +551,7 @@
     -unity-font-definition: var(--mimas-font-caps);
     font-size: var(--mimas-text-10);
     letter-spacing: var(--mimas-caps-tracking);
-    color: var(--mimas-paper-fg-3);
+    color: var(--mimas-fg-3);
     -unity-text-align: upper-center;
     margin: 3px 0 0 0;
     padding: 0 2px 0 2px;
@@ -556,7 +561,7 @@
 
 .ex-tile--changed .ex-tile-box,
 .ex-tile--added .ex-tile-box {
-    border-color: var(--mimas-paper-changed);
+    border-color: var(--mimas-changed);
 }
 
 .ex-tile-mark {
@@ -565,7 +570,7 @@
     top: -5px;
     width: 9px;
     height: 9px;
-    --glyph-color: var(--mimas-paper-changed);
+    --glyph-color: var(--mimas-changed);
 }
 
 /* An unseen tile is drawn by a dashed frame, not a border: USS has no dashed border. */
@@ -580,9 +585,9 @@
     top: 0;
     right: 0;
     bottom: 0;
-    --glyph-color: var(--mimas-paper-fg-3);
+    --glyph-color: var(--mimas-fg-3);
 }
 
 .ex-tile--unseen .ex-tile-letter {
-    color: var(--mimas-paper-fg-3);
+    color: var(--mimas-fg-3);
 }

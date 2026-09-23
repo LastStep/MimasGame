@@ -21,6 +21,10 @@ namespace Mimas.Client.UI
         private const float HoverDelayMs = 120f;
         private const float TallWindow = 900f;
 
+        /// <summary>Fallbacks for the painting before the plate's style resolves: language §1 <c>ink</c> and <c>fg</c> (bone).</summary>
+        private static readonly Color Ink = new Color32(11, 11, 14, 255);
+        private static readonly Color Bone = new Color32(239, 233, 220, 255);
+
         private readonly VisualElement _hudRoot;
         private readonly VisualElement _root;
         private readonly VisualElement _wash;
@@ -169,24 +173,25 @@ namespace Mimas.Client.UI
             _root.EnableInClassList("ex--theirs", !model.IsMine && !model.IsProp);
             _root.EnableInClassList("ex--prop", model.IsProp);
 
-            // The painting: the lineage's two hues fading into paper; grey when the lineage is unknown.
-            Color paper = _plate.resolvedStyle.backgroundColor;
-            if (paper.a <= 0f) paper = new Color(0.914f, 0.886f, 0.824f);
+            // The painting: the lineage's two hues fading into the plate's ink; grey when the lineage is unknown.
+            Color ground = _plate.resolvedStyle.backgroundColor;
+            if (ground.a <= 0f) ground = Ink;
             Color dark, light;
             bool known = TryHue(model.HueDark, out dark) & TryHue(model.HueLight, out light);
             if (!known)
             {
-                // Neutral: the paper's own ink at two strengths (docs/ui/examine.md §3.1 "neutral grey wash").
-                dark = Color.Lerp(paper, new Color(0.086f, 0.082f, 0.102f), 0.55f);
-                light = Color.Lerp(paper, new Color(0.086f, 0.082f, 0.102f), 0.25f);
+                // Neutral: bone breathed onto the ink at two strengths (docs/ui/examine.md §3.1 "neutral grey wash").
+                dark = Color.Lerp(ground, Bone, 0.05f);
+                light = Color.Lerp(ground, Bone, 0.10f);
             }
-            _portrait.style.backgroundImage = new StyleBackground(Ramps.Painting(dark, light, paper));
+            _portrait.style.backgroundImage = new StyleBackground(Ramps.Painting(dark, light, ground));
             _emblem.Shape = model.LineageIcon;
             _emblem.style.display = string.IsNullOrEmpty(model.LineageIcon) ? DisplayStyle.None : DisplayStyle.Flex;
             _emblem.Tint = light;
 
-            _name.text = model.Name ?? string.Empty;
-            _lineage.text = model.LineageLine ?? string.Empty;
+            // Names and captions are capitals (docs/ui/examine.md, ink): USS has no text-transform.
+            _name.text = (model.Name ?? string.Empty).ToUpperInvariant();
+            _lineage.text = (model.LineageLine ?? string.Empty).ToUpperInvariant();
 
             _hpValue.text = model.Hp.ToString();
             _hpMax.text = "/ " + model.MaxHp;
@@ -254,7 +259,7 @@ namespace Mimas.Client.UI
             var glyph = new Glyph(boon.Revealed ? HoverContents.KindShape(boon.Kind) : GlyphPaths.Unknown) { Filled = boon.Starting };
             glyph.AddToClassList("ex-boon-glyph");
             row.Add(glyph);
-            row.Add(Text(boon.Revealed ? boon.Name : "Unrevealed", "ex-boon-name"));
+            row.Add(Text((boon.Revealed ? boon.Name : "Unrevealed").ToUpperInvariant(), "ex-boon-name"));
             if (!string.IsNullOrEmpty(boon.OnItemName)) row.Add(Text(boon.OnItemName, "ex-boon-on"));
 
             HudBoon captured = boon;
@@ -277,7 +282,7 @@ namespace Mimas.Client.UI
             slotGlyph.AddToClassList("ex-item-slot-glyph");
             square.Add(slotGlyph);
             head.Add(square);
-            head.Add(Text(item.Name, "ex-item-name"));
+            head.Add(Text((item.Name ?? string.Empty).ToUpperInvariant(), "ex-item-name"));
             if (!string.IsNullOrEmpty(item.StatLine)) head.Add(Text(item.StatLine, "ex-item-stat"));
             HudItem captured = item;
             RegisterHover(head, () => HoverContents.Item(captured));

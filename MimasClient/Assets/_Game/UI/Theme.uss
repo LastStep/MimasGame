@@ -1,16 +1,16 @@
 /*
  * The Mimas interface language as USS variables (docs/ui/language.md). Every colour, face, size and gap
- * a screen in the new language uses is declared here once and nowhere else; Examine.uss and
- * HoverPanel.uss contain no literal colour or font. Imported first by MatchHud.uss and Lobby.uss.
+ * a screen in the new language uses is declared here once and nowhere else; Examine.uss,
+ * HoverPanel.uss and MatchHud.uss contain no literal colour or font. Imported first by MatchHud.uss and
+ * Lobby.uss.
  *
- * Two surfaces: ink (the board HUD, hover panels) and paper (the examine plate). A token that differs
- * between them has both: --mimas-fg is the ink value, --mimas-paper-fg the paper one.
- *
- * Today's --hud-* variables in MatchHud.uss stay until the bar and lobby adopt these (follow-up).
+ * One surface: ink (decided 23 Sep 2026, HUD session round 3, ADR-040). The board HUD, the hover panel,
+ * the examine plate, the draft cards, the round band and the lobby are all ink; the second surface and its
+ * face are retired and no longer declared.
  */
 
 :root {
-    /* ---- §1 colour: ink surface ---- */
+    /* ---- §1 colour ---- */
     --mimas-ink: #0b0b0e;
     --mimas-ink-2: #121217;
     --mimas-fg: #efe9dc;
@@ -25,23 +25,28 @@
     --mimas-up: #8fdc7a;
     --mimas-down: #ff6a5c;
 
-    /* ---- §1 colour: paper surface ---- */
-    --mimas-paper: #e9e2d2;
-    --mimas-paper-fg: #16151a;
-    --mimas-paper-fg-2: rgba(22, 21, 26, 0.76);
-    --mimas-paper-fg-3: rgba(22, 21, 26, 0.58);
-    --mimas-paper-hair: rgba(22, 21, 26, 0.16);
-    --mimas-paper-tile: rgba(22, 21, 26, 0.06);
-    --mimas-paper-you: #1f7f78;
-    --mimas-paper-them: #c8321f;
-    --mimas-paper-amount: #e9b45c;
-    --mimas-paper-changed: #5a48c8;
-    --mimas-paper-up: #2f7d3a;
-    --mimas-paper-down: #c8321f;
+    /* `you` at the alphas the action-bar states use (§5): armed 10%, primary buttons 14%, done 18%, spends 28%. */
+    --mimas-you-10: rgba(95, 211, 200, 0.10);
+    --mimas-you-14: rgba(95, 211, 200, 0.14);
+    --mimas-you-18: rgba(95, 211, 200, 0.18);
+    --mimas-you-28: rgba(95, 211, 200, 0.28);
 
-    /* Row hover ground (§5 state.hover: fg at 4.5%), per surface. */
+    /* Ink at the alphas the HUD lays over the board: a tag's bar ground (50%), End Turn and the boon circles (55%),
+       the cursor tag (82%). */
+    --mimas-ink-50: rgba(11, 11, 14, 0.50);
+    --mimas-ink-55: rgba(11, 11, 14, 0.55);
+    --mimas-ink-82: rgba(11, 11, 14, 0.82);
+
+    /* The round moments' band (§1 band) and the draft's scrim over the board. */
+    --mimas-band: rgba(11, 11, 14, 0.86);
+    --mimas-scrim: rgba(11, 11, 14, 0.80);
+
+    /* The floors under the bar and the track (docs/ui/hud.md §2): tints for Ramps.Vertical. */
+    --mimas-floor: rgba(11, 11, 14, 0.86);
+    --mimas-floor-top: rgba(11, 11, 14, 0.62);
+
+    /* Row hover ground (§5 state.hover: fg at 4.5%). */
     --mimas-hover: rgba(239, 233, 220, 0.045);
-    --mimas-paper-hover: rgba(22, 21, 26, 0.045);
 
     /* The ground under a number tile in the hover panel (§6: "on a 4% ground"). */
     --mimas-number-ground: rgba(239, 233, 220, 0.04);
@@ -55,13 +60,12 @@
     /* ---- §2 type: faces (Latin subsets, SIL OFL; Josefin Sans unmodified) ---- */
     --mimas-font-display: url("Fonts/JosefinSans-Light SDF.asset");
     --mimas-font-caps: url("Fonts/JosefinSans-Regular SDF.asset");
-    --mimas-font-serif: url("Fonts/CormorantGaramond-Bold SDF.asset");
-    --mimas-font-serif-semibold: url("Fonts/CormorantGaramond-SemiBold SDF.asset");
-    --mimas-font-serif-italic: url("Fonts/CormorantGaramond-MediumItalic SDF.asset");
     --mimas-font-body: url("Fonts/Sora-Regular SDF.asset");
 
     /* ---- §2 type: the scale (raised 23 Sep 2026 for readability: nothing under 10px at 1080, and the
-       HUD scales down with the window, so 1280×720 draws these at two thirds). A new size is a decision. */
+       HUD scales down with the window, so 1280×720 draws these at two thirds). A new size is a decision:
+       56 is the room code's alone (docs/ui/lobby.md). */
+    --mimas-text-56: 56px;
     --mimas-text-38: 38px;
     --mimas-text-36: 36px;
     --mimas-text-28: 28px;
@@ -92,6 +96,14 @@
     --mimas-panel-w: 340px;
     --mimas-panel-tile: 46px;
     --mimas-panel-edge: 2px;
+
+    /* The HUD's own sizes (language §4): buttons, the turn track, a draft card, the distance from the window edge. */
+    --mimas-button-w: 230px;
+    --mimas-button-h: 58px;
+    --mimas-track-w: 620px;
+    --mimas-card-w: 360px;
+    --mimas-card-h: 470px;
+    --mimas-edge: 40px;
 
     /* USS has no box-shadow: the panel's shadow is a blurred-looking offset layer in this colour (drift). */
     --mimas-shadow-panel: rgba(0, 0, 0, 0.6);

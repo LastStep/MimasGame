@@ -1,6 +1,6 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" xmlns:mimas="Mimas.Client.UI" editor-extension-mode="False">
     <!--
-        The examine plate (docs/ui/examine.md §3, spec E §7.3): the manuscript, paper, one column. Every element
+        The examine plate (docs/ui/examine.md §3, spec E §7.3, spec H §7.9): ink, one column. Every element
         of the book's inventory exists by its id as the element's name; rows that repeat (boons, items, tiles)
         are built by ExamineView under the named containers with the same ids ("ex.boon[0]",
         "ex.item[weapon]", "ex.item[weapon].tile[0]"). Styling is by class only: an id with dots cannot be a
@@ -14,7 +14,7 @@
 
         <ui:VisualElement name="ex.plate" class="ex-plate">
 
-            <!-- The painting: the lineage's hues fading into paper, the emblem huge and faint. -->
+            <!-- The painting: the lineage's hues fading into ink, the emblem huge and faint. -->
             <ui:VisualElement name="ex.portrait" class="ex-portrait" picking-mode="Ignore">
                 <mimas:Glyph name="ex.emblem" class="ex-emblem" shape="laurel" />
                 <ui:VisualElement class="ex-titles" picking-mode="Ignore">
