@@ -9,6 +9,7 @@
 //   node tools/smoke/browser-smoke.mjs --expect "\\[NetClient\\] connected"
 //   node tools/smoke/browser-smoke.mjs --url http://localhost:7777/?room=ABCD --shot artifacts/smoke
 //   node tools/smoke/browser-smoke.mjs --do "wait:2000,click:480,420,type:ABCD,shot:after-click,wait:8000"
+//   node tools/smoke/browser-smoke.mjs --do "click:239,637,move:891,345,shot:preview"   (move: no press)
 //   node tools/smoke/browser-smoke.mjs --url https://mimas.laststep.cloud/ --timing
 //   node tools/smoke/browser-smoke.mjs --browser webkit --timing
 //   node tools/smoke/browser-smoke.mjs --headed --do "wait:3000,click:640,520,wait:2000,clipmatch:^[A-HJ-NP-Z2-9]{4}$"
@@ -234,6 +235,15 @@ async function runSteps(page, spec, dir, say, browserName = 'chromium') {
       // wasPressedThisFrame to the Input System, so a board click would silently do nothing.
       await page.mouse.click(box.x + x, box.y + y, { delay: 80 });
       say(`click ${x},${y} (canvas-relative)`);
+    } else if (verb === 'move') {
+      // Rests the pointer without pressing, in steps so the page sees it travel: how an armed attack's
+      // preview over the target is reached, since a click there would fire it.
+      const x = Number(first);
+      const y = Number(parts[++i]);
+      const box = await page.locator('#unity-canvas').boundingBox();
+      if (!box) throw new Error('cannot move: #unity-canvas has no box');
+      await page.mouse.move(box.x + x, box.y + y, { steps: 8 });
+      say(`move ${x},${y} (canvas-relative)`);
     } else if (verb === 'key') {
       await page.keyboard.press(first);
       say(`key ${first}`);
