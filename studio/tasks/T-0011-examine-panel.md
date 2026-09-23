@@ -34,6 +34,8 @@ allows_assets:
   - 'MimasClient/Assets/_Game/Presentation/Match/ExamineModelBuilder.cs.meta'
   - 'MimasClient/Assets/_Game/Tests/EditMode/ExamineModelTests.cs.meta'
   - 'MimasClient/Assets/_Game/Editor/Fonts.cs.meta'
+  # Added in the session (spec §0.6): the §13 round-3 preview menu item's script.
+  - 'MimasClient/Assets/_Game/Editor/ExaminePreview.cs.meta'
   # Spec §11: captures land under Assets/_Shots (never a Temp folder); the folder .meta already exists.
   - 'MimasClient/Assets/_Shots/**'
 # Rungs by number (studio/game.yaml): 0 asset safety, 1 core build, 2 core tests, 5 server integration.
