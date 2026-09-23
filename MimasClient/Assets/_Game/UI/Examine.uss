@@ -1,0 +1,604 @@
+/*
+ * The examine plate (docs/ui/examine.md, spec E §7.3). Paper, ink type, serif names; no hairlines, no
+ * boxed sections: a section is a caption and 18px of air (E3). Every colour, face and size is a --mimas-*
+ * token from Theme.uss; this file holds no literal colour and no font file. The owner's accent is
+ * --ex-accent, set once by ex--mine / ex--theirs.
+ */
+
+.ex-root {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+}
+
+.ex--mine {
+    --ex-accent: var(--mimas-paper-you);
+}
+
+.ex--theirs {
+    --ex-accent: var(--mimas-paper-them);
+}
+
+/* ---- the scrim and the wash ------------------------------------------------------------------ */
+
+.ex-scrim {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    display: none;
+}
+
+.ex--open .ex-scrim {
+    display: flex;
+}
+
+/* A white ramp drawn by the view, tinted to the wash token: ink at 45% at the plate, nothing 200px out. */
+.ex-wash {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: var(--mimas-plate-w);
+    width: 200px;
+    -unity-background-image-tint-color: var(--mimas-wash);
+    -unity-background-scale-mode: stretch-to-fill;
+    opacity: 0;
+    transition-property: opacity;
+    transition-duration: 0.16s;
+}
+
+.ex--open .ex-wash {
+    opacity: 1;
+}
+
+/* ---- the plate --------------------------------------------------------------------------------- */
+
+.ex-plate {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: var(--mimas-plate-w);
+    background-color: var(--mimas-paper);
+    padding-top: var(--mimas-plate-pad);
+    padding-bottom: 0;
+    padding-left: var(--mimas-plate-pad-x);
+    padding-right: var(--mimas-plate-pad-x);
+    translate: 100% 0;
+    transition-property: translate;
+    transition-duration: 0.16s;
+    transition-timing-function: ease-out-cubic;
+    overflow: hidden;
+}
+
+.ex--open .ex-plate {
+    translate: 0 0;
+}
+
+/* The painting bleeds to the plate's edges; its height is set by the view (210, or 120 below 900px). */
+.ex-portrait {
+    margin-top: -22px;                              /* bleeds through --mimas-plate-pad */
+    margin-left: -20px;                             /* and through --mimas-plate-pad-x */
+    margin-right: -20px;
+    height: 210px;
+    flex-shrink: 0;
+    justify-content: flex-end;
+    padding-left: var(--mimas-plate-pad-x);
+    padding-right: var(--mimas-plate-pad-x);
+    padding-bottom: 10px;
+    -unity-background-scale-mode: stretch-to-fill;
+}
+
+.ex--short .ex-portrait {
+    height: 120px;
+}
+
+.ex-emblem {
+    position: absolute;
+    right: -26px;
+    top: -8px;
+    width: 220px;
+    height: 220px;
+    opacity: 0.5;
+    --glyph-stroke: 1.2;
+}
+
+.ex--short .ex-emblem {
+    width: 130px;
+    height: 130px;
+    right: -10px;
+    top: -6px;
+}
+
+.ex-titles {
+    flex-direction: column;
+}
+
+.ex-name {
+    -unity-font-definition: var(--mimas-font-serif);
+    font-size: var(--mimas-text-32);
+    color: var(--mimas-paper-fg);
+    margin: 0;
+    padding: 0;
+}
+
+.ex-lineage {
+    -unity-font-definition: var(--mimas-font-serif-italic);
+    font-size: var(--mimas-text-15);
+    color: var(--mimas-paper-fg-2);
+    margin: 0;
+    padding: 0;
+}
+
+.ex-close {
+    position: absolute;
+    right: 14px;
+    top: 14px;
+    width: 22px;
+    height: 22px;
+    align-items: center;
+    justify-content: center;
+}
+
+.ex-close-glyph {
+    width: 14px;
+    height: 14px;
+    --glyph-color: var(--mimas-paper-fg-3);
+}
+
+.ex-close:hover .ex-close-glyph {
+    --glyph-color: var(--mimas-paper-fg);
+}
+
+/* ---- the scrolling body ------------------------------------------------------------------------ */
+
+.ex-body {
+    flex-grow: 1;
+    flex-shrink: 1;
+}
+
+.ex-body .unity-scroll-view__content-container {
+    padding-top: 14px;
+    padding-bottom: var(--mimas-plate-pad);
+    padding-right: 6px;
+}
+
+/* A 2px scroller in the hair colour: no arrows, no track. */
+.ex-body .unity-scroller--vertical {
+    width: 2px;
+    min-width: 2px;
+    border-width: 0;
+    background-color: var(--mimas-clear);
+}
+
+.ex-body .unity-scroller--vertical .unity-scroller__low-button,
+.ex-body .unity-scroller--vertical .unity-scroller__high-button {
+    display: none;
+}
+
+.ex-body .unity-scroller--vertical .unity-slider {
+    margin: 0;
+    width: 2px;
+}
+
+.ex-body .unity-scroller--vertical .unity-base-slider__tracker {
+    background-color: var(--mimas-clear);
+    border-width: 0;
+}
+
+.ex-body .unity-scroller--vertical .unity-base-slider__dragger {
+    background-color: var(--mimas-paper-hair);
+    border-width: 0;
+    width: 2px;
+    left: 0;
+}
+
+.ex-body .unity-scroller--vertical .unity-base-slider__dragger-border {
+    display: none;
+}
+
+/* Rows that open the hover panel get the faint hover ground (language §5 state.hover). */
+.ex-row:hover {
+    background-color: var(--mimas-paper-hover);
+}
+
+/* ---- vitals ------------------------------------------------------------------------------------ */
+
+.ex-vitals {
+    flex-direction: column;
+    margin-bottom: var(--mimas-gap-section);
+}
+
+.ex-vital {
+    flex-direction: row;
+    align-items: center;
+    height: 38px;
+}
+
+.ex-vitals-second {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.ex-vital-glyph {
+    width: 16px;
+    height: 16px;
+    margin-right: 10px;
+}
+
+.ex-accent-glyph {
+    --glyph-color: var(--ex-accent);
+}
+
+.ex-vital-value {
+    -unity-font-definition: var(--mimas-font-display);
+    font-size: var(--mimas-text-34);
+    color: var(--mimas-paper-fg);
+    margin: 0;
+    padding: 0;
+    min-width: 22px;
+}
+
+.ex-vital-max {
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-10);
+    color: var(--mimas-paper-fg-3);
+    margin: 6px 0 0 8px;
+    padding: 0;
+}
+
+.ex-bar {
+    flex-grow: 1;
+    height: var(--mimas-bar);
+    margin-left: 18px;
+    background-color: var(--mimas-paper-hair);
+}
+
+.ex-bar-fill {
+    height: var(--mimas-bar);
+    background-color: var(--ex-accent);
+}
+
+.ex-eggs {
+    flex-direction: row;
+    margin-left: 14px;
+}
+
+.ex-egg {
+    width: 12px;
+    height: 12px;
+    margin-right: 4px;
+    --glyph-color: var(--ex-accent);
+    --glyph-stroke: 2.4;
+}
+
+.ex-height {
+    flex-direction: row;
+    align-items: center;
+}
+
+.ex-height-glyph {
+    width: 14px;
+    height: 14px;
+    margin-right: 6px;
+    --glyph-color: var(--mimas-paper-fg-3);
+}
+
+.ex-height-value {
+    -unity-font-definition: var(--mimas-font-display);
+    font-size: var(--mimas-text-17);
+    color: var(--mimas-paper-fg);
+    margin: 0;
+    padding: 0;
+}
+
+.ex-height-caption {
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-7-5);
+    letter-spacing: var(--mimas-caps-tracking);
+    color: var(--mimas-paper-fg-3);
+    margin: 3px 0 0 6px;
+    padding: 0;
+}
+
+.ex-description {
+    -unity-font-definition: var(--mimas-font-body);
+    font-size: var(--mimas-text-12);
+    color: var(--mimas-paper-fg-2);
+    white-space: normal;
+    margin: 0;
+    margin-bottom: var(--mimas-gap-section);
+    padding: 0;
+    display: none;
+}
+
+.ex--prop .ex-description {
+    display: flex;
+}
+
+/* A prop's plate is name, height and health only (§13). */
+.ex--prop .ex-caption,
+.ex--prop .ex-stats,
+.ex--prop .ex-boons,
+.ex--prop .ex-equipment,
+.ex--prop .ex-eggs,
+.ex--prop .ex-vitals-second > .ex-vital {
+    display: none;
+}
+
+/* ---- section captions: a caption and air, never a line ----------------------------------------- */
+
+.ex-caption {
+    -unity-font-definition: var(--mimas-font-serif-semibold);
+    font-size: var(--mimas-text-15);
+    letter-spacing: var(--mimas-caps-tracking);
+    color: var(--ex-accent);
+    margin: 0 0 6px 0;
+    padding: 0;
+}
+
+/* ---- stats: a 3×2 grid of base, net, glyph and caption ------------------------------------------ */
+
+.ex-stats {
+    flex-direction: row;
+    flex-wrap: wrap;
+    margin-bottom: var(--mimas-gap-section);
+}
+
+.ex-stat {
+    width: 33.33%;
+    flex-direction: column;
+    padding: 3px 0 6px 0;
+}
+
+.ex-stat-numbers {
+    flex-direction: row;
+    align-items: flex-end;
+}
+
+.ex-stat-base {
+    -unity-font-definition: var(--mimas-font-display);
+    font-size: var(--mimas-text-24);
+    color: var(--mimas-paper-fg);
+    margin: 0;
+    padding: 0;
+}
+
+.ex-stat-net {
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-12);
+    margin: 0 0 4px 6px;
+    padding: 0;
+}
+
+.ex-stat-net--up {
+    color: var(--mimas-paper-up);
+}
+
+.ex-stat-net--down {
+    color: var(--mimas-paper-down);
+}
+
+.ex-stat-net--hidden {
+    color: var(--mimas-paper-fg-3);
+}
+
+.ex-stat-label {
+    flex-direction: row;
+    align-items: center;
+    margin-top: 2px;
+}
+
+.ex-stat-glyph {
+    width: 9px;
+    height: 9px;
+    margin-right: 5px;
+    --glyph-color: var(--mimas-paper-fg-3);
+}
+
+.ex-stat-caption {
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-7-5);
+    letter-spacing: var(--mimas-caps-tracking);
+    color: var(--mimas-paper-fg-3);
+    margin: 0;
+    padding: 0;
+    white-space: normal;
+    max-width: 80px;
+}
+
+/* ---- boons ------------------------------------------------------------------------------------- */
+
+.ex-boons {
+    flex-direction: column;
+    margin-bottom: var(--mimas-gap-section);
+}
+
+.ex-boon {
+    flex-direction: row;
+    align-items: center;
+    height: 25px;
+    margin-bottom: var(--mimas-gap-row);
+}
+
+.ex-boon-glyph {
+    width: 12px;
+    height: 12px;
+    margin-right: 14px;
+    --glyph-color: var(--ex-accent);
+}
+
+.ex-boon-name {
+    -unity-font-definition: var(--mimas-font-serif-semibold);
+    font-size: var(--mimas-text-16);
+    color: var(--mimas-paper-fg);
+    flex-grow: 1;
+    margin: 0;
+    padding: 0;
+}
+
+.ex-boon-on {
+    -unity-font-definition: var(--mimas-font-body);
+    font-size: var(--mimas-text-10);
+    color: var(--mimas-paper-fg-3);
+    margin: 0;
+    padding: 0;
+}
+
+.ex-boon--unrevealed .ex-boon-glyph {
+    --glyph-color: var(--mimas-paper-fg-3);
+}
+
+.ex-boon--unrevealed .ex-boon-name {
+    color: var(--mimas-paper-fg-3);
+}
+
+.glyph-question {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    -unity-text-align: middle-center;
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-7-5);
+    margin: 0;
+    padding: 0;
+}
+
+/* ---- equipment and tiles ----------------------------------------------------------------------- */
+
+.ex-equipment {
+    flex-direction: column;
+}
+
+.ex-item {
+    flex-direction: column;
+    margin-bottom: var(--mimas-gap-item);
+}
+
+.ex-item-head {
+    flex-direction: row;
+    align-items: center;
+    height: 32px;
+}
+
+.ex-item-square {
+    width: 28px;
+    height: 28px;
+    margin-right: 10px;
+    -unity-background-scale-mode: stretch-to-fill;
+    align-items: center;
+    justify-content: center;
+}
+
+.ex-item-slot-glyph {
+    width: 14px;
+    height: 14px;
+    --glyph-color: var(--mimas-paper);
+    opacity: 0.7;
+}
+
+.ex-item-name {
+    -unity-font-definition: var(--mimas-font-serif-semibold);
+    font-size: var(--mimas-text-17);
+    color: var(--mimas-paper-fg);
+    flex-grow: 1;
+    margin: 0;
+    padding: 0;
+}
+
+.ex-item-stat {
+    -unity-font-definition: var(--mimas-font-body);
+    font-size: var(--mimas-text-10);
+    color: var(--mimas-paper-up);
+    margin: 0;
+    padding: 0;
+}
+
+.ex-item-note {
+    -unity-font-definition: var(--mimas-font-body);
+    font-size: var(--mimas-text-10);
+    color: var(--mimas-paper-fg-3);
+    margin: 2px 0 0 38px;
+    padding: 0;
+}
+
+.ex-tiles {
+    flex-direction: row;
+    flex-wrap: wrap;
+    margin: 4px 0 0 38px;
+}
+
+.ex-tile {
+    width: 56px;
+    align-items: center;
+    margin-right: 0;
+    margin-bottom: 0;
+}
+
+.ex-tile-box {
+    width: var(--mimas-tile-size);
+    height: var(--mimas-tile-size);
+    background-color: var(--mimas-paper-tile);
+    border-width: 1px;
+    border-color: var(--mimas-paper-hair);
+    align-items: center;
+    justify-content: center;
+}
+
+.ex-tile-letter {
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-13-5);
+    color: var(--mimas-paper-fg-2);
+    margin: 0;
+    padding: 0;
+}
+
+.ex-tile-name {
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-6-5);
+    letter-spacing: var(--mimas-caps-tracking);
+    color: var(--mimas-paper-fg-3);
+    -unity-text-align: upper-center;
+    margin: 4px 0 0 0;
+    padding: 0;
+    white-space: normal;
+}
+
+.ex-tile--changed .ex-tile-box,
+.ex-tile--added .ex-tile-box {
+    border-color: var(--mimas-paper-changed);
+}
+
+.ex-tile-mark {
+    position: absolute;
+    right: -4px;
+    top: -5px;
+    width: 9px;
+    height: 9px;
+    --glyph-color: var(--mimas-paper-changed);
+}
+
+/* An unseen tile is drawn by a dashed frame, not a border: USS has no dashed border. */
+.ex-tile--unseen .ex-tile-box {
+    border-width: 0;
+    background-color: var(--mimas-clear);
+}
+
+.ex-tile-dash {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    --glyph-color: var(--mimas-paper-fg-3);
+}
+
+.ex-tile--unseen .ex-tile-letter {
+    color: var(--mimas-paper-fg-3);
+}

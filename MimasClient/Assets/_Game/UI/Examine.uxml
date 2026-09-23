@@ -1,0 +1,83 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" xmlns:mimas="Mimas.Client.UI" editor-extension-mode="False">
+    <!--
+        The examine plate (docs/ui/examine.md §3, spec E §7.3): the manuscript, paper, one column. Every element
+        of the book's inventory exists by its id as the element's name; rows that repeat (boons, items, tiles)
+        are built by ExamineView under the named containers with the same ids ("ex.boon[0]",
+        "ex.item[weapon]", "ex.item[weapon].tile[0]"). Styling is by class only: an id with dots cannot be a
+        USS selector. Every colour, face and size is a token from Theme.uss.
+    -->
+    <Style src="Examine.uss" />
+    <ui:VisualElement name="ex.root" class="ex-root" picking-mode="Ignore">
+
+        <!-- Behind the plate, over the board: the catcher that closes it (E10). Inserted and removed by the view. -->
+        <ui:VisualElement name="ex.scrim" class="ex-scrim" />
+
+        <!-- The plate throws a dark wash onto the board, so it reads as a layer, not a window. -->
+        <ui:VisualElement name="ex.wash" class="ex-wash" picking-mode="Ignore" />
+
+        <ui:VisualElement name="ex.plate" class="ex-plate">
+
+            <!-- The painting: the lineage's hues fading into paper, the emblem huge and faint. -->
+            <ui:VisualElement name="ex.portrait" class="ex-portrait" picking-mode="Ignore">
+                <mimas:Glyph name="ex.emblem" class="ex-emblem" shape="laurel" />
+                <ui:VisualElement class="ex-titles" picking-mode="Ignore">
+                    <ui:Label name="ex.name" class="ex-name" text="Rohan" picking-mode="Ignore" />
+                    <ui:Label name="ex.lineage" class="ex-lineage" text="Greek · your hero" picking-mode="Ignore" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+            <ui:VisualElement name="ex.close" class="ex-close">
+                <mimas:Glyph class="ex-close-glyph" shape="close" />
+            </ui:VisualElement>
+
+            <ui:ScrollView name="ex.body" class="ex-body" mode="Vertical" horizontal-scroller-visibility="Hidden">
+
+                <!-- Vitals: live health and action points, and the level the hero stands on. -->
+                <ui:VisualElement name="ex.vitals" class="ex-vitals">
+                    <ui:VisualElement name="ex.vitals.hp" class="ex-vital ex-row">
+                        <mimas:Glyph class="ex-vital-glyph ex-accent-glyph" shape="heart" />
+                        <ui:Label name="ex.vitals.hp.value" class="ex-vital-value" text="17" picking-mode="Ignore" />
+                        <ui:Label name="ex.vitals.hp.max" class="ex-vital-max" text="/ 24" picking-mode="Ignore" />
+                        <ui:VisualElement class="ex-bar" picking-mode="Ignore">
+                            <ui:VisualElement name="ex.vitals.hp.fill" class="ex-bar-fill" picking-mode="Ignore" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                    <ui:VisualElement class="ex-vitals-second" picking-mode="Ignore">
+                        <ui:VisualElement name="ex.vitals.ap" class="ex-vital ex-row">
+                            <mimas:Glyph class="ex-vital-glyph ex-accent-glyph" shape="bolt" />
+                            <ui:Label name="ex.vitals.ap.value" class="ex-vital-value" text="1" picking-mode="Ignore" />
+                            <ui:Label name="ex.vitals.ap.max" class="ex-vital-max" text="/ 4" picking-mode="Ignore" />
+                            <ui:VisualElement name="ex.vitals.ap.eggs" class="ex-eggs" picking-mode="Ignore" />
+                        </ui:VisualElement>
+                        <ui:VisualElement name="ex.vitals.height" class="ex-height" picking-mode="Ignore">
+                            <mimas:Glyph class="ex-height-glyph" shape="arc" />
+                            <ui:Label name="ex.vitals.height.value" class="ex-height-value" text="1" picking-mode="Ignore" />
+                            <ui:Label class="ex-height-caption" text="HEIGHT" picking-mode="Ignore" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                </ui:VisualElement>
+
+                <!-- The prop's one line; heroes never show it. -->
+                <ui:Label name="ex.description" class="ex-description" text="" picking-mode="Ignore" />
+
+                <!-- Stats: base, then the net of what boons changed. A 3×2 grid. -->
+                <ui:Label name="ex.stats.caption" class="ex-caption" text="STATS" picking-mode="Ignore" />
+                <ui:VisualElement name="ex.stats" class="ex-stats">
+                    <ui:VisualElement name="ex.stat.hp" class="ex-stat ex-row" />
+                    <ui:VisualElement name="ex.stat.ap" class="ex-stat ex-row" />
+                    <ui:VisualElement name="ex.stat.strength" class="ex-stat ex-row" />
+                    <ui:VisualElement name="ex.stat.magic" class="ex-stat ex-row" />
+                    <ui:VisualElement name="ex.stat.armour-weapon" class="ex-stat ex-row" />
+                    <ui:VisualElement name="ex.stat.armour-spell" class="ex-stat ex-row" />
+                </ui:VisualElement>
+
+                <!-- Boons, oldest to latest: ex.boon[i], built by the view. -->
+                <ui:Label name="ex.boons.caption" class="ex-caption" text="BOONS" picking-mode="Ignore" />
+                <ui:VisualElement name="ex.boons" class="ex-boons" />
+
+                <!-- Equipment: ex.item[slot] groups with their ex.item[slot].tile[j] tiles, built by the view. -->
+                <ui:Label name="ex.equipment.caption" class="ex-caption" text="EQUIPMENT" picking-mode="Ignore" />
+                <ui:VisualElement name="ex.equipment" class="ex-equipment" />
+            </ui:ScrollView>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

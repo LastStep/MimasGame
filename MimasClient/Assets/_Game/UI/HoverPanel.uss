@@ -1,0 +1,260 @@
+/*
+ * The hover panel (docs/ui/language.md §6). Always ink, even over the paper plate. Names in the list,
+ * numbers in the panel. Tokens only: no literal colour, no font file.
+ */
+
+.hp-root {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: var(--mimas-panel-w);
+    display: none;
+    --hp-accent: var(--mimas-you);
+}
+
+.hp--visible {
+    display: flex;
+}
+
+.hp--theirs {
+    --hp-accent: var(--mimas-them);
+}
+
+.hp--unknown {
+    --hp-accent: var(--mimas-fg-3);
+}
+
+/* USS has no box-shadow: an offset layer in the shadow token stands in for it (drift, language §4). */
+.hp-shadow {
+    position: absolute;
+    left: 6px;
+    right: -6px;
+    top: var(--mimas-shadow-offset);
+    bottom: -14px;
+    background-color: var(--mimas-shadow-panel);
+    opacity: 0.55;
+}
+
+.hp-body {
+    background-color: var(--mimas-ink-2);
+    border-left-width: var(--mimas-panel-edge);
+    border-left-color: var(--hp-accent);
+    padding: 14px 16px 14px 16px;
+    flex-direction: column;
+}
+
+/* ---- head: tile, name, type line ------------------------------------------------------------------ */
+
+.hp-head {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.hp-tile {
+    width: var(--mimas-panel-tile);
+    height: var(--mimas-panel-tile);
+    border-width: 1px;
+    border-color: var(--hp-accent);
+    background-color: var(--mimas-tile);
+    align-items: center;
+    justify-content: center;
+    margin-right: 12px;
+    flex-shrink: 0;
+}
+
+.hp-tile-glyph {
+    width: 20px;
+    height: 20px;
+    --glyph-color: var(--hp-accent);
+}
+
+.hp-tile-letter {
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-17);
+    color: var(--mimas-fg);
+    margin: 0;
+    padding: 0;
+}
+
+.hp-titles {
+    flex-direction: column;
+    flex-shrink: 1;
+}
+
+.hp-name {
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-17);
+    letter-spacing: var(--mimas-caps-tracking-wide);
+    color: var(--mimas-fg);
+    margin: 0;
+    padding: 0;
+    white-space: normal;
+}
+
+.hp-type {
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-7-5);
+    letter-spacing: var(--mimas-caps-tracking);
+    color: var(--mimas-fg-3);
+    margin: 3px 0 0 0;
+    padding: 0;
+    white-space: normal;
+}
+
+/* ---- numbers as tiles: glyph over value over label ------------------------------------------------- */
+
+.hp-numbers {
+    flex-direction: row;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+
+.hp-number {
+    min-width: 50px;
+    flex-direction: column;
+    align-items: center;
+    background-color: var(--mimas-number-ground);
+    padding: 6px 6px 5px 6px;
+    margin: 0 4px 4px 0;
+}
+
+.hp-number-glyph {
+    width: 11px;
+    height: 11px;
+    --glyph-color: var(--mimas-fg-3);
+}
+
+.hp-number-value {
+    -unity-font-definition: var(--mimas-font-display);
+    font-size: var(--mimas-text-17);
+    color: var(--mimas-fg);
+    margin: 3px 0 0 0;
+    padding: 0;
+}
+
+.hp-number-label {
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-6-5);
+    letter-spacing: var(--mimas-caps-tracking);
+    color: var(--mimas-fg-3);
+    margin: 2px 0 0 0;
+    padding: 0;
+}
+
+.hp-number--amount .hp-number-value {
+    color: var(--mimas-amount);
+}
+
+.hp-number--changed .hp-number-value {
+    color: var(--mimas-changed);
+}
+
+/* ---- the stat breakdown rows ----------------------------------------------------------------------- */
+
+.hp-rows {
+    flex-direction: column;
+    margin-bottom: 8px;
+}
+
+.hp-row {
+    flex-direction: row;
+    justify-content: space-between;
+    margin-bottom: 3px;
+}
+
+.hp-row-label {
+    -unity-font-definition: var(--mimas-font-body);
+    font-size: var(--mimas-text-11-5);
+    color: var(--mimas-fg-2);
+    margin: 0;
+    padding: 0;
+}
+
+.hp-row-amount {
+    -unity-font-definition: var(--mimas-font-display);
+    font-size: var(--mimas-text-13-5);
+    color: var(--mimas-fg);
+    margin: 0;
+    padding: 0;
+}
+
+.hp-row--up .hp-row-amount {
+    color: var(--mimas-up);
+}
+
+.hp-row--down .hp-row-amount {
+    color: var(--mimas-down);
+}
+
+.hp-row--unknown .hp-row-label,
+.hp-row--unknown .hp-row-amount {
+    color: var(--mimas-fg-3);
+}
+
+/* ---- sentence, damage line, changes, conditions, flavour ----------------------------------------- */
+
+.hp-text {
+    -unity-font-definition: var(--mimas-font-body);
+    font-size: var(--mimas-text-12);
+    color: var(--mimas-fg);
+    white-space: normal;
+    margin: 0 0 8px 0;
+    padding: 0;
+}
+
+.hp-damageline {
+    -unity-font-definition: var(--mimas-font-body);
+    font-size: var(--mimas-text-11-5);
+    color: var(--mimas-amount);
+    white-space: normal;
+    margin: 0 0 8px 0;
+    padding: 0;
+}
+
+.hp-changes {
+    flex-direction: column;
+    margin-bottom: 6px;
+}
+
+.hp-change {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 3px;
+}
+
+.hp-change-glyph {
+    width: 7px;
+    height: 7px;
+    margin-right: 7px;
+    --glyph-color: var(--mimas-changed);
+}
+
+.hp-change-text {
+    -unity-font-definition: var(--mimas-font-body);
+    font-size: var(--mimas-text-10-5);
+    color: var(--mimas-changed);
+    white-space: normal;
+    margin: 0;
+    padding: 0;
+    flex-shrink: 1;
+}
+
+.hp-conditions {
+    -unity-font-definition: var(--mimas-font-body);
+    font-size: var(--mimas-text-10);
+    color: var(--mimas-fg-3);
+    white-space: normal;
+    margin: 0 0 6px 0;
+    padding: 0;
+}
+
+.hp-flavour {
+    -unity-font-definition: var(--mimas-font-body);
+    -unity-font-style: italic;
+    font-size: var(--mimas-text-10-5);
+    color: var(--mimas-fg-3);
+    white-space: normal;
+    margin: 2px 0 0 0;
+    padding: 0;
+}

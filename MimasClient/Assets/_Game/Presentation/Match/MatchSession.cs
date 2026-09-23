@@ -129,6 +129,13 @@ namespace Mimas.Client.Presentation
         private int _armed = None;
         private MovementOptions _moveOptions = MovementOptions.Empty;
         private HudExamine _examine;
+
+        /// <summary>
+        /// Per enemy unit, the boon ids in the order this client saw them revealed: the plate lists theirs in the
+        /// order you learned them (E8). Presentation memory only, lost on reload, where the plate falls back to
+        /// grant order (docs/ui/examine.md open question 4).
+        /// </summary>
+        private readonly Dictionary<int, List<string>> _revealOrder = new Dictionary<int, List<string>>();
         private int _examinedUnitId = None;
         private int _examinedPropId = None;
         private HudPreview _preview;
@@ -346,6 +353,7 @@ namespace Mimas.Client.Presentation
             _bannerDetail = null;
             _bannerClearsAt = -1f;
             Disarm();
+            DropExamine();
             RaiseStateChanged();
             Debug.Log("[MatchSession] draft: " + draft.Cards.Count + " cards, " + draft.NextRoundLine);
         }
@@ -465,6 +473,11 @@ namespace Mimas.Client.Presentation
             if (!_ready) return;
 
             PlayPendingEvents();
+
+            // Escape closes the examine plate (§7.11); nothing else in the match listens for it.
+            UnityEngine.InputSystem.Keyboard keyboard = UnityEngine.InputSystem.Keyboard.current;
+            if (keyboard != null && keyboard.escapeKey.wasPressedThisFrame && (_examinedUnitId != None || _examinedPropId != None))
+                CloseExamine();
 
             // Playback just finished (a move landed, a hit pause elapsed): the board is interactive again.
             bool playing = IsPlaying;
@@ -715,7 +728,7 @@ namespace Mimas.Client.Presentation
         /// True when a boon on this unit changes a number the button shows. Asked of the unit's own overlay
         /// rather than of the catalogue, because the overlay is where a boon's effect lives (ADR-034).
         /// </summary>
-        private static bool IsChangedByABoon(Unit unit, string abilityId)
+        internal static bool IsChangedByABoon(Unit unit, string abilityId)
         {
             IReadOnlyList<AbilityOverride> overrides = unit.Overlay.Overrides;
             for (int i = 0; i < overrides.Count; i++)
@@ -837,6 +850,7 @@ namespace Mimas.Client.Presentation
                 _bannerDetail = "the server no longer has this match";
                 _backToLobbyAt = Time.time;
                 Disarm();
+                DropExamine();
                 Debug.Log("[MatchSession] the match is gone from the server; offering the lobby.");
             }
 
@@ -926,9 +940,7 @@ namespace Mimas.Client.Presentation
                 }
 
                 case TurnEndedEvent ended:
-                    Disarm();
-                    _examinedUnitId = None;
-                    _examinedPropId = None;
+                    Disarm();                           // examine stays open across turns (§7.11)
                     RefreshView();
                     RaiseStateChanged();
                     break;
@@ -998,6 +1010,7 @@ namespace Mimas.Client.Presentation
             _backToLobbyAt = -1f;
             RefreshSeriesLine();
             Disarm();
+            DropExamine();
             RefreshView();
             RaiseStateChanged();
             Debug.Log("[MatchSession] round " + round.Round + " over: " + _banner + " (" + _bannerDetail + ")");
@@ -1047,6 +1060,7 @@ namespace Mimas.Client.Presentation
             _backToLobbyAt = Time.time + BackToLobbyDelaySeconds;
             _seriesLine = null;
             Disarm();
+            DropExamine();
             RefreshView();
             RaiseStateChanged();
             Debug.Log("[MatchSession] series over: " + _banner + " (" + _bannerDetail + ").");
@@ -1118,6 +1132,7 @@ namespace Mimas.Client.Presentation
             _bannerDetail = "series " + mine + " – " + theirs + " · " + ReasonLine(_lastReason, won);
             _bannerClearsAt = -1f;
             _seriesLine = null;
+            DropExamine();
             _backToLobbyAt = Time.time + BackToLobbyDelaySeconds;
             Debug.Log("[MatchSession] series found over on resync: player " + session.Winner + " wins " + _bannerDetail + ".");
         }
@@ -1274,6 +1289,9 @@ namespace Mimas.Client.Presentation
             BoonDef boon;
             bool known = _catalog.Boons.TryGet(revealed.BoonId, out boon);
             _revealedThisBatch.Add(revealed.BoonId);
+            List<string> order;
+            if (!_revealOrder.TryGetValue(revealed.UnitId, out order)) _revealOrder[revealed.UnitId] = order = new List<string>();
+            if (!order.Contains(revealed.BoonId)) order.Add(revealed.BoonId);
             RaiseFlyover(revealed.UnitId,
                 "Revealed: " + (known ? boon.Name : revealed.BoonId),
                 known ? LineageName(boon.LineageId) + " · " + KindName(boon.Kind) : null);
@@ -1414,137 +1432,59 @@ namespace Mimas.Client.Presentation
             {
                 HudUnit hud = _hudUnits[i];
                 hud.Emphasised = armed || hud == _previewUnit || hud.Id == _examinedUnitId;
+                hud.Examined = hud.Id == _examinedUnitId || hud.Id == _examinedPropId;
             }
         }
 
+        /// <summary>
+        /// Rebuilds the examine plate's model from the view (spec E §7). The builder makes its own mirror of the
+        /// unit from the view, so the plate cannot show a boon this seat has not been shown even in practice,
+        /// where <see cref="Rules"/> is the truth.
+        /// </summary>
         private void RefreshExamine()
         {
             if (_examinedPropId != None)
             {
-                _examine = ExamineProp(_examinedPropId);
+                _examine = ExamineModelBuilder.BuildProp(_catalog, View, Rules, _examinedPropId);
                 if (_examine != null) return;
                 _examinedPropId = None;            // it was destroyed while the panel was open
             }
 
             Mimas.Core.Match.UnitView unit = _examinedUnitId == None || View == null ? null : View.FindUnit(_examinedUnitId);
-            if (unit == null)
+            if (unit == null || !unit.IsAlive)
             {
+                _examinedUnitId = None;            // the plate closes itself when its unit dies (§7.11)
                 _examine = null;
                 return;
             }
 
-            var examine = new HudExamine
-            {
-                Title = "Hero",
-                // The lineage sits under the name: yours always, theirs once something has revealed it
-                // (design: #lineage rule 3).
-                Subtitle = LineageSubtitle(unit),
-                Description = null,
-                Hp = unit.Hp,
-                MaxHp = unit.MaxHp,
-                Ap = unit.Ap,
-                ApPerTurn = unit.ApPerTurn,
-            };
-
-            // Gear first, in slot order: the four items are public even when their abilities are not.
-            for (int i = 0; i < unit.ItemIds.Count; i++)
-            {
-                ItemDef item;
-                bool known = _catalog.Items.TryGet(unit.ItemIds[i], out item);
-                examine.Items.Add(new HudExamineEntry
-                {
-                    Name = known ? item.Name : unit.ItemIds[i],
-                    Description = known ? DescribeItem(item) : null,
-                    Icon = known ? item.Icon : null,
-                    Hidden = false,
-                });
-            }
-
-            // Abilities grouped by the item that grants them, innate ones last.
-            for (int i = 0; i < unit.ItemIds.Count; i++) AddAbilityEntries(examine, unit, unit.ItemIds[i]);
-            AddAbilityEntries(examine, unit, null);
-
-            for (int i = 0; i < unit.Modifiers.Count; i++)
-            {
-                KnownEntry entry = unit.Modifiers[i];
-                ModifierDef def = null;
-                bool known = entry.Revealed && _catalog.Modifiers.TryGet(entry.Id, out def);
-                examine.Modifiers.Add(new HudExamineEntry
-                {
-                    Name = entry.Revealed ? (known ? def.Name : entry.Id) : "Unknown passive",
-                    Description = entry.Revealed ? (known ? def.Description : null) : "Revealed the first time it changes a result.",
-                    Icon = known ? def.Icon : null,
-                    Hidden = !entry.Revealed,
-                });
-            }
-
-            AddBoonEntries(examine, unit);
-            _examine = examine;
+            List<string> order;
+            _revealOrder.TryGetValue(unit.Id, out order);
+            _examine = ExamineModelBuilder.BuildUnit(_catalog, View, Rules, unit.Id, SeatName(unit.IsMine), order);
         }
 
-        private string LineageSubtitle(Mimas.Core.Match.UnitView unit)
+        /// <summary>"You" and "Random Bot" in practice (§13); online, this seat's name and the opponent's.</summary>
+        private string SeatName(bool mine)
         {
-            if (unit.LineageId == null) return unit.IsMine ? "Your unit" : "Unknown lineage";
-            LineageDef lineage;
-            string name = _catalog.Lineages.TryGet(unit.LineageId, out lineage) ? lineage.Name : unit.LineageId;
-            return unit.IsMine ? "Your unit · " + name : name;
+            if (mine)
+            {
+                NetClient net = NetClient.Instance;
+                string own = net != null && _driver is OnlineMatchDriver ? net.PlayerName : null;
+                return string.IsNullOrEmpty(own) ? "You" : own;
+            }
+            string theirs = OpponentName;
+            return string.IsNullOrEmpty(theirs) ? "Opponent" : theirs;
         }
 
         /// <summary>
-        /// The unit's boons, in grant order. Yours by name, kind and god; theirs as one "?" row per boon they
-        /// hold, so the count is public and the identity is not (design: #hidden-info rule 5). A row turns
-        /// into a name the moment a reveal names it.
+        /// The plate gives way to the round's result and to the draft, which take the screen, and does not come
+        /// back after them (§7.11).
         /// </summary>
-        private void AddBoonEntries(HudExamine examine, Mimas.Core.Match.UnitView unit)
+        private void DropExamine()
         {
-            for (int i = 0; i < unit.Boons.Count; i++)
-            {
-                KnownEntry entry = unit.Boons[i];
-                BoonDef def = null;
-                bool known = entry.Revealed && _catalog.Boons.TryGet(entry.Id, out def);
-                examine.Boons.Add(new HudExamineEntry
-                {
-                    Name = entry.Revealed ? (known ? def.Name : entry.Id) : "Unknown boon",
-                    Description = entry.Revealed
-                        ? (known ? def.Description : null)
-                        : "Revealed when it changes something you can see.",
-                    Icon = known ? def.Icon : null,
-                    Hidden = !entry.Revealed,
-                    Group = known ? KindName(def.Kind) : null,
-                });
-            }
-        }
-
-        /// <summary>
-        /// The examine panel for a prop: what it is, what it is made of and what it costs to remove. Props are
-        /// neutral and entirely public (design: #props), so there is nothing here to hide and no gear or
-        /// abilities to list. Null when that prop is no longer on the board.
-        /// </summary>
-        private HudExamine ExamineProp(int propId)
-        {
-            if (View == null) return null;
-            Mimas.Core.Match.PropView prop = View.FindProp(propId);
-            if (prop == null) return null;
-
-            PropDef def;
-            bool known = _catalog.Props.TryGet(prop.DefId, out def);
-
-            var examine = new HudExamine
-            {
-                Title = known ? def.Name : prop.DefId,
-                Subtitle = "Terrain",
-                Description = known ? def.Description : null,
-                Hp = prop.Hp,
-                MaxHp = prop.MaxHp,
-            };
-            examine.Modifiers.Add(new HudExamineEntry
-            {
-                Name = "Blocks sight and movement",
-                Description = prop.IsDamageable
-                    ? "Shots stop on it and nothing walks through it, until it comes down."
-                    : "Shots stop on it and nothing walks through it. It cannot be destroyed.",
-            });
-            return examine;
+            _examinedUnitId = None;
+            _examinedPropId = None;
+            _examine = null;
         }
 
         /// <summary>One unit's ability as it really is: gear plus every boon on it (ADR-034). Null when it has none.</summary>
@@ -1554,83 +1494,6 @@ namespace Mimas.Client.Presentation
             AbilityDef def;
             if (Rules == null || abilityId == null || !Rules.Units.TryGet(unitId, out unit)) return null;
             return Rules.ResolveAbility(unit, abilityId, out def) ? def : null;
-        }
-
-        /// <summary>The same, as the local seat knows it: only the boons that have been revealed to them apply.</summary>
-        private AbilityDef ResolveKnownFor(int unitId, string abilityId)
-        {
-            Unit unit;
-            AbilityDef def;
-            if (Rules == null || abilityId == null || !Rules.Units.TryGet(unitId, out unit)) return null;
-            return Rules.ResolveAbilityKnownTo(LocalPlayer, unit, abilityId, out def) ? def : null;
-        }
-
-        /// <summary>Adds every ability the given item grants (or every innate one when <paramref name="itemId"/> is null).</summary>
-        private void AddAbilityEntries(HudExamine examine, Mimas.Core.Match.UnitView unit, string itemId)
-        {
-            string group = "Innate";
-            if (itemId != null)
-            {
-                ItemDef item;
-                group = _catalog.Items.TryGet(itemId, out item) ? item.Name : itemId;
-            }
-
-            for (int i = 0; i < unit.Abilities.Count; i++)
-            {
-                KnownEntry entry = unit.Abilities[i];
-                if (entry.SourceItemId != itemId) continue;
-
-                // The enemy's abilities as this seat knows them: only the boons they have been shown apply,
-                // and one the mirror cannot resolve at all keeps the "Unknown ability" row.
-                AbilityDef def = entry.Revealed ? ResolveKnownFor(unit.Id, entry.Id) : null;
-                bool known = def != null;
-                examine.Abilities.Add(new HudExamineEntry
-                {
-                    Name = entry.Revealed ? (known ? def.Name : entry.Id) : "Unknown ability",
-                    Description = entry.Revealed ? (known ? DescribeAbility(def) : null) : "Revealed once the opponent uses it.",
-                    Icon = known ? def.Icon : null,
-                    Hidden = !entry.Revealed,
-                    Group = group,
-                });
-            }
-        }
-
-        /// <summary>Stat keys in the order the examine panel reads them out; anything else follows, sorted.</summary>
-        private static readonly string[] StatOrder = { "hp", "ap", "power.weapon", "power.spell", "defense.weapon", "defense.spell" };
-
-        /// <summary>The item's own line plus a one-line summary of the stats it adds.</summary>
-        private static string DescribeItem(ItemDef item)
-        {
-            string stats = null;
-            for (int order = 0; order <= StatOrder.Length; order++)
-            {
-                for (int i = 0; i < item.Stats.Entries.Count; i++)
-                {
-                    var entry = item.Stats.Entries[i];
-                    if (entry.Value == 0) continue;
-                    int at = System.Array.IndexOf(StatOrder, entry.Key);
-                    if (at < 0) at = StatOrder.Length;          // unknown keys come last, in key order
-                    if (at != order) continue;
-                    string line = (entry.Value > 0 ? "+" : "") + entry.Value + " " + StatLabel(entry.Key);
-                    stats = stats == null ? line : stats + ", " + line;
-                }
-            }
-            if (string.IsNullOrEmpty(item.Description)) return stats;
-            return stats == null ? item.Description : item.Description + "\n" + stats;
-        }
-
-        private static string StatLabel(string key)
-        {
-            switch (key)
-            {
-                case "hp": return "hp";
-                case "ap": return "ap";
-                case "power.weapon": return "strength";
-                case "power.spell": return "magic";
-                case "defense.weapon": return "weapon armour";
-                case "defense.spell": return "spell armour";
-                default: return key;
-            }
         }
 
         /// <summary>
@@ -1663,18 +1526,6 @@ namespace Mimas.Client.Presentation
         {
             if (string.IsNullOrEmpty(word)) return word;
             return char.ToUpperInvariant(word[0]) + word.Substring(1);
-        }
-
-        private static string DescribeAbility(AbilityDef def)
-        {
-            var attack = def as AttackDef;
-            string cost = def.Cost + " AP";
-            if (attack != null)
-            {
-                string range = attack.MinRange == attack.Range ? "range " + attack.Range : "range " + attack.MinRange + "-" + attack.Range;
-                return cost + " · " + attack.Damage + " " + attack.DamageType + " · " + range + (string.IsNullOrEmpty(def.Description) ? "" : "\n" + def.Description);
-            }
-            return cost + (string.IsNullOrEmpty(def.Description) ? "" : "\n" + def.Description);
         }
 
         private void RaiseStateChanged()

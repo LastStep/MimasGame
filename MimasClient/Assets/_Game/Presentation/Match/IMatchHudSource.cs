@@ -50,34 +50,201 @@ namespace Mimas.Client.Presentation
         }
     }
 
-    /// <summary>One ability or passive line in the examine panel. Hidden entries are the opponent's unrevealed ones.</summary>
-    public sealed class HudExamineEntry
-    {
-        public string Name;
-        public string Description;
-        public string Icon;
-        public bool Hidden;
-
-        /// <summary>Caption the entry sits under (the granting item's name, or "Innate"), or null for no grouping.</summary>
-        public string Group;
-    }
-
-    /// <summary>What the examine panel shows for the unit the player clicked.</summary>
+    /// <summary>
+    /// What the examine plate shows for the unit the player clicked (docs/ui/examine.md §3, spec E §7.2):
+    /// the inventory with every flag already resolved, so the view formats numbers and picks colours and
+    /// never touches a Core type. Every string is composed by <c>ExamineModelBuilder</c>, which has the
+    /// catalogue. Nothing in it is a number the rules would not let the viewer see (#hidden-info).
+    /// </summary>
     public sealed class HudExamine
     {
-        public string Title;
-        public string Subtitle;
-        public string Description;
-        public int Hp;
-        public int MaxHp;
-        public int Ap;
-        public int ApPerTurn;
-        public List<HudExamineEntry> Items = new List<HudExamineEntry>();
-        public List<HudExamineEntry> Abilities = new List<HudExamineEntry>();
-        public List<HudExamineEntry> Modifiers = new List<HudExamineEntry>();
+        public int UnitId;
 
-        /// <summary>The unit's boons in grant order, grouped by kind; the enemy's are "?" rows until revealed.</summary>
-        public List<HudExamineEntry> Boons = new List<HudExamineEntry>();
+        /// <summary>The seat's name ("You", "Random Bot" in practice; the room's names online), or the prop's name.</summary>
+        public string Name;
+
+        /// <summary>"Greek · your hero" / "Norse · the enemy" / "Unknown lineage" / "Terrain".</summary>
+        public string LineageLine;
+
+        /// <summary>The lineage's display name, or null when unknown.</summary>
+        public string LineageName;
+
+        /// <summary>Emblem glyph key ("laurel", "hammer", "lotus"), or null when unknown.</summary>
+        public string LineageIcon;
+
+        /// <summary>The painting's hues (<c>#rrggbb</c>), or null when the lineage is unknown: the view falls back to grey.</summary>
+        public string HueDark, HueLight;
+
+        public bool IsMine;
+
+        /// <summary>A prop: the reduced plate (name, height, health; no stats, boons or equipment).</summary>
+        public bool IsProp;
+
+        /// <summary>A prop's one line of description; null for a hero.</summary>
+        public string Description;
+
+        public int Hp, MaxHp, Ap, ApPerTurn, Height;
+
+        /// <summary>Six, in inventory order: hp, ap, power.weapon, power.spell, defense.weapon, defense.spell.</summary>
+        public List<HudStat> Stats = new List<HudStat>();
+
+        /// <summary>Oldest to latest (E8): yours in grant order; theirs in the order you learned them, unknown last.</summary>
+        public List<HudBoon> Boons = new List<HudBoon>();
+
+        /// <summary>Four, slot order.</summary>
+        public List<HudItem> Items = new List<HudItem>();
+
+        public HudStat FindStat(string id)
+        {
+            for (int i = 0; i < Stats.Count; i++) if (Stats[i].Id == id) return Stats[i];
+            return null;
+        }
+
+        public HudItem FindItem(string slot)
+        {
+            for (int i = 0; i < Items.Count; i++) if (Items[i].Slot == slot) return Items[i];
+            return null;
+        }
+    }
+
+    /// <summary>One cell of the stats grid: base (rules base + items, public) then net (what known boons changed).</summary>
+    public sealed class HudStat
+    {
+        /// <summary><c>hp</c>, <c>ap</c>, <c>power.weapon</c>, <c>power.spell</c>, <c>defense.weapon</c>, <c>defense.spell</c>.</summary>
+        public string Id;
+
+        /// <summary>The UXML name suffix: hp, ap, strength, magic, armour-weapon, armour-spell.</summary>
+        public string Element;
+
+        /// <summary>"Health", "Actions", "Strength", "Magic", "Armour · weapon", "Armour · spell".</summary>
+        public string Label;
+
+        /// <summary>Glyph key.</summary>
+        public string Icon;
+
+        public int Base;
+        public int Net;
+
+        /// <summary>Theirs, a lane stat, and a boon of theirs is still unrevealed: a grey "?" instead of the net (E4).</summary>
+        public bool Hidden;
+
+        /// <summary>The hover panel's rows: base, each item, each known boon, and a "?" row when hidden.</summary>
+        public List<HudStatLine> Lines = new List<HudStatLine>();
+    }
+
+    public sealed class HudStatLine
+    {
+        public string Label;
+        public int Amount;
+
+        /// <summary>The "unrevealed boons · ?" row.</summary>
+        public bool Unknown;
+    }
+
+    /// <summary>One boon row. An unrevealed one carries only <see cref="Revealed"/> = false and the reveal sentence.</summary>
+    public sealed class HudBoon
+    {
+        public string Id;
+        public string Name;
+
+        /// <summary>"Blessing" / "Enchant" / "Sigil", or null when unrevealed.</summary>
+        public string Kind;
+        public string God;
+        public string LineageName;
+
+        /// <summary>The item it sits on ("Longbow"), or null for a Blessing.</summary>
+        public string OnItemName;
+        public string Description;
+
+        /// <summary>"starting Blessing" / "drafted".</summary>
+        public string Badge;
+
+        /// <summary>The hover panel's type line: "Blessing · Greek · on you", "drafted · not yet revealed".</summary>
+        public string TypeLine;
+
+        /// <summary>"Athena answers those who pray to the Greek gods."</summary>
+        public string Flavour;
+
+        public bool Revealed;
+
+        /// <summary>The Blessing the lineage starts you with: its circle is filled.</summary>
+        public bool Starting;
+    }
+
+    /// <summary>One item group: square, name, its stat line, and its actions as tiles.</summary>
+    public sealed class HudItem
+    {
+        public string Id;
+        public string Name;
+
+        /// <summary>weapon / crown / boots / armour.</summary>
+        public string Slot;
+        public string Kind;
+
+        /// <summary>The hover panel's type line: "weapon · bow".</summary>
+        public string Quick;
+        public string Description;
+
+        /// <summary>"+2 Strength", in the up colour on the plate; null when the item adds nothing.</summary>
+        public string StatLine;
+
+        /// <summary>The armour's grey line in place of tiles ("turns 2 of every blow"), else null.</summary>
+        public string Note;
+
+        /// <summary>Theirs only: "You have seen 1 of its 2 abilities."; null for yours.</summary>
+        public string SeenLine;
+
+        public List<HudTile> Tiles = new List<HudTile>();
+
+        /// <summary>The known boons on this item, for the hover panel's Changes. Never drawn on the plate (E7).</summary>
+        public List<string> BoonNames = new List<string>();
+    }
+
+    /// <summary>One action tile: icon and name on the plate; everything else waits in the hover panel.</summary>
+    public sealed class HudTile
+    {
+        public string Id;
+        public string Name;
+
+        /// <summary>The ability's icon key, or null. The tile shows <see cref="Letter"/> until action art exists.</summary>
+        public string Icon;
+        public string Letter;
+
+        /// <summary>"weapon attack · Longbow · action", "movement · innate", or "ability · Flintlock" when unseen.</summary>
+        public string TypeLine;
+        public string Description;
+
+        public bool IsMovement;
+
+        /// <summary>False: the dashed "?" tile, "unseen".</summary>
+        public bool Revealed;
+
+        /// <summary>An Enchant changed one of its numbers (violet edge, diamond).</summary>
+        public bool Changed;
+
+        /// <summary>A Sigil granted it (violet edge, triangle).</summary>
+        public bool Added;
+
+        /// <summary>Null for an unseen tile.</summary>
+        public HudTileNumbers Numbers;
+
+        /// <summary>"reach 5 → 6 · Apollo's Bowstring", "granted by Nike's Jab".</summary>
+        public List<string> Changes = new List<string>();
+
+        /// <summary>"lobbed, clears cover", "no sight needed", "one target"; for movement its mode's own words.</summary>
+        public List<string> Conditions = new List<string>();
+
+        /// <summary>"3 base + 3 Strength − their armour" for an attack; null for movement.</summary>
+        public string DamageLine;
+    }
+
+    public sealed class HudTileNumbers
+    {
+        public int Cost;
+        public int? Damage, Apex;
+        public int? RangeMin, RangeMax;
+        public string Element;
+        public bool CostChanged, RangeChanged, DamageChanged;
     }
 
     /// <summary>A revealed passive drawn as a small icon under a unit's bar.</summary>
@@ -162,6 +329,9 @@ namespace Mimas.Client.Presentation
 
         /// <summary>Drawn at full opacity (hovered, targeted, or something is armed); otherwise faded.</summary>
         public bool Emphasised;
+
+        /// <summary>The examine plate is open for this unit: its tag wears the owner's ring (ex.ring).</summary>
+        public bool Examined;
 
         /// <summary>Hit points the armed attack would remove if it landed on this unit, or 0 (ghosted on the bar).</summary>
         public int GhostDamage;

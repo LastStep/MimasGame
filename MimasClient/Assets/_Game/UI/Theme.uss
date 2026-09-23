@@ -46,6 +46,9 @@
     /* The ground under a number tile in the hover panel (§6: "on a 4% ground"). */
     --mimas-number-ground: rgba(239, 233, 220, 0.04);
 
+    /* Nothing: a transparent ground, so no stylesheet needs a literal for it. */
+    --mimas-clear: rgba(0, 0, 0, 0);
+
     /* The wash the plate throws on the board: ink at 45% (docs/ui/examine.md §3.5). */
     --mimas-wash: rgba(11, 11, 14, 0.45);
 

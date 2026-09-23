@@ -1,5 +1,7 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" xsi="http://www.w3.org/2001/XMLSchema-instance" engine="UnityEngine.UIElements" editor="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
     <Style src="MatchHud.uss" />
+    <ui:Template name="Examine" src="Examine.uxml" />
+    <ui:Template name="HoverPanel" src="HoverPanel.uxml" />
     <ui:VisualElement name="hud-root" class="hud-root" picking-mode="Ignore">
 
         <!-- Under everything: one floating tag per unit (hp bar, number, passives), anchored to the world each frame. -->
@@ -43,31 +45,9 @@
             <ui:Button name="banner-button" class="banner-button" text="Back to lobby" />
         </ui:VisualElement>
 
-        <!-- Left: examine panel for the clicked unit. -->
-        <ui:VisualElement name="examine" class="examine">
-            <ui:VisualElement class="examine-header">
-                <ui:VisualElement class="examine-titles" picking-mode="Ignore">
-                    <ui:Label name="examine-title" class="examine-title" text="Hero" />
-                    <ui:Label name="examine-subtitle" class="examine-subtitle" text="Your unit" />
-                </ui:VisualElement>
-                <ui:Button name="examine-close" class="examine-close" text="✕" />
-            </ui:VisualElement>
-            <!-- Gear, abilities, passives and now boons: taller than the screen on a full hero, so the body
-                 scrolls rather than spilling off both ends. -->
-            <ui:ScrollView name="examine-body" class="examine-body" mode="Vertical">
-                <ui:Label name="examine-stats" class="examine-stats" text="HP 20 / 20   ·   AP 3 / 3" />
-                <ui:Label name="examine-description" class="examine-description" text="" />
-                <ui:Label name="examine-items-caption" class="examine-caption" text="GEAR" />
-                <ui:VisualElement name="examine-items" class="examine-abilities" />
-                <ui:Label class="examine-caption" text="ABILITIES" />
-                <ui:VisualElement name="examine-abilities" class="examine-abilities" />
-                <ui:Label name="examine-modifiers-caption" class="examine-caption" text="PASSIVES" />
-                <ui:VisualElement name="examine-modifiers" class="examine-abilities" />
-                <!-- Yours by name, kind and god; theirs as one "?" row per boon they hold (#hidden-info rule 5). -->
-                <ui:Label name="examine-boons-caption" class="examine-caption" text="BOONS" />
-                <ui:VisualElement name="examine-boons" class="examine-abilities" />
-            </ui:ScrollView>
-        </ui:VisualElement>
+        <!-- Right: the examine plate (docs/ui/examine.md), driven by ExamineView. Here in the tree so the
+             bar, End Turn and Resign below it stay above its scrim and still take clicks. -->
+        <ui:Instance template="Examine" name="examine-mount" picking-mode="Ignore" />
 
         <!-- Bottom centre: action points, then one section per category, filled at runtime from IMatchHudSource. -->
         <ui:VisualElement name="tooltip" class="tooltip" picking-mode="Ignore">
@@ -103,6 +83,9 @@
                 </ui:VisualElement>
             </ui:VisualElement>
         </ui:VisualElement>
+
+        <!-- The one hover panel, over everything (docs/ui/language.md §6). -->
+        <ui:Instance template="HoverPanel" name="hover-mount" picking-mode="Ignore" />
 
     </ui:VisualElement>
 </ui:UXML>

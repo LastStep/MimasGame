@@ -474,165 +474,33 @@
     background-color: var(--hud-ember);
 }
 
-/* ---- examine --------------------------------------------------------------------------------- */
+/* ---- examine: the plate is Examine.uxml / Examine.uss; here only what it does to the rest --------- */
 
-.examine {
+/* The plate is full height on the right, so End Turn and Resign step 380px left while it is open (§13). */
+.hud--examining .end-turn,
+.hud--examining .resign {
+    right: 404px;
+}
+
+/* ex.ring: a 1px ring in the owner's colour around the examined unit's tag (language §5 state.selected). */
+.ex-ring {
     position: absolute;
-    left: 24px;
-    top: 50%;
-    translate: 0 -50%;
-    width: 300px;
-    max-height: 88%;
-    padding: 14px 16px 16px 16px;
-    background-color: var(--hud-panel-solid);
-    border-radius: 14px;
+    left: -6px;
+    right: -6px;
+    top: -5px;
+    bottom: -4px;
     border-width: 1px;
-    border-color: var(--hud-edge);
+    border-color: var(--mimas-you);
+    border-radius: 3px;
     display: none;
 }
 
-.examine--visible {
+.unit-tag--theirs .ex-ring {
+    border-color: var(--mimas-them);
+}
+
+.unit-tag--examined .ex-ring {
     display: flex;
-}
-
-.examine-header {
-    flex-direction: row;
-    justify-content: space-between;
-    align-items: flex-start;
-}
-
-.examine-titles {
-    flex-shrink: 1;
-}
-
-.examine-title {
-    color: var(--hud-text);
-    font-size: 20px;
-    -unity-font-style: bold;
-    margin: 0;
-    padding: 0;
-}
-
-.examine-subtitle {
-    color: var(--hud-accent);
-    font-size: 11px;
-    letter-spacing: 2px;
-    -unity-font-style: bold;
-    margin: 2px 0 0 0;
-    padding: 0;
-}
-
-.examine--theirs .examine-subtitle {
-    color: var(--hud-theirs);
-}
-
-.examine-close {
-    width: 26px;
-    height: 26px;
-    margin: 0;
-    padding: 0;
-    border-width: 0;
-    border-radius: 13px;
-    background-color: rgba(255, 255, 255, 0.08);
-    color: var(--hud-text-dim);
-    font-size: 12px;
-    -unity-text-align: middle-center;
-}
-
-.examine-close:hover {
-    background-color: rgba(255, 255, 255, 0.16);
-    color: var(--hud-text);
-}
-
-.examine-stats {
-    color: var(--hud-text);
-    font-size: 12px;
-    -unity-font-style: bold;
-    margin: 8px 0 0 0;
-    padding: 0;
-}
-
-.examine-description {
-    color: var(--hud-text-dim);
-    font-size: 12px;
-    white-space: normal;
-    margin: 6px 0 0 0;
-    padding: 0;
-}
-
-.examine-caption {
-    color: var(--hud-text-faint);
-    font-size: 10px;
-    letter-spacing: 3px;
-    -unity-font-style: bold;
-    margin: 14px 0 6px 0;
-    padding: 0;
-}
-
-.examine-group {
-    margin: 6px 0 2px 0;
-    font-size: 10px;
-    letter-spacing: 1px;
-    -unity-font-style: bold;
-    color: var(--hud-text-faint);
-}
-
-.examine-abilities {
-    flex-direction: column;
-}
-
-.examine-entry {
-    flex-direction: row;
-    align-items: center;
-    padding: 6px 8px;
-    margin: 2px 0;
-    border-radius: 8px;
-    background-color: rgba(255, 255, 255, 0.05);
-}
-
-.examine-entry--hidden {
-    opacity: 0.55;
-}
-
-.examine-entry-icon {
-    width: 26px;
-    height: 26px;
-    margin-right: 10px;
-    -unity-background-scale-mode: scale-to-fit;
-    justify-content: center;
-    align-items: center;
-}
-
-.examine-entry-glyph {
-    color: var(--hud-text);
-    font-size: 15px;
-    -unity-font-style: bold;
-    margin: 0;
-    padding: 0;
-}
-
-.examine-entry-text {
-    flex-shrink: 1;
-}
-
-.examine-entry-name {
-    color: var(--hud-text);
-    font-size: 13px;
-    -unity-font-style: bold;
-    margin: 0;
-    padding: 0;
-}
-
-.examine-entry--hidden .examine-entry-name {
-    -unity-font-style: italic;
-}
-
-.examine-entry-desc {
-    color: var(--hud-text-dim);
-    font-size: 11px;
-    white-space: normal;
-    margin: 1px 0 0 0;
-    padding: 0;
 }
 
 /* ---- action bar ------------------------------------------------------------------------------ */
@@ -1117,15 +985,4 @@
     letter-spacing: 2px;
     -unity-font-style: bold;
     -unity-text-align: middle-center;
-}
-
-/* The examine panel's body scrolls: gear, abilities, passives and boons together are taller than the
-   screen on a fully-drafted hero, and the boons are the newest thing on it. */
-.examine-body {
-    flex-grow: 1;
-    flex-shrink: 1;
-}
-
-.examine-body > .unity-scroll-view__content-viewport {
-    flex-grow: 1;
 }

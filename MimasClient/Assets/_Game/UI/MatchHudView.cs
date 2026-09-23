@@ -10,7 +10,8 @@ namespace Mimas.Client.UI
 {
     /// <summary>
     /// The in-match HUD (ADR-015, ADR-019): sectioned action bar with action-point dots (bottom centre),
-    /// turn owner with a burning rope (top centre), examine panel (left), End Turn (bottom right), plus the
+    /// turn owner with a burning rope (top centre), the examine plate (right, drawn by <see cref="ExamineView"/>
+    /// from its own templates), End Turn (bottom right), plus the
     /// world-anchored layer: one tag per unit (segmented hp bar, number, revealed passives) that fades until
     /// relevant, an attack-preview tooltip over the hovered target, damage flyovers, and the result banner.
     /// Reads everything from an <see cref="IMatchHudSource"/> and asks it for exactly three things: arm or
@@ -71,10 +72,7 @@ namespace Mimas.Client.UI
         private VisualElement _ropeEmber;
         private VisualElement _actionBar;
         private VisualElement _tooltip;
-        private VisualElement _examine;
-        private VisualElement _examineItems;
-        private VisualElement _examineAbilities;
-        private VisualElement _examineModifiers;
+        private ExamineView _examineView;
         private VisualElement _unitLayer;
         private VisualElement _preview;
         private VisualElement _previewLines;
@@ -83,14 +81,6 @@ namespace Mimas.Client.UI
         private Label _tooltipTitle;
         private Label _tooltipDetail;
         private Label _tooltipBody;
-        private Label _examineTitle;
-        private Label _examineSubtitle;
-        private Label _examineStats;
-        private Label _examineDescription;
-        private Label _examineItemsCaption;
-        private Label _examineModifiersCaption;
-        private Label _examineBoonsCaption;
-        private VisualElement _examineBoons;
         private Label _previewTitle;
         private Label _previewTotal;
         private Label _previewBlocked;
@@ -123,7 +113,6 @@ namespace Mimas.Client.UI
 
         /// <summary>When the armed resign button gives up and goes back to asking.</summary>
         private float _resignArmedUntil;
-        private Button _examineClose;
         private Button _endTurn;
 
         private bool _bound;
@@ -138,6 +127,9 @@ namespace Mimas.Client.UI
             public Label Number;
             public VisualElement Markers;
             public Label Lineage;
+
+            /// <summary>ex.ring: the 1px ring in the owner's colour while this unit is examined.</summary>
+            public VisualElement Ring;
             public readonly List<VisualElement> Segments = new List<VisualElement>();
             public int MaxHp;
             public string MarkerSignature;
@@ -251,19 +243,8 @@ namespace Mimas.Client.UI
             _tooltipTitle = root.Q<Label>("tooltip-title");
             _tooltipDetail = root.Q<Label>("tooltip-detail");
             _tooltipBody = root.Q<Label>("tooltip-body");
-            _examine = root.Q<VisualElement>("examine");
-            _examineTitle = root.Q<Label>("examine-title");
-            _examineSubtitle = root.Q<Label>("examine-subtitle");
-            _examineStats = root.Q<Label>("examine-stats");
-            _examineDescription = root.Q<Label>("examine-description");
-            _examineItemsCaption = root.Q<Label>("examine-items-caption");
-            _examineItems = root.Q<VisualElement>("examine-items");
-            _examineAbilities = root.Q<VisualElement>("examine-abilities");
-            _examineModifiersCaption = root.Q<Label>("examine-modifiers-caption");
-            _examineModifiers = root.Q<VisualElement>("examine-modifiers");
-            _examineBoonsCaption = root.Q<Label>("examine-boons-caption");
-            _examineBoons = root.Q<VisualElement>("examine-boons");
-            _examineClose = root.Q<Button>("examine-close");
+            VisualElement examineMount = root.Q<VisualElement>("examine-mount");
+            VisualElement hoverMount = root.Q<VisualElement>("hover-mount");
             _endTurn = root.Q<Button>("end-turn");
             _unitLayer = root.Q<VisualElement>("unit-layer");
             _preview = root.Q<VisualElement>("preview");
@@ -291,25 +272,23 @@ namespace Mimas.Client.UI
 
             if (_root == null || _turnPanel == null || _turnOwner == null || _rope == null || _ropeFill == null || _ropeEmber == null
                 || _actionBar == null || _tooltip == null || _tooltipTitle == null || _tooltipDetail == null || _tooltipBody == null
-                || _examine == null || _examineTitle == null || _examineSubtitle == null || _examineStats == null || _examineDescription == null
-                || _examineItemsCaption == null || _examineItems == null
-                || _examineAbilities == null || _examineModifiersCaption == null || _examineModifiers == null || _examineClose == null || _endTurn == null
+                || examineMount == null || hoverMount == null || _endTurn == null
                 || _unitLayer == null || _preview == null || _previewTitle == null || _previewTotal == null
                 || _previewBlocked == null || _previewLines == null || _cursorTag == null
                 || _flyLayer == null || _banner == null || _bannerPanel == null || _bannerDetail == null || _bannerButton == null
                 || _statusLine == null || _resign == null
                 || _seriesLine == null || _draftPanel == null || _draftHeadline == null || _draftNext == null
-                || _draftCards == null || _draftTimerFill == null || _draftDot == null || _draftStatus == null || _draftConfirm == null
-                || _examineBoonsCaption == null || _examineBoons == null)
+                || _draftCards == null || _draftTimerFill == null || _draftDot == null || _draftStatus == null || _draftConfirm == null)
             {
                 Debug.LogError("[MatchHudView] MatchHud.uxml is missing one of the named elements.", this);
                 enabled = false;
                 return false;
             }
 
+            _examineView = new ExamineView(_root, examineMount, hoverMount, HandleExamineClose);
+
             _draftConfirm.clicked += HandleDraftConfirmClicked;
             _endTurn.clicked += HandleEndTurnClicked;
-            _examineClose.clicked += HandleExamineCloseClicked;
             _resign.clicked += HandleResignClicked;
             _bannerButton.clicked += HandleBackToLobbyClicked;
             _bound = true;
@@ -324,7 +303,7 @@ namespace Mimas.Client.UI
         {
             if (!_bound) return;
             _endTurn.clicked -= HandleEndTurnClicked;
-            _examineClose.clicked -= HandleExamineCloseClicked;
+            if (_examineView != null) { _examineView.Dispose(); _examineView = null; }
             _resign.clicked -= HandleResignClicked;
             _bannerButton.clicked -= HandleBackToLobbyClicked;
             _draftConfirm.clicked -= HandleDraftConfirmClicked;
@@ -514,88 +493,12 @@ namespace Mimas.Client.UI
             }
         }
 
+        /// <summary>The plate is ExamineView's; the HUD only makes room for it (End Turn steps left).</summary>
         private void RefreshExamine()
         {
             HudExamine examine = _source.Examine;
-            if (examine == null)
-            {
-                _examine.RemoveFromClassList("examine--visible");
-                return;
-            }
-
-            _examineTitle.text = examine.Title ?? string.Empty;
-            _examineSubtitle.text = (examine.Subtitle ?? string.Empty).ToUpperInvariant();
-            _examineStats.text = examine.ApPerTurn > 0
-                ? "HP " + examine.Hp + " / " + examine.MaxHp + "     AP " + examine.Ap + " / " + examine.ApPerTurn
-                : "HP " + examine.Hp + " / " + examine.MaxHp;
-            _examineDescription.text = examine.Description ?? string.Empty;
-            _examineDescription.style.display = string.IsNullOrEmpty(examine.Description) ? DisplayStyle.None : DisplayStyle.Flex;
-            _examine.EnableInClassList("examine--theirs", examine.Subtitle != null && examine.Subtitle.StartsWith("Opp", StringComparison.Ordinal));
-
-            FillEntries(_examineItems, examine.Items);
-            bool anyItems = examine.Items.Count > 0;
-            _examineItemsCaption.style.display = anyItems ? DisplayStyle.Flex : DisplayStyle.None;
-            _examineItems.style.display = anyItems ? DisplayStyle.Flex : DisplayStyle.None;
-
-            FillEntries(_examineAbilities, examine.Abilities);
-            FillEntries(_examineModifiers, examine.Modifiers);
-            bool anyModifiers = examine.Modifiers.Count > 0;
-            _examineModifiersCaption.style.display = anyModifiers ? DisplayStyle.Flex : DisplayStyle.None;
-            _examineModifiers.style.display = anyModifiers ? DisplayStyle.Flex : DisplayStyle.None;
-
-            FillEntries(_examineBoons, examine.Boons);
-            bool anyBoons = examine.Boons.Count > 0;
-            _examineBoonsCaption.style.display = anyBoons ? DisplayStyle.Flex : DisplayStyle.None;
-            _examineBoons.style.display = anyBoons ? DisplayStyle.Flex : DisplayStyle.None;
-
-            _examine.AddToClassList("examine--visible");
-        }
-
-        private void FillEntries(VisualElement container, List<HudExamineEntry> entries)
-        {
-            container.Clear();
-            string group = null;
-            for (int i = 0; i < entries.Count; i++)
-            {
-                HudExamineEntry entry = entries[i];
-
-                // A new source (the item that grants the next abilities) gets its own small caption row.
-                if (!string.IsNullOrEmpty(entry.Group) && entry.Group != group)
-                {
-                    group = entry.Group;
-                    var caption = new Label { text = group, pickingMode = PickingMode.Ignore };
-                    caption.AddToClassList("examine-group");
-                    container.Add(caption);
-                }
-
-                var row = new VisualElement { pickingMode = PickingMode.Ignore };
-                row.AddToClassList("examine-entry");
-                row.EnableInClassList("examine-entry--hidden", entry.Hidden);
-
-                var icon = new VisualElement { name = "icon", pickingMode = PickingMode.Ignore };
-                icon.AddToClassList("examine-entry-icon");
-                var glyph = new Label { name = "glyph", pickingMode = PickingMode.Ignore };
-                glyph.AddToClassList("examine-entry-glyph");
-                icon.Add(glyph);
-                row.Add(icon);
-                if (entry.Hidden) { icon.style.backgroundImage = StyleKeyword.None; glyph.text = "?"; }
-                else ApplyIcon(icon, glyph, entry.Icon, entry.Name);
-
-                var text = new VisualElement { pickingMode = PickingMode.Ignore };
-                text.AddToClassList("examine-entry-text");
-                var name = new Label { text = entry.Name ?? string.Empty, pickingMode = PickingMode.Ignore };
-                name.AddToClassList("examine-entry-name");
-                text.Add(name);
-                if (!string.IsNullOrEmpty(entry.Description))
-                {
-                    var desc = new Label { text = entry.Description, pickingMode = PickingMode.Ignore };
-                    desc.AddToClassList("examine-entry-desc");
-                    text.Add(desc);
-                }
-                row.Add(text);
-
-                container.Add(row);
-            }
+            _examineView.Render(examine);
+            _root.EnableInClassList("hud--examining", examine != null);
         }
 
         private void RefreshPreview()
@@ -736,6 +639,7 @@ namespace Mimas.Client.UI
                 tag.Number.EnableInClassList("unit-number--ghost", ghost > 0);
                 tag.Root.EnableInClassList("unit-tag--emphasised", unit.Emphasised || ghost > 0);
                 tag.Root.EnableInClassList("unit-tag--dead", !unit.IsAlive);
+                tag.Root.EnableInClassList("unit-tag--examined", unit.Examined);
 
                 // The god, once something has revealed it (design #lineage rule 3).
                 bool hasLineage = !string.IsNullOrEmpty(unit.LineageTag);
@@ -780,6 +684,10 @@ namespace Mimas.Client.UI
             tag.Bar = new VisualElement { pickingMode = PickingMode.Ignore };
             tag.Bar.AddToClassList("unit-bar");
             tag.Root.Add(tag.Bar);
+
+            tag.Ring = new VisualElement { name = "ex.ring", pickingMode = PickingMode.Ignore };
+            tag.Ring.AddToClassList("ex-ring");
+            tag.Root.Add(tag.Ring);
 
             tag.Number = new Label { pickingMode = PickingMode.Ignore };
             tag.Number.AddToClassList("unit-number");
@@ -1131,12 +1039,14 @@ namespace Mimas.Client.UI
 
         private void HandleEndTurnClicked() => _source.EndTurn();
 
-        private void HandleExamineCloseClicked() => _source.CloseExamine();
+        private void HandleExamineClose() => _source.CloseExamine();
 
         /// <summary>True when a pickable HUD element sits under the given screen position (bottom-left origin).</summary>
         private bool IsPointerOverHud(Vector2 screenPosition)
         {
             if (!_bound || _root == null) return false;
+            // The off-plate click that closed examine is the plate's, even if the scrim is already gone (E10).
+            if (_examineView != null && _examineView.SwallowsBoardPointer) return true;
             IPanel panel = _root.panel;
             if (panel == null) return false;
             Vector2 panelPosition = RuntimePanelUtils.ScreenToPanel(panel, screenPosition);

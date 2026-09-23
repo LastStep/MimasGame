@@ -1,7 +1,7 @@
 {
   "name": "Mimas.Client.Tests.EditMode",
   "rootNamespace": "Mimas.Client.Tests",
-  "references": ["UnityEngine.TestRunner", "UnityEditor.TestRunner", "Mimas.Core"],
+  "references": ["UnityEngine.TestRunner", "UnityEditor.TestRunner", "Mimas.Core", "Mimas.Client.Presentation"],
   "includePlatforms": ["Editor"],
   "excludePlatforms": [],
   "allowUnsafeCode": false,

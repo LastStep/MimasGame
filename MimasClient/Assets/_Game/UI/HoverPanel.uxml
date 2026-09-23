@@ -1,0 +1,31 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" xmlns:mimas="Mimas.Client.UI" editor-extension-mode="False">
+    <!--
+        The one hover panel (docs/ui/language.md §6, spec E §7.10): 300 wide, on ink-2, a 2px left edge in the
+        owner's colour, to the left of whatever the pointer rests on. One instance; ExamineView moves it and
+        fills it. Sections without data are hidden. Order, top to bottom: tile and name and type line; the
+        numbers as tiles; one sentence; the damage line; changes; conditions; one line of flavour.
+    -->
+    <Style src="HoverPanel.uss" />
+    <ui:VisualElement name="hp.root" class="hp-root" picking-mode="Ignore">
+        <ui:VisualElement name="hp.shadow" class="hp-shadow" picking-mode="Ignore" />
+        <ui:VisualElement name="hp.body" class="hp-body" picking-mode="Ignore">
+            <ui:VisualElement class="hp-head" picking-mode="Ignore">
+                <ui:VisualElement name="hp.tile" class="hp-tile" picking-mode="Ignore">
+                    <mimas:Glyph name="hp.tile.glyph" class="hp-tile-glyph" shape="sword" />
+                    <ui:Label name="hp.tile.letter" class="hp-tile-letter" text="A" picking-mode="Ignore" />
+                </ui:VisualElement>
+                <ui:VisualElement class="hp-titles" picking-mode="Ignore">
+                    <ui:Label name="hp.name" class="hp-name" text="ARROW SHOT" picking-mode="Ignore" />
+                    <ui:Label name="hp.type" class="hp-type" text="WEAPON ATTACK · LONGBOW · ACTION" picking-mode="Ignore" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+            <ui:VisualElement name="hp.numbers" class="hp-numbers" picking-mode="Ignore" />
+            <ui:VisualElement name="hp.rows" class="hp-rows" picking-mode="Ignore" />
+            <ui:Label name="hp.text" class="hp-text" text="" picking-mode="Ignore" />
+            <ui:Label name="hp.damageline" class="hp-damageline" text="" picking-mode="Ignore" />
+            <ui:VisualElement name="hp.changes" class="hp-changes" picking-mode="Ignore" />
+            <ui:Label name="hp.conditions" class="hp-conditions" text="" picking-mode="Ignore" />
+            <ui:Label name="hp.flavour" class="hp-flavour" text="" picking-mode="Ignore" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

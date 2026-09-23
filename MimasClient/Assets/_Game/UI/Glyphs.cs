@@ -67,13 +67,30 @@ namespace Mimas.Client.UI
             set { EnableInClassList(FilledClass, value); MarkDirtyRepaint(); }
         }
 
+        private Color? _tint;
+
+        /// <summary>
+        /// A colour from data rather than from a token — the lineage's painting hue on the emblem. Null goes
+        /// back to <c>--glyph-color</c>. UI Toolkit cannot set a custom property inline, hence this.
+        /// </summary>
+        public Color? Tint
+        {
+            get => _tint;
+            set
+            {
+                _tint = value;
+                if (_question != null) _question.style.color = _tint ?? _color;
+                MarkDirtyRepaint();
+            }
+        }
+
         private void OnStyleResolved(CustomStyleResolvedEvent evt)
         {
             Color color;
             if (evt.customStyle.TryGetValue(ColorProperty, out color)) _color = color;
             float stroke;
             _stroke = evt.customStyle.TryGetValue(StrokeProperty, out stroke) ? stroke : DefaultStroke;
-            if (_question != null) _question.style.color = _color;
+            if (_question != null) _question.style.color = _tint ?? _color;
             MarkDirtyRepaint();
         }
 
@@ -105,14 +122,71 @@ namespace Mimas.Client.UI
             var origin = new Vector2(rect.x + (rect.width - size) * 0.5f, rect.y + (rect.height - size) * 0.5f);
 
             Painter2D painter = context.painter2D;
-            painter.strokeColor = _color;
-            painter.fillColor = _color;
+            Color color = _tint ?? _color;
+            painter.strokeColor = color;
+            painter.fillColor = color;
             painter.lineWidth = Mathf.Max(0.75f, _stroke * scale);
             painter.lineCap = LineCap.Round;
             painter.lineJoin = LineJoin.Round;
 
             bool filled = Filled;
             GlyphPaths.Draw(_shape, painter, origin, scale, filled);
+        }
+    }
+
+    /// <summary>
+    /// A dashed rectangle the size of the element: the unseen tile's edge (language §5 <c>state.unseen</c>).
+    /// USS borders cannot be dashed. Colour from <c>--glyph-color</c>.
+    /// </summary>
+    [UxmlElement]
+    public partial class DashedFrame : VisualElement
+    {
+        private static readonly CustomStyleProperty<Color> ColorProperty = new CustomStyleProperty<Color>("--glyph-color");
+
+        private const float Dash = 4f;
+        private const float Gap = 3f;
+
+        private Color _color = Color.white;
+
+        public DashedFrame()
+        {
+            AddToClassList("dashed-frame");
+            pickingMode = PickingMode.Ignore;
+            generateVisualContent += Draw;
+            RegisterCallback<CustomStyleResolvedEvent>(evt =>
+            {
+                Color color;
+                if (evt.customStyle.TryGetValue(ColorProperty, out color)) _color = color;
+                MarkDirtyRepaint();
+            });
+        }
+
+        private void Draw(MeshGenerationContext context)
+        {
+            Rect r = contentRect;
+            if (r.width <= 1f || r.height <= 1f) return;
+            Painter2D painter = context.painter2D;
+            painter.strokeColor = _color;
+            painter.lineWidth = 1f;
+            painter.lineCap = LineCap.Butt;
+            float x0 = r.xMin + 0.5f, y0 = r.yMin + 0.5f, x1 = r.xMax - 0.5f, y1 = r.yMax - 0.5f;
+            Side(painter, new Vector2(x0, y0), new Vector2(x1, y0));
+            Side(painter, new Vector2(x1, y0), new Vector2(x1, y1));
+            Side(painter, new Vector2(x1, y1), new Vector2(x0, y1));
+            Side(painter, new Vector2(x0, y1), new Vector2(x0, y0));
+        }
+
+        private static void Side(Painter2D painter, Vector2 from, Vector2 to)
+        {
+            float length = Vector2.Distance(from, to);
+            Vector2 direction = (to - from) / length;
+            for (float at = 0f; at < length; at += Dash + Gap)
+            {
+                painter.BeginPath();
+                painter.MoveTo(from + direction * at);
+                painter.LineTo(from + direction * Mathf.Min(length, at + Dash));
+                painter.Stroke();
+            }
         }
     }
 
