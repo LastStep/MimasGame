@@ -2,7 +2,7 @@
 project: mimas
 milestone: M2
 updated: 2026-09-23
-updated_by: opus — T-0011 built (the examine plate), at verify
+updated_by: opus — T-0012 built (the camera controls), at verify
 ---
 
 # Where Mimas stands
@@ -51,7 +51,16 @@ the same day. It is the first screen in the new interface language: `Theme.uss` 
 three fonts ship as Latin-subset TextCore assets, glyphs are drawn with `Painter2D`. Run report:
 `studio/runs/R-2026-09-23-T-0011.md`; screenshots in `artifacts/t0011/shots/`.
 
-**461 Core tests, 58 server tests, 14 EditMode tests.** The Web build is **12.57 MiB** (was 12.38) against the 13 MB
+**23 Sep, later: the camera is the player's (T-0012, F-camera), at `verify`.** Rohan asked for it and
+answered four questions the same day. Hold Q/E to turn round the arena (free, 90°/s), W A S D to slide
+across it (stops at the outermost tiles plus a margin in tiles), the wheel to zoom (10–32), Space to glide
+home to the default view centred on the arena, V to flip between **side-on** — your end always on the left,
+so online seat 2 now sees itself left too — and **behind you** (past your end, looking across, 55° / 25).
+Every value is on `ArenaCameraRig` on `Cameras/vcam_Tilted` and is live in Play Mode; the default view is an
+enum there. Tab and the top-down camera are untouched. ADR-038, spec `docs/specs/2026-09-23-camera.md`, run
+report `studio/runs/R-2026-09-23-T-0012.md`, captures in `artifacts/t0012/`.
+
+**461 Core tests, 58 server tests, 24 EditMode tests.** The Web build is **12.57 MiB** (was 12.38) against the 13 MB
 ratchet (fonts included). T-0010's run report: `studio/runs/R-2026-09-22-T-0010-build.md`.
 
 ## The one thing to do next
@@ -71,6 +80,7 @@ ratchet (fonts included). T-0010's run report: `studio/runs/R-2026-09-22-T-0010-
    deviations (the builder reads a mirror built from the view, not `Rules`, because in practice `Rules` is the
    truth; commits 5–7 landed as one) and the round-3 preview menu item the §14 captures used.
 4. **Verifiers for the M2 set**: T-0008 (closes T-0005 and T-0006), T-0007, T-0002.
+5. **Rohan plays the camera and tunes it** (T-0012), then a verifier in a fresh context.
 
 ## Current milestone: M2 — online
 
@@ -97,6 +107,7 @@ tick.
 |---|---|---|---|
 | **T-0010** | **Boons in the game** — the room hosts the session, lineage row, draft over the board, presentation of boons and reveals, practice-mode session, nine boons | **verify — FAILED 23 Sep on evidence, not code.** Five captures from one Editor practice game make it pass; list in `R-2026-09-23-verify-boons` | builder, small |
 | T-0009 | Boons groundwork in Core | **verified PASS 23 Sep** (ledger rows are ticked with T-0010, per F-boons) | done pending T-0010 |
+| **T-0012** | **The camera** — Q/E turn, WASD pan with a limit, wheel zoom, Space home, V side-on ↔ behind you | **verify** — built 23 Sep, run report `R-2026-09-23-T-0012` | Rohan plays, then verifier |
 | **T-0011** | **The examine panel** — manuscript plate, one hover panel, `--mimas-*` tokens, `Unit.StatLines`, lineage hues, fonts | **verify** — built 23 Sep, run report `R-2026-09-23-T-0011` | verifier needed |
 | T-0008 | Finish M2 in the browser | verify — deployed and measured live 21 Sep | verifier needed |
 | T-0007 | Deploy | verify — live confirmed 21 Sep | verifier needed |
@@ -148,6 +159,10 @@ Nothing, except what waits on Rohan below.
 
 ## Things the next agent must not rediscover
 
+- **Camera keys can be driven for real from `eval`**: `InputSystem.QueueStateEvent(Keyboard.current, new
+  KeyboardState(Key.V))`, then an empty `KeyboardState()` in the next eval to release; the same with a
+  `MouseState` carrying `scroll` for the wheel. The rig's own polling sees them. The MCP `capture_game_view`
+  refuses a `..` path, so it cannot write into `artifacts/`; use `ScreenCapture.CaptureScreenshot` from eval.
 - **Never call `unity command run_tests` while the Editor is in Play Mode.** The job queues behind Play
   Mode and every later CLI command times out behind it (`editor_stop` and `unity close` included); it took
   Rohan closing the Editor by hand on 23 Sep.
