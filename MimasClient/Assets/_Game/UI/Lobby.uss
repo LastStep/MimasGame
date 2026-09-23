@@ -1,5 +1,7 @@
 /* Lobby and room. One centred column, the same palette as the match HUD, nothing else on screen. */
 
+@import url("Theme.uss");
+
 :root {
     --lobby-bg: rgb(10, 12, 17);
     --panel: rgba(18, 21, 28, 0.94);

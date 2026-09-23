@@ -1,5 +1,7 @@
 /* Match HUD. Minimal chrome, four anchored panels; everything else is board. */
 
+@import url("Theme.uss");
+
 :root {
     --hud-panel: rgba(12, 14, 20, 0.78);
     --hud-panel-solid: rgba(12, 14, 20, 0.94);

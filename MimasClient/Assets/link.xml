@@ -23,4 +23,10 @@
     <type fullname="UnityEngine.MeshCollider" preserve="all" />
     <type fullname="UnityEngine.Physics" preserve="all" />
   </assembly>
+  <!-- The interface language's fonts (T-0011) are TextCore font assets referenced only from USS
+       (Theme.uss), which the stripper cannot read. UI Toolkit's own text already keeps the engine, but
+       the asset type is named here so a font never falls back to the default on the Web build alone. -->
+  <assembly fullname="UnityEngine.TextCoreTextEngineModule">
+    <type fullname="UnityEngine.TextCore.Text.FontAsset" preserve="all" />
+  </assembly>
 </linker>

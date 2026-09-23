@@ -1,0 +1,98 @@
+/*
+ * The Mimas interface language as USS variables (docs/ui/language.md). Every colour, face, size and gap
+ * a screen in the new language uses is declared here once and nowhere else; Examine.uss and
+ * HoverPanel.uss contain no literal colour or font. Imported first by MatchHud.uss and Lobby.uss.
+ *
+ * Two surfaces: ink (the board HUD, hover panels) and paper (the examine plate). A token that differs
+ * between them has both: --mimas-fg is the ink value, --mimas-paper-fg the paper one.
+ *
+ * Today's --hud-* variables in MatchHud.uss stay until the bar and lobby adopt these (follow-up).
+ */
+
+:root {
+    /* ---- §1 colour: ink surface ---- */
+    --mimas-ink: #0b0b0e;
+    --mimas-ink-2: #121217;
+    --mimas-fg: #efe9dc;
+    --mimas-fg-2: rgba(239, 233, 220, 0.62);
+    --mimas-fg-3: rgba(239, 233, 220, 0.34);
+    --mimas-hair: rgba(239, 233, 220, 0.14);
+    --mimas-tile: rgba(0, 0, 0, 0.32);
+    --mimas-you: #5fd3c8;
+    --mimas-them: #ff4b3e;
+    --mimas-amount: #e9b45c;
+    --mimas-changed: #a99cff;
+    --mimas-up: #8fdc7a;
+    --mimas-down: #ff6a5c;
+
+    /* ---- §1 colour: paper surface ---- */
+    --mimas-paper: #e9e2d2;
+    --mimas-paper-fg: #16151a;
+    --mimas-paper-fg-2: rgba(22, 21, 26, 0.64);
+    --mimas-paper-fg-3: rgba(22, 21, 26, 0.42);
+    --mimas-paper-hair: rgba(22, 21, 26, 0.16);
+    --mimas-paper-tile: rgba(22, 21, 26, 0.06);
+    --mimas-paper-you: #1f7f78;
+    --mimas-paper-them: #c8321f;
+    --mimas-paper-amount: #e9b45c;
+    --mimas-paper-changed: #5a48c8;
+    --mimas-paper-up: #2f7d3a;
+    --mimas-paper-down: #c8321f;
+
+    /* Row hover ground (§5 state.hover: fg at 4.5%), per surface. */
+    --mimas-hover: rgba(239, 233, 220, 0.045);
+    --mimas-paper-hover: rgba(22, 21, 26, 0.045);
+
+    /* The ground under a number tile in the hover panel (§6: "on a 4% ground"). */
+    --mimas-number-ground: rgba(239, 233, 220, 0.04);
+
+    /* The wash the plate throws on the board: ink at 45% (docs/ui/examine.md §3.5). */
+    --mimas-wash: rgba(11, 11, 14, 0.45);
+
+    /* ---- §2 type: faces (Latin subsets, SIL OFL; Josefin Sans unmodified) ---- */
+    --mimas-font-display: url("Fonts/JosefinSans-Light SDF.asset");
+    --mimas-font-caps: url("Fonts/JosefinSans-Regular SDF.asset");
+    --mimas-font-serif: url("Fonts/CormorantGaramond-Bold SDF.asset");
+    --mimas-font-serif-semibold: url("Fonts/CormorantGaramond-SemiBold SDF.asset");
+    --mimas-font-serif-italic: url("Fonts/CormorantGaramond-MediumItalic SDF.asset");
+    --mimas-font-body: url("Fonts/Sora-Regular SDF.asset");
+
+    /* ---- §2 type: the scale. A new size is a decision, not a tweak. ---- */
+    --mimas-text-34: 34px;
+    --mimas-text-32: 32px;
+    --mimas-text-26: 26px;
+    --mimas-text-24: 24px;
+    --mimas-text-17: 17px;
+    --mimas-text-16: 16px;
+    --mimas-text-15: 15px;
+    --mimas-text-13-5: 13.5px;
+    --mimas-text-12: 12px;
+    --mimas-text-11-5: 11.5px;
+    --mimas-text-10-5: 10.5px;
+    --mimas-text-10: 10px;
+    --mimas-text-9: 9px;
+    --mimas-text-7-5: 7.5px;
+    --mimas-text-6-5: 6.5px;
+
+    /* display-caps letter-spacing, 0.14–0.28em of the size, as pixels at the size it is used. */
+    --mimas-caps-tracking-wide: 2px;
+    --mimas-caps-tracking: 1px;
+
+    /* ---- §4 space and shape ---- */
+    --mimas-plate-w: 380px;
+    --mimas-plate-pad: 22px;
+    --mimas-plate-pad-x: 20px;
+    --mimas-gap-section: 18px;
+    --mimas-gap-item: 12px;
+    --mimas-gap-row: 5px;
+    --mimas-tile-size: 40px;
+    --mimas-tile-gap: 8px;
+    --mimas-bar: 2px;
+    --mimas-panel-w: 300px;
+    --mimas-panel-tile: 42px;
+    --mimas-panel-edge: 2px;
+
+    /* USS has no box-shadow: the panel's shadow is a blurred-looking offset layer in this colour (drift). */
+    --mimas-shadow-panel: rgba(0, 0, 0, 0.6);
+    --mimas-shadow-offset: 14px;
+}
