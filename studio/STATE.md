@@ -1,8 +1,8 @@
 ---
 project: mimas
 milestone: M2
-updated: 2026-09-22
-updated_by: opus — T-0010 built; boons are in the game, online and in practice
+updated: 2026-09-23
+updated_by: fable — boons verified; the examine panel designed and specced as T-0011
 ---
 
 # Where Mimas stands
@@ -48,14 +48,16 @@ against the 13 MB ratchet, and boots in 1.5–1.8 s on all three engines. Run re
    M2-7, and M2-8 with a human on the other seat. Record it as `studio/playtests/<date>-<name>.md`.
    **Deploy first** (`bash tools/deploy/deploy.sh`): the live site is from before boons, and its client
    cannot talk to a server that wants a lineage.
-2. **Verifiers.** Six tasks sit at `verify` and nothing in the ledger is ticked until someone in a fresh
-   context agrees: **T-0010**, T-0009 (part-1 spec §14), and the M2 set T-0008 (closes T-0005 and T-0006),
-   T-0007, T-0002.
-   For T-0010 start at the **Definition of done** table in `studio/runs/R-2026-09-22-T-0010-build.md`: it
-   ticks spec §14 line by line and marks five things **written but never looked at** (the reveal flyover,
-   the changed-number mark on the action bar, the element words, the `boonStat` / `nullify` preview labels,
-   Back to room after a series). One practice game in the Editor reaches all five. The section under it
-   says where else to start.
+2. **Close T-0010's evidence gap.** Verified 23 Sep: T-0009 passes; T-0010 fails only because five
+   player-visible things were written and never looked at (reveal flyover, changed number on the action
+   bar with its element word, round card, series banner with Back to room, `boonStat`/`nullify` preview
+   label). One practice game in the Editor, five captures, and the verdict flips. Issue list and the small
+   follow-ups (a vacuous server assertion, a mislabelled shot): `studio/runs/R-2026-09-23-verify-boons.md`.
+   **M3-5 says three ladder maps and two ship** — Rohan rewords the ledger line or a map gets built.
+3. **Build T-0011, the examine panel** (Opus, autonomous): spec `docs/specs/2026-09-23-examine-panel.md`, design in
+   the new UI book `docs/ui/language.md` + `docs/ui/examine.md`, render pinned under `docs/ui/mockups/`. Six rounds
+   of options on 23 Sep ended with the manuscript plate; the spec is the whole work order.
+4. **Verifiers for the M2 set**: T-0008 (closes T-0005 and T-0006), T-0007, T-0002.
 
 ## Current milestone: M2 — online
 
@@ -80,8 +82,9 @@ tick.
 
 | Task | What | Status | Who |
 |---|---|---|---|
-| **T-0010** | **Boons in the game** — the room hosts the session, lineage row, draft over the board, presentation of boons and reveals, practice-mode session, nine boons | **verify.** Eleven commits, 22 Sep, run report `R-2026-09-22-T-0010-build` | verifier needed |
-| T-0009 | Boons groundwork in Core | verify | verifier needed |
+| **T-0010** | **Boons in the game** — the room hosts the session, lineage row, draft over the board, presentation of boons and reveals, practice-mode session, nine boons | **verify — FAILED 23 Sep on evidence, not code.** Five captures from one Editor practice game make it pass; list in `R-2026-09-23-verify-boons` | builder, small |
+| T-0009 | Boons groundwork in Core | **verified PASS 23 Sep** (ledger rows are ticked with T-0010, per F-boons) | done pending T-0010 |
+| **T-0011** | **The examine panel** — manuscript plate, one hover panel, `--mimas-*` tokens, `Unit.StatLines`, lineage hues, fonts | **approved**, spec written 23 Sep | Opus, next fresh session |
 | T-0008 | Finish M2 in the browser | verify — deployed and measured live 21 Sep | verifier needed |
 | T-0007 | Deploy | verify — live confirmed 21 Sep | verifier needed |
 | T-0002 | Execute the online slice | verify | verifier needed |
@@ -119,6 +122,14 @@ Nothing, except what waits on Rohan below.
 | P8 What Resign concedes | **The series**; a disconnect forfeit too |
 
 ## Things the next agent must not rediscover
+
+- **The UI book is `docs/ui/`.** One page per screen (`examine.md` first) with element ids that become UXML
+  names, data sources, asset gaps and acceptance screenshots; `language.md` holds every token and maps it to a
+  `--mimas-*` USS variable. Design a screen there before touching UXML. The mock canvas and its Python
+  generators are under `artifacts/UI Drafts/` (gitignored); the pinned render is under `docs/ui/mockups/`.
+- **The asset guard scans shell command text for protected paths, even in prose and even for reads**: the
+  design page, anything under `.claude/`, the studio config and ledger files, and any path containing `Temp`.
+  Use the Read/Grep/Edit tools for those files and keep their names out of shell commands.
 
 - **`Room.Session` is one whole best-of-3.** `Room.Round` is gone; it is `Room.Series` (rematches) and the
   session owns the round. The map comes from the session's ladder, so `ServerOptions.MapId` is gone too:
