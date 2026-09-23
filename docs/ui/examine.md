@@ -20,10 +20,10 @@ plate shows exactly the edge of what you know. It never shows a number the rules
 |---|---|---|
 | Opens | on a click on any unit with nothing armed (design `#hud`: "clicking a unit with nothing armed opens examine") | `MatchSession` selection |
 | Stays | open across turns and events; it re-renders from every new `PlayerView` | ADR-026 mirror |
-| Closes | on a click anywhere off the plate, on ✕, on Escape, or when its unit dies. The off-plate click **only closes**; it selects and arms nothing (Rohan, 23 Sep 2026) | `ex.scrim` swallows the click |
+| Closes | on **any** click outside the plate, on ✕, on Escape, or when its unit dies. A click on the board **only closes** — it selects and arms nothing. A click on the HUD (an action, End Turn) closes the plate **and** does what it does, so arming Move with the plate open closes it and the board is ready for the move (Rohan, 23 Sep 2026, both) | `ExamineView` listens for every press on the HUD; the presenter closes it for a board press |
 | Overflow | the plate is full window height; the painting is 210 tall at ≥ 900px windows, 120 below; the body scrolls with a 2px scroller. At 1920×1080 the round-3 state fits; at 1280×720 it scrolls | spec §3 |
 | Hover | every row and tile opens the language's hover panel to the left, 120 ms after the pointer rests, closes on leave | `docs/ui/language.md` §6 |
-| Position | flush to the right edge, full window height, 380 wide; a 200px dark wash bleeds onto the board so it reads as a layer, not a window | `language.md` §4 |
+| Position | flush to the right edge, full window height, 420 wide, **a layer over the whole HUD**: it appears and goes without a slide and moves nothing — End Turn and Resign are under it while it is open (Rohan, 23 Sep 2026). A 200px dark wash bleeds onto the board so it reads as a layer, not a window | `language.md` §4 |
 | Owner colour | `you` when the unit is yours, `them` when not; the plate is paper either way, the wash and panels are ink | `UnitView.IsMine` |
 
 ## 3. Element inventory
@@ -87,7 +87,6 @@ Armour, which has no abilities, shows one grey line: "turns 2 of every blow".
 | id | Shows | Data |
 |---|---|---|
 | `ex.ring` | 1px ring in the owner colour around the examined unit | `client` selection (drawn around the unit's nameplate, not on the board mesh) |
-| `ex.scrim` | invisible full-window catcher behind the plate that closes it | `client` |
 | `ex.wash` | 200px gradient to ink at 45% on the board's edge next to the plate | none |
 
 ## 4. Hover panel contents, per thing (the language §6 shape)
@@ -155,3 +154,4 @@ colour tokens for you/them/changed used, not literals.
 - 2026-09-23 · open questions 1 and 2 answered by Rohan; `ex.vitals.height` added; render pinned; spec and
   T-0011 written.
 - 2026-09-23 · built by T-0011: `Examine.uxml` / `Examine.uss`, `HoverPanel.uxml` / `HoverPanel.uss`, `ExamineView`, `ExamineModelBuilder`; gap 1 closed by `Unit.StatLines`, gap 3 by client memory (open question 4 stands), gap 4 by the lineage hues, gap 5 by seat names, gap 6 by `ex.vitals.height`. Drifts are noted in their rows.
+- 2026-09-23 · after Rohan played it: the plate is a layer over the HUD with no slide and moves nothing; any click outside closes it, a HUD click also does its own thing (`ex.scrim` removed); the type scale raised (nothing under 10px at 1080) and the greys made stronger for readability; plate 420 wide.

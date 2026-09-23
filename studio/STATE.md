@@ -38,14 +38,16 @@ now that they could not yesterday:
 - **Nine more boons** (three per lineage, one of each kind) and a new spell, Indra's Storm.
 
 **23 Sep: the examine plate is built (T-0011, F-examine-panel), at `verify`.** Click a hero with nothing
-armed and a paper plate slides in from the right: the painting in the lineage's hues with the name in a
+armed and a paper plate appears on the right, a layer over the rest of the HUD: the painting in the lineage's hues with the name in a
 serif, health and action points with a bar and eggs, standing height, six stats as base then a green or red
 net, boons oldest to latest, and the four items with their actions as named tiles — violet-edged with a
 diamond when an Enchant changed one, with a triangle when a Sigil added one, dashed `?` when it is theirs
 and unseen. Rest on anything for one hover panel to the left with the numbers, the sentence, the damage
 line and what a boon changed. The enemy's plate is vermilion with grey `?` after the lane stats while a boon
-of theirs is hidden. A click anywhere off the plate only closes it; Escape and ✕ too; it stays open across
-turns. It is the first screen in the new interface language: `Theme.uss` declares every `--mimas-*` token,
+of theirs is hidden. Any click outside closes it: on the board it only closes; on the HUD it closes and
+the action still happens (arm Move with the plate open and the board is ready to move). Escape and ✕ too;
+it stays open across turns. Rohan played it on 23 Sep and asked for that, no slide, and bigger type — done
+the same day. It is the first screen in the new interface language: `Theme.uss` declares every `--mimas-*` token,
 three fonts ship as Latin-subset TextCore assets, glyphs are drawn with `Painter2D`. Run report:
 `studio/runs/R-2026-09-23-T-0011.md`; screenshots in `artifacts/t0011/shots/`.
 
@@ -161,8 +163,14 @@ Nothing, except what waits on Rohan below.
 - **A UI Toolkit hover or press can be driven** with `PointerEnterEvent.GetPooled()` / `PointerDownEvent`
   sent to the element: the Input System's simulated mouse does not reach UI Toolkit in an unfocused Editor.
 - **A board click is read twice**: by `BoardInputController` in its `Update` and by UI Toolkit later the
-  same frame. Anything that appears under the pointer because of a board click (the examine scrim) must
-  ignore the press that made it appear — found only in the browser.
+  same frame (a frame later on the Web). Anything that reacts to presses and appears because of a board
+  click (the examine plate's close-on-outside-press) must ignore the press that opened it.
+- **Keep a task `running` for any rework after it reached `verify`**: its `allows_assets` only apply while it
+  is the one running task. Never write a protected path from a script file — the guard only reads the
+  command text, so it cannot stop it, and the next commit is refused anyway.
+- **Closing examine must clear the model, not only the ids.** Arming an action once cleared the ids and
+  left `_examine` drawn: the plate stayed up, ate the board, and `CloseExamine` refused because the ids
+  were already empty — the player was stuck (found by Rohan, 23 Sep).
 - **The browser smoke's `click` now holds the button 80 ms**: an instant click never reads as
   `wasPressedThisFrame`, so board clicks silently did nothing.
 - **The asset guard reads shell variables literally**: `git add $C/…meta` is refused even when the path is

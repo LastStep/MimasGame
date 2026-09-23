@@ -28,8 +28,8 @@ except the painting.
 | `ink-2` | a raised plate (hover panel) | `#121217` | — | `--mimas-ink-2` | built |
 | `paper` | the examine plate | — | `#e9e2d2` | `--mimas-paper` | built |
 | `fg` | all primary type | `#efe9dc` (bone) | `#16151a` | `--mimas-fg` | built |
-| `fg-2` | secondary type, captions | bone at 62% | ink at 64% | `--mimas-fg-2` | built |
-| `fg-3` | tertiary: labels, "/ max", unseen | bone at 34% | ink at 42% | `--mimas-fg-3` | built |
+| `fg-2` | secondary type, captions | bone at 74% | ink at 76% | `--mimas-fg-2` | built |
+| `fg-3` | tertiary: labels, "/ max", unseen | bone at 50% | ink at 58% | `--mimas-fg-3` | built |
 | `hair` | the only stroke: bars, tile edges | bone at 14% | ink at 16% | `--mimas-hair` | built |
 | `tile` | the ground of an action tile | black at 32% | ink at 6% | `--mimas-tile` | built |
 | `you` | your accent: bars, pips, section labels, tile edges (at 55%) | `#5fd3c8` | `#1f7f78` | `--mimas-you` | built |
@@ -57,8 +57,11 @@ Two faces on ink, three on paper. Nothing else. All numbers that carry weight ar
 | `serif` | Cormorant Garamond 700 / 600 / italic | names, item names, section labels, the lineage line, on paper only | 32 / 17 / 16 / 15 | `--mimas-font-serif`, `-serif-semibold`, `-serif-italic` | built: 700, 600 and 500 italic, Latin subset |
 | `body` | Sora 400 / 600 | every sentence: descriptions, hover text, notes | 12 / 11.5 / 10.5 / 10 | `--mimas-font-body` | built: 400 only, Latin subset (600 not needed yet; italic is synthesised for the flavour line) |
 
-Scale, top to bottom: **34 · 32 · 26 · 24 · 17 · 16 · 15 · 13.5 · 12 · 11.5 · 10.5 · 10 · 9 · 7.5 · 6.5**.
-A new size is a decision, not a tweak.
+Scale, top to bottom: **38 · 36 · 28 · 20 · 19 · 17 · 15 · 14 · 13 · 12 · 11 · 10** (USS `--mimas-text-<size>`).
+A new size is a decision, not a tweak. Raised on 23 Sep 2026 after Rohan played the plate: the HUD scales
+with the window, so 1280×720 draws every size at two thirds, and the old 6.5 and 7.5 became unreadable.
+The sizes in the rows below are the 23 Sep originals; each moved up one step of this scale
+(34→38, 32→36, 24→28, 17→20, 16→19, 15→17, 13.5→15, 12→14, 11.5→13, 10.5 and 10→12, 7.5→11, 6.5→10).
 
 Licence: all three are SIL OFL on Google Fonts. **Asset gap**: they must ship as Unity font assets under
 `MimasClient/Assets/_Game/UI/Fonts/` (UI Toolkit uses TextCore font assets; generate with the Editor, never
@@ -93,12 +96,12 @@ today the action bar draws a letter. Vector (SVG import) preferred so one file s
 
 | Token | Value | Used for | USS | Status |
 |---|---|---|---|---|
-| `plate.width` | 380 | the examine plate; the hover panel is 300 | `--mimas-plate-w` | built |
+| `plate.width` | 420 (was 380; widened with the type) | the examine plate; the hover panel is 340 | `--mimas-plate-w`, `--mimas-panel-w` | built |
 | `plate.pad` | 22 top/bottom, 20 sides | plate padding | `--mimas-plate-pad` | built |
 | `gap.section` | 18 | between sections; a section is a caption plus this air, **no line** | `--mimas-gap-section` | built |
 | `gap.item` | 12 | between items in equipment | `--mimas-gap-item` | built |
 | `gap.row` | 4–5 | between rows in a list | `--mimas-gap-row` | built |
-| `tile` | 40 square, 1px edge, 8 apart, label beneath | an action tile | `--mimas-tile-size` | built |
+| `tile` | 44 square (was 40), 1px edge, label beneath | an action tile | `--mimas-tile-size` | built |
 | `bar` | 2px tall | health bar; the fill is the owner's colour | `--mimas-bar` | built |
 | `radius` | 0 | nothing is rounded except eggs, dots and the `?` | — | built |
 | `shadow.panel` | `0 14px 34px` black at 60% | the hover panel only | `--mimas-shadow-panel` | drift: USS has no `box-shadow`; an offset layer in this colour stands in |
@@ -122,7 +125,7 @@ There is no "seen by your opponent" text anywhere. The mirror of `unseen` on you
 
 ## 6. The hover panel (one object, everywhere)
 
-Anything that can be rested on opens the same panel, 300 wide, to the left of the thing, on `ink-2`, with a
+Anything that can be rested on opens the same panel, 340 wide, to the left of the thing, on `ink-2`, with a
 2px left edge in the owner's colour (grey `fg-3` for an unknown). Order inside, top to bottom:
 
 1. Icon tile (42, 1px edge in the accent) beside the **name** in `display-caps` 17 and a **type line** in
@@ -153,3 +156,4 @@ reveals). Nothing in the list repeats what the panel says: **names in the list, 
 
 - 2026-09-23 · written from the examine session; status proposed.
 - 2026-09-23 · built by T-0011: every §1, §2, §4 token in `MimasClient/Assets/_Game/UI/Theme.uss`; glyphs drawn by `Glyphs.cs`; fonts as dynamic TextCore assets under `UI/Fonts/`. Two drifts noted in the rows: no USS box-shadow, and the egg and unknown glyphs drawn in code rather than USS.
+- 2026-09-23 · readability pass after Rohan played it: the type scale raised one step throughout, `fg-2` / `fg-3` stronger on both surfaces, plate 420 and panel 340 wide, tiles 44.
