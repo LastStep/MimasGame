@@ -151,7 +151,7 @@ Nothing, except what waits on Rohan below.
 - **Never call `unity command run_tests` while the Editor is in Play Mode.** The job queues behind Play
   Mode and every later CLI command times out behind it (`editor_stop` and `unity close` included); it took
   Rohan closing the Editor by hand on 23 Sep.
-- **Play Mode writes the dynamic font atlases into the font assets** under `UI/Fonts/` (5 KB → up to
+- **Play Mode and the batch Web build both write the dynamic font atlases into the font assets** under `UI/Fonts/` (5 KB → up to
   730 KB each). It is a cache (`ClearDynamicDataOnBuild` is on): with the Editor **closed**,
   `git restore MimasClient/Assets/_Game/UI/Fonts` before committing. Never commit the populated ones.
 - **Practice from the CLI:** `editor_play` on the Lobby, `SceneManager.LoadScene("Arena")` via `eval`, then
