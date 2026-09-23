@@ -1,0 +1,154 @@
+# Mimas interface language
+
+_Status: **proposed** (Rohan, 23 Sep 2026, from the examine-panel design session). Source of the look:
+`artifacts/UI Drafts/canvas_Titan Inspiration-260923_0720.png` and the Disco Elysium reference. Mock canvas:
+https://claude.ai/artifact/K9qZcJQ115G5G685sdMAwy (page 2 "Examine", the "Final · the rules" sheet).
+This page is the single place a colour, a face, a glyph or a spacing is defined. Every screen page under
+`docs/ui/` refers to these names; the client declares them once as USS variables on `:root` and never
+hard-codes a value._
+
+## How to read the tables
+
+- **Token** is the name in this book. **USS** is the variable the client declares. A screen page or a
+  builder writes the token; the USS column is what the UXML/USS actually uses.
+- Two surfaces exist: **ink** (the board HUD, hover panels, the portrait plate) and **paper** (the chosen
+  examine plate). A token that differs between them has both values. Hover panels are always ink, even
+  over paper.
+- Status per row: `proposed` until Rohan approves this page; then `built` when the variable exists in
+  `MimasClient/Assets/_Game/UI/*.uss`, or `drift` with a note when the code does something else on purpose.
+
+## 1. Colour
+
+The rule: ink and bone, one signal colour per owner, four meaning colours, and nothing else carries colour
+except the painting.
+
+| Token | Meaning | Ink surface | Paper surface | USS | Status |
+|---|---|---|---|---|---|
+| `ink` | every plate, the void behind the HUD | `#0b0b0e` | — | `--mimas-ink` | proposed |
+| `ink-2` | a raised plate (hover panel) | `#121217` | — | `--mimas-ink-2` | proposed |
+| `paper` | the examine plate | — | `#e9e2d2` | `--mimas-paper` | proposed |
+| `fg` | all primary type | `#efe9dc` (bone) | `#16151a` | `--mimas-fg` | proposed |
+| `fg-2` | secondary type, captions | bone at 62% | ink at 64% | `--mimas-fg-2` | proposed |
+| `fg-3` | tertiary: labels, "/ max", unseen | bone at 34% | ink at 42% | `--mimas-fg-3` | proposed |
+| `hair` | the only stroke: bars, tile edges | bone at 14% | ink at 16% | `--mimas-hair` | proposed |
+| `tile` | the ground of an action tile | black at 32% | ink at 6% | `--mimas-tile` | proposed |
+| `you` | your accent: bars, pips, section labels, tile edges (at 55%) | `#5fd3c8` | `#1f7f78` | `--mimas-you` | proposed |
+| `them` | the enemy's accent, same uses | `#ff4b3e` | `#c8321f` | `--mimas-them` | proposed |
+| `amount` | a damage number, anywhere | `#e9b45c` | same | `--mimas-amount` | proposed |
+| `changed` | a number a boon changed; an action a boon added | `#a99cff` | `#5a48c8` | `--mimas-changed` | proposed |
+| `up` | a stat above its base | `#8fdc7a` | `#2f7d3a` | `--mimas-up` | proposed |
+| `down` | a stat below its base | `#ff6a5c` | `#c8321f` | `--mimas-down` | proposed |
+
+Lineage hues are **painting colours, not UI colours**: they tint the portrait wash and the item squares
+and never a bar or a label. Greek `#1d4f5c` / `#7fb7b0`, Norse `#3a3f52` / `#8e98b8`, Hindu `#6a3a12` /
+`#e0a35a` (dark, light). Data: `lineages/*.json` gets two presentation keys `hueDark`, `hueLight`
+(**data gap**, see §7).
+
+Never pure white. Never a grey-on-grey card. Never a colour that means two things.
+
+## 2. Type
+
+Two faces on ink, three on paper. Nothing else. All numbers that carry weight are set light.
+
+| Token | Face, weight | Where | Size (px) | USS | Status |
+|---|---|---|---|---|---|
+| `display` | Josefin Sans 300 | every large number (health, AP, stat base) | 34 / 24 | `--mimas-font-display` | proposed |
+| `display-caps` | Josefin Sans 400, letter-spacing 0.14–0.28em, uppercase | names and captions on ink; tile labels everywhere | 26 / 13.5 / 9 / 7.5 / 6.5 | same face | proposed |
+| `serif` | Cormorant Garamond 700 / 600 / italic | names, item names, section labels, the lineage line, on paper only | 32 / 17 / 16 / 15 | `--mimas-font-serif` | proposed |
+| `body` | Sora 400 / 600 | every sentence: descriptions, hover text, notes | 12 / 11.5 / 10.5 / 10 | `--mimas-font-body` | proposed |
+
+Scale, top to bottom: **34 · 32 · 26 · 24 · 17 · 16 · 15 · 13.5 · 12 · 11.5 · 10.5 · 10 · 9 · 7.5 · 6.5**.
+A new size is a decision, not a tweak.
+
+Licence: all three are SIL OFL on Google Fonts. **Asset gap**: they must ship as Unity font assets under
+`MimasClient/Assets/_Game/UI/Fonts/` (UI Toolkit uses TextCore font assets; generate with the Editor, never
+hand-make the `.asset`). Fallback stack in USS: `"Josefin Sans", "Sora", sans-serif`.
+
+## 3. Glyphs
+
+Shapes carry meaning so it survives any colour, the art, and colour-blindness.
+
+| Token | Shape | Means | Source | Status |
+|---|---|---|---|---|
+| `glyph.health` | heart, stroke | health | `Icons/heart` | proposed |
+| `glyph.ap` | bolt, stroke | action points | `Icons/bolt` | proposed |
+| `glyph.egg` | egg, hollow / filled | one AP, spent / held | drawn in USS (border-radius), no asset | proposed |
+| `glyph.cost` | 5px dot ×n | an action's AP cost | drawn in USS | proposed |
+| `glyph.blessing` | circle | Blessing (filled when it is the starting one) | `Icons/kind-blessing` | proposed |
+| `glyph.enchant` | diamond | Enchant | `Icons/kind-enchant` | proposed |
+| `glyph.sigil` | triangle | Sigil | `Icons/kind-sigil` | proposed |
+| `glyph.weapon` | sword | weapon lane, weapon slot | `Icons/lane-weapon` | proposed |
+| `glyph.spell` | spark | spell lane | `Icons/lane-spell` | proposed |
+| `glyph.crown` `glyph.boots` `glyph.armour` | crown, boot, shield | the other three slots (fallback under item art) | `Icons/slot-*` | proposed |
+| `glyph.lobbed` `glyph.straight` | arc, arrow | trajectory | `Icons/traj-*` | proposed |
+| `glyph.sight` `glyph.nosight` | eye, eye struck | needs sight / no sight needed | `Icons/sight-*` | proposed |
+| `glyph.unknown` | dashed circle with `?` | a thing of theirs you have not seen | drawn in USS | proposed |
+| `glyph.emblem.<lineage>` | laurel, hammer, lotus (placeholders) | the lineage | `lineages/*.json` `icon` key, already in data | proposed |
+| action icons | one per ability | the action, identical on the bar, in examine and in the hover | `abilities/*.json` `icon` key, already in data | built (bar) |
+
+All stroke icons: 24-unit grid, 1.4–1.8 stroke, round caps. **Asset gap**: the Icons folder does not exist;
+today the action bar draws a letter. Vector (SVG import) preferred so one file serves 12px and 22px.
+
+## 4. Space and shape
+
+| Token | Value | Used for | USS | Status |
+|---|---|---|---|---|
+| `plate.width` | 380 | the examine plate; the hover panel is 300 | `--mimas-plate-w` | proposed |
+| `plate.pad` | 22 top/bottom, 20 sides | plate padding | `--mimas-plate-pad` | proposed |
+| `gap.section` | 18 | between sections; a section is a caption plus this air, **no line** | `--mimas-gap-section` | proposed |
+| `gap.item` | 12 | between items in equipment | `--mimas-gap-item` | proposed |
+| `gap.row` | 4–5 | between rows in a list | `--mimas-gap-row` | proposed |
+| `tile` | 40 square, 1px edge, 8 apart, label beneath | an action tile | `--mimas-tile-size` | proposed |
+| `bar` | 2px tall | health bar; the fill is the owner's colour | `--mimas-bar` | proposed |
+| `radius` | 0 | nothing is rounded except eggs, dots and the `?` | — | proposed |
+| `shadow.panel` | `0 14px 34px` black at 60% | the hover panel only | `--mimas-shadow-panel` | proposed |
+
+No hairline dividers, no boxed sections, no borders around groups. If two things need separating, use
+space or a caption. The one edge allowed is the hover panel's 2px left edge in the owner's colour.
+
+## 5. States
+
+| Token | Looks like | Means |
+|---|---|---|
+| `state.changed` | tile edge in `changed`, a small diamond at the corner | an Enchant changed a number of this action |
+| `state.added` | tile edge in `changed`, a small triangle at the corner | a Sigil granted this action |
+| `state.unseen` | dashed tile with `?` and the label "unseen" | an action of theirs you have not seen |
+| `state.unrevealed` | dashed `?` row | a boon they hold that you have not seen |
+| `state.hidden-stat` | grey `?` after a stat | an unrevealed boon may be moving this stat |
+| `state.hover` | row ground at fg 4.5%; the hover panel opens to the left | the pointer rests on a thing |
+| `state.selected` | a 1px ring in the owner's colour around the unit on the board | the unit examine is open for |
+
+There is no "seen by your opponent" text anywhere. The mirror of `unseen` on your own side is not shown.
+
+## 6. The hover panel (one object, everywhere)
+
+Anything that can be rested on opens the same panel, 300 wide, to the left of the thing, on `ink-2`, with a
+2px left edge in the owner's colour (grey `fg-3` for an unknown). Order inside, top to bottom:
+
+1. Icon tile (42, 1px edge in the accent) beside the **name** in `display-caps` 17 and a **type line** in
+   caps 8: what it is · what it belongs to · action / movement / Blessing / Enchant / Sigil / stat / item.
+2. **Numbers as tiles**: glyph over value over label, on a 4% ground: cost · damage (in `amount`) · reach
+   (in `changed` when a boon changed it) · apex · element.
+3. **One sentence** (`body` 12).
+4. **The damage line**, as the rules compute it: `3 base + 3 Strength − their armour` (only for attacks).
+5. **Changes** from boons, one per line, in `changed`, with a diamond.
+6. **Conditions** in `fg-3` 10: lobbed and clears cover / straight line · needs sight / no sight needed · one target.
+7. One italic line of flavour (`body` 10.5, `fg-3`), never more. Anti-pillar: no lore beyond one line.
+
+The same panel serves a boon (kind glyph instead of icon, flavour = "Athena answers those who pray to the
+Greek gods."), an item (slot glyph, its stats as a tile, the boons on it under Changes), a stat (the
+breakdown as rows: base, each item, each boon), and the unknown (grey edge, one sentence about when it
+reveals). Nothing in the list repeats what the panel says: **names in the list, numbers in the panel**.
+
+## 7. Data and asset gaps this page creates
+
+| Gap | Kind | Where it lands |
+|---|---|---|
+| `hueDark`, `hueLight` per lineage | data | `lineages/*.json`, `docs/data.md`, `tools/schemas/lineage.schema.json` |
+| Font assets for Josefin Sans, Cormorant Garamond, Sora | asset | `MimasClient/Assets/_Game/UI/Fonts/` via the Editor |
+| Stroke icon set (§3) | asset | `MimasClient/Assets/_Game/UI/Icons/` |
+| USS variables (`--mimas-*`) replacing today's `--hud-*` in `MatchHud.uss` / `Lobby.uss` | code | one commit, no visual change until a screen adopts them |
+
+## Change log
+
+- 2026-09-23 · written from the examine session; status proposed.
