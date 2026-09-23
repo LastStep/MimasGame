@@ -32,8 +32,8 @@ except the painting.
 | `ink` | every plate, the void behind the HUD | `#0b0b0e` | — | `--mimas-ink` | built |
 | `ink-2` | a raised plate (hover panel) | `#121217` | — | `--mimas-ink-2` | built |
 | `paper` | ~~the examine plate~~ | — | `#e9e2d2` | `--mimas-paper` | **retired** 23 Sep 2026 (the plate is ink); the variable may stay until nothing reads it |
-| `void` | the world behind the board: the Arena and Lobby cameras' background | `#0b0b0e` (= `ink`) | — | camera clear colour, not USS | proposed (T-0013) |
-| `band` | the round card and results: a band across the middle, ink at 86% fading to nothing over the outer 22% each side, 300 tall | ink at 86% | — | `--mimas-band` | proposed (T-0013) |
+| `void` | the world behind the board: the Arena and Lobby cameras' background | `#0b0b0e` (= `ink`) | — | camera clear colour, not USS | built (Arena, T-0013); the Lobby's is its USS (T-0014) |
+| `band` | the round card and results: a band across the middle, ink at 86% fading to nothing over the outer 22% each side, 300 tall | ink at 86% | — | `--mimas-band` | built (T-0013): `Ramps.BothEnds` tinted by the token |
 | `fg` | all primary type | `#efe9dc` (bone) | `#16151a` | `--mimas-fg` | built |
 | `fg-2` | secondary type, captions | bone at 74% | ink at 76% | `--mimas-fg-2` | built |
 | `fg-3` | tertiary: labels, "/ max", unseen | bone at 50% | ink at 58% | `--mimas-fg-3` | built |
@@ -71,6 +71,14 @@ with the window, so 1280×720 draws every size at two thirds, and the old 6.5 an
 The sizes in the rows below are the 23 Sep originals; each moved up one step of this scale
 (34→38, 32→36, 24→28, 17→20, 16→19, 15→17, 13.5→15, 12→14, 11.5→13, 10.5 and 10→12, 7.5→11, 6.5→10).
 
+**Letter-spacing is written in hundredths of an em** (drift, found by T-0013 on 23 Sep 2026): UI Toolkit's text
+generator in 6000.4 reads `letter-spacing` as em × 100 whatever its unit says — a 15px label with
+`letter-spacing: 100px` gains 15px per gap. So `--mimas-caps-tracking: 8px` is 0.08em, `-wide: 14px` 0.14em, and
+the HUD's `--mimas-tracking-11/-15/-20/-38` are 0.28 / 0.24 / 0.28 / 0.30em. Until T-0013 they were written as
+pixels (1px, 2px) and drew as almost nothing, on the plate too. The fonts' kerning pairs also carried TextCore's
+"ignore spacing adjustments" flag (1422 of 1439 in Josefin Sans Light), which dropped the tracking on pairs such
+as T-O and Y-O ("V I C TORY"); `UI/FontSpacing` clears it in memory when the HUD binds.
+
 Licence: all three are SIL OFL on Google Fonts. **Asset gap**: they must ship as Unity font assets under
 `MimasClient/Assets/_Game/UI/Fonts/` (UI Toolkit uses TextCore font assets; generate with the Editor, never
 hand-make the `.asset`). Fallback stack in USS: `"Josefin Sans", "Sora", sans-serif`.
@@ -84,8 +92,8 @@ Shapes carry meaning so it survives any colour, the art, and colour-blindness.
 | `glyph.health` | heart, stroke | health | `Icons/heart` | built (`Glyphs.cs`) |
 | `glyph.ap` | bolt, stroke | action points | `Icons/bolt` | built (`Glyphs.cs`) |
 | `glyph.egg` | egg, hollow / filled | one AP, spent / held | drawn in USS (border-radius), no asset | drift: drawn by `Glyphs.cs` (Painter2D), not USS |
-| `glyph.cost` | 5px dot ×n, 3 apart, centred 5px above the tile's bottom edge | an action's AP cost, on its action-bar tile (never a digit; HUD round 1) | drawn in USS | proposed (T-0013) |
-| `glyph.unseen-by-them` | closed eye: a lid arc with three short lashes, 11px, at the tile's top-left | an action of **yours** the opponent has not seen yet (HUD round 1). Not the struck eye: that is `glyph.nosight` | `Glyphs.cs` path `eye-closed` | proposed (T-0013) |
+| `glyph.cost` | 5px dot ×n, 3 apart, centred 5px above the tile's bottom edge | an action's AP cost, on its action-bar tile (never a digit; HUD round 1) | drawn in USS | built (T-0013) |
+| `glyph.unseen-by-them` | closed eye: a lid arc with three short lashes, 11px, at the tile's top-left | an action of **yours** the opponent has not seen yet (HUD round 1). Not the struck eye: that is `glyph.nosight` | `Glyphs.cs` path `eye-closed` | built (T-0013): on the bar's tiles; the plate's own tiles do not draw it, their hover panel says it |
 | `glyph.blessing` | circle | Blessing (filled when it is the starting one) | `Icons/kind-blessing` | built (`Glyphs.cs`) |
 | `glyph.enchant` | diamond | Enchant | `Icons/kind-enchant` | built (`Glyphs.cs`) |
 | `glyph.sigil` | triangle | Sigil | `Icons/kind-sigil` | built (`Glyphs.cs`) |
@@ -114,10 +122,10 @@ today the action bar draws a letter. Vector (SVG import) preferred so one file s
 | `bar` | 2px tall | health bar; the fill is the owner's colour | `--mimas-bar` | built |
 | `radius` | 0 | nothing is rounded except eggs, dots and the `?` | — | built |
 | `shadow.panel` | `0 14px 34px` black at 60% | the hover panel, the draft cards | `--mimas-shadow-panel` | drift: USS has no `box-shadow`; an offset layer in this colour stands in |
-| `button` | 230 × 58, 1px edge, caps 15 at 0.28em | End Turn, Confirm, Back to room, Ready (Ready is 320 wide) | `--mimas-button-w`, `--mimas-button-h` | proposed (T-0013) |
-| `track` | 620 wide, a 2px line, 14px marker | the turn track (`docs/ui/hud.md`) | `--mimas-track-w` | proposed (T-0013) |
-| `card` | 360 × 470; the selected one lifts 14px | a draft card (`docs/ui/between-rounds.md`) | `--mimas-card-w`, `--mimas-card-h` | proposed (T-0013) |
-| `edge` | 40 | the HUD's distance from the window edges (bar, End Turn, boons column) | `--mimas-edge` | proposed (T-0013) |
+| `button` | 230 × 58, 1px edge, caps 15 at 0.28em | End Turn, Confirm, Back to room, Ready (Ready is 320 wide) | `--mimas-button-w`, `--mimas-button-h` | built (T-0013; Ready with T-0014). The edge at 55% is `--mimas-you-55` |
+| `track` | 620 wide, a 2px line, 14px marker | the turn track (`docs/ui/hud.md`) | `--mimas-track-w` | built (T-0013) |
+| `card` | 360 × 470; the selected one lifts 14px | a draft card (`docs/ui/between-rounds.md`) | `--mimas-card-w`, `--mimas-card-h` | built (T-0013) |
+| `edge` | 40 | the HUD's distance from the window edges (bar, End Turn, boons column) | `--mimas-edge` | built (T-0013) |
 
 No hairline dividers, no boxed sections, no borders around groups. If two things need separating, use
 space or a caption. The one edge allowed is the hover panel's 2px left edge in the owner's colour.
@@ -169,6 +177,14 @@ Greek gods."), an item (slot glyph, its stats as a tile, the boons on it under C
 breakdown as rows: base, each item, each boon), and the unknown (grey edge, one sentence about when it
 reveals). Nothing in the list repeats what the panel says: **names in the list, numbers in the panel**.
 
+### Tokens T-0013 added (built)
+
+`you` at 10 / 14 / 18 / 28 / 55% (`--mimas-you-10` … `-55`: armed, primary buttons, done, spends, the button
+edge); ink at 50 / 55 / 82% (`--mimas-ink-50` a tag's bar ground, `-55` End Turn and the boon circles, `-82` the
+cursor tag); `--mimas-scrim` (the draft's 80%), `--mimas-floor` / `--mimas-floor-top` (the floors' 86% and 62%,
+tints for `Ramps.Vertical`); the 56 size (`--mimas-text-56`, the room code's, used by T-0014); the tracking
+tokens above.
+
 ## 7. Data and asset gaps this page creates
 
 | Gap | Kind | Where it lands |
@@ -183,4 +199,7 @@ reveals). Nothing in the list repeats what the panel says: **names in the list, 
 - 2026-09-23 · written from the examine session; status proposed.
 - 2026-09-23 · built by T-0011: every §1, §2, §4 token in `MimasClient/Assets/_Game/UI/Theme.uss`; glyphs drawn by `Glyphs.cs`; fonts as dynamic TextCore assets under `UI/Fonts/`. Two drifts noted in the rows: no USS box-shadow, and the egg and unknown glyphs drawn in code rather than USS.
 - 2026-09-23 · readability pass after Rohan played it: the type scale raised one step throughout, `fg-2` / `fg-3` stronger on both surfaces, plate 420 and panel 340 wide, tiles 44.
+- 2026-09-23 · built by T-0013: the HUD session's rows (void, band, cost dots, closed eye, button, track, card,
+  edge) and the new alpha and tracking tokens; the paper block and the serif faces gone from `Theme.uss` and the
+  three Cormorant assets from the build; the letter-spacing unit and the kerning flag found and fixed (§2).
 - 2026-09-23 · HUD session (canvas page "HUD", rounds 1–3, Rohan): one surface, ink — paper and the serif retired; `void`, `band`, the 56 size for the room code; `glyph.cost` placed, `glyph.unseen-by-them` (closed eye, because the struck eye already means "no sight needed"); the action-bar states; where the hover panel opens; button, track, card and edge sizes. Screens: `docs/ui/hud.md`, `docs/ui/between-rounds.md`, `docs/ui/lobby.md`.

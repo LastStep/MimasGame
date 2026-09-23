@@ -56,6 +56,16 @@ stat or an Enchant's damage override, `id` = the boon) and `nullify` (an immunit
 The session's own five events, its view and the draft pick joined them in part 2 (ADR-036); see
 **The session on the wire** below.
 
+**What the opponent has seen of you** (ADR-039, T-0013). On the viewer's **own** unit only, each ability,
+modifier and boon entry carries `"seen": true|false` and the unit carries `"lineageSeen": true|false`:
+whether the opponent's revealed set already holds it (a public modifier is always `true`). `Wire.ReadView`
+requires both keys on a unit with `"mine": true` (a missing one is a malformed frame) and never reads them on
+an enemy unit, whose JSON has no such key at all — it is byte-for-byte what it was before. The mirror
+imports the flags back into the opponent's side of its revealed set, so `mirror.ViewFor(viewer)` reproduces
+the view. A client from before T-0013 ignores the keys; a client from after it throws on a server from
+before it, which is why the two deploy together. Tests: `SeenByOpponentTests` in Core (12) and over sockets
+(2).
+
 ### How two players meet
 
 **Room codes, not a queue** (OPT-0001, 17 Sep 2026). Four friends in two arranged pairs are not a
@@ -164,8 +174,10 @@ seat. One place in the code does both (`Room.Broadcast`), which is the guarantee
 than a promise; `TwoHumans_MirrorPlayersPlayToTheEnd` asserts every view a player ever received was
 their own.
 
-- Own units: everything, including `lineage` and every boon id. The `session` block adds your own offers
-  in a draft, your build, and whether each seat has picked.
+- Own units: everything, including `lineage` and every boon id, and — per entry — whether the opponent has
+  already seen it (`seen`, `lineageSeen`; ADR-039). That tells you only what your own play has shown the
+  other side. The `session` block adds your own offers in a draft, your build, and whether each seat has
+  picked.
 - Enemy units: position, gear, hit points, action points, heights — and **revealed** abilities,
   modifiers and boons only, plus the `lineage` once it is revealed (else `null`). A hidden entry keeps its
   slot with a `null` id, so the opponent can see *that* there is

@@ -1,6 +1,6 @@
 # Between rounds · the draft and the round moments
 
-_Status: **proposed** (chosen by Rohan on 23 Sep 2026 in the HUD session, canvas round 2). Design anchors:
+_Status: **built** (T-0013, 23 Sep 2026; chosen by Rohan on 23 Sep 2026 in the HUD session, canvas round 2). Design anchors:
 `#draft`, `#session`, `#round`, `#win-conditions`, `#hidden-info`, `#presentation` (HUD: series line, round
 card, draft overlay). Language: `docs/ui/language.md`. Mock: https://claude.ai/artifact/K9qZcJQ115G5G685sdMAwy,
 page "HUD", round 2 row 2: **"Draft · ink cards with the lineage wash"** (chosen; the paper cards and
@@ -77,6 +77,19 @@ Captures at 1920×1080 and 1280×720 against the canvas boards:
 4. A round result with the score in both colours and no button.
 5. The series result with "BACK TO ROOM".
 
+## Drift
+
+- **The card's wash is the painting without the emblem** (the plate draws its emblem over the painting; the
+  card does not).
+- **After the pick the cards stop taking clicks** rather than being disabled, because a disabled button takes the
+  theme's own fade and the kept card must stay whole.
+- **The series result's button follows the room** (ADR-032): "BACK TO ROOM" online, "BACK TO LOBBY" in
+  practice, where there is no room. The practice capture shows the second.
+- **The canvas's draft board put HAS CHOSEN under your end and lit your half**; this page says their end and
+  nothing lit, and the build follows the page.
+
 ## Change log
 
 - 2026-09-23 · written from the HUD session (canvas round 2); status proposed.
+- 2026-09-23 · built by T-0013 (`dr.*`, `mo.*` in `MatchHud.uxml`; `HudMoment`, `HudModel.DraftHeadline`). Captures
+  in `artifacts/t0013/shots/` (items 1–5 at both sizes, and a real practice draft).

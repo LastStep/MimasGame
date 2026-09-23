@@ -4,7 +4,7 @@ _Status: **built** (T-0011, 23 Sep 2026; chosen by Rohan on 23 Sep 2026: the man
 **Surface changed to ink the same evening** (HUD session, canvas page "HUD" round 3, board "A · examine open on
 them · the ink plate": Rohan, for consistency with every other screen). The layout, the inventory and the
 behaviour below are unchanged; only the surface and the faces move, per the rows marked *ink*. T-0013 builds
-it (`docs/specs/2026-09-23-hud-restyle.md`); until then the code is the paper plate. Design
+it (`docs/specs/2026-09-23-hud-restyle.md`) — **built on ink by T-0013 the same night**. Design
 anchors: `#examine`, `#hidden-info`, `#stats`, `#equipment`, `#boons`, `#abilities`, `#presentation`. Language:
 `docs/ui/language.md`. Mock: https://claude.ai/artifact/K9qZcJQ115G5G685sdMAwy, page 2 "Examine", top row:
 "Manuscript · round 3 · chosen", with round 1, the enemy, and "Final · manuscript in context" beside it.
@@ -162,4 +162,8 @@ colour tokens for you/them/changed used, not literals.
   T-0011 written.
 - 2026-09-23 · built by T-0011: `Examine.uxml` / `Examine.uss`, `HoverPanel.uxml` / `HoverPanel.uss`, `ExamineView`, `ExamineModelBuilder`; gap 1 closed by `Unit.StatLines`, gap 3 by client memory (open question 4 stands), gap 4 by the lineage hues, gap 5 by seat names, gap 6 by `ex.vitals.height`. Drifts are noted in their rows.
 - 2026-09-23 · after Rohan played it: the plate is a layer over the HUD with no slide and moves nothing; any click outside closes it, a HUD click also does its own thing (`ex.scrim` removed); the type scale raised (nothing under 10px at 1080) and the greys made stronger for readability; plate 420 wide.
+- 2026-09-23 · ink built by T-0013: `Examine.uss` on ink tokens only, names and captions in capitals (set in
+  text: USS has no text-transform), the painting fading into ink, the neutral wash bone at 5% and 10%; the hover
+  panel is the HUD's shared one (`HoverPanelView`) and the painting comes from `Ramps`. The tracking the plate
+  always asked for now renders (`language.md` §2).
 - 2026-09-23 · HUD session, round 3 (Rohan): the plate goes **ink** for consistency with every other screen — the surface, the faces (caps instead of the serif) and the painting's fade change; layout, inventory and behaviour do not. Rows marked *ink*. Built by T-0013.

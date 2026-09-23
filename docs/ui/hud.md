@@ -1,6 +1,6 @@
 # The match HUD · the board in play
 
-_Status: **proposed** (chosen by Rohan on 23 Sep 2026 in the HUD session, canvas rounds 1–3). Design anchors:
+_Status: **built** (T-0013, 23 Sep 2026; chosen by Rohan on 23 Sep 2026 in the HUD session, canvas rounds 1–3). Design anchors:
 `#hud`, `#turns`, `#time-controls`, `#attacks`, `#damage`, `#hidden-info`, `#aiming-presentation`, `#camera`
 (your end is always on the left), `#presentation`. Language: `docs/ui/language.md`. Mock:
 https://claude.ai/artifact/K9qZcJQ115G5G685sdMAwy, page "HUD": round 1 **"A · as drawn"** (the layout) and
@@ -206,6 +206,23 @@ it; nothing under 10px at 1920×1080.
    built until one exists.
 2. The status column on the left (Draft 1) waits for status effects.
 
+## Drift (what the build does that this page does not say)
+
+- **The bar, the boons column, Resign and End Turn step aside** between rounds and while any moment holds the
+  band (the round card included), as the canvas boards draw them; the page did not say.
+- **`hud.tag[u].ring`** is the element named `ex.ring` (`docs/ui/examine.md` §3.5) inside the tag: one element,
+  one name.
+- **The preview's head** is the one hover panel's head: the name at 20 (the panel's size), not 17, and the icon
+  tile shows the action's letter as everywhere else.
+- **The preview is the shared panel** (`hover-mount`), so it has no `hud.preview` element of its own; a tile's
+  panel takes over while the pointer is on the bar and the preview comes back when it leaves.
+- **The eggs are drawn in USS** (12 × 14, radius 6) rather than as glyphs, so `state.spends` can be a `you` edge
+  over `you` at 28%.
+- **`hud.lane.<category>` rows with no tiles hide.**
+
 ## Change log
 
 - 2026-09-23 · written from the HUD session (canvas rounds 1–3); status proposed; spec and T-0013 written.
+- 2026-09-23 · built by T-0013 (`MatchHud.uxml` / `.uss`, `MatchHudView`, `HoverPanelView`, `Ramps`, `HudModel`,
+  the seen flags of ADR-039). Captures in `artifacts/t0013/shots/` (items 1–6 at 1920×1080 and 1280×720). Drifts
+  above.
