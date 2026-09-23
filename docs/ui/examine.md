@@ -1,6 +1,10 @@
 # Examine · the character panel
 
-_Status: **built** (T-0011, 23 Sep 2026; chosen by Rohan on 23 Sep 2026: the manuscript plate at its round-3 state). Design
+_Status: **built** (T-0011, 23 Sep 2026; chosen by Rohan on 23 Sep 2026: the manuscript plate at its round-3 state).
+**Surface changed to ink the same evening** (HUD session, canvas page "HUD" round 3, board "A · examine open on
+them · the ink plate": Rohan, for consistency with every other screen). The layout, the inventory and the
+behaviour below are unchanged; only the surface and the faces move, per the rows marked *ink*. T-0013 builds
+it (`docs/specs/2026-09-23-hud-restyle.md`); until then the code is the paper plate. Design
 anchors: `#examine`, `#hidden-info`, `#stats`, `#equipment`, `#boons`, `#abilities`, `#presentation`. Language:
 `docs/ui/language.md`. Mock: https://claude.ai/artifact/K9qZcJQ115G5G685sdMAwy, page 2 "Examine", top row:
 "Manuscript · round 3 · chosen", with round 1, the enemy, and "Final · manuscript in context" beside it.
@@ -24,7 +28,7 @@ plate shows exactly the edge of what you know. It never shows a number the rules
 | Overflow | the plate is full window height; the painting is 210 tall at ≥ 900px windows, 120 below; the body scrolls with a 2px scroller. At 1920×1080 the round-3 state fits; at 1280×720 it scrolls | spec §3 |
 | Hover | every row and tile opens the language's hover panel to the left, 120 ms after the pointer rests, closes on leave | `docs/ui/language.md` §6 |
 | Position | flush to the right edge, full window height, 420 wide, **a layer over the whole HUD**: it appears and goes without a slide and moves nothing — End Turn and Resign are under it while it is open (Rohan, 23 Sep 2026). A 200px dark wash bleeds onto the board so it reads as a layer, not a window | `language.md` §4 |
-| Owner colour | `you` when the unit is yours, `them` when not; the plate is paper either way, the wash and panels are ink | `UnitView.IsMine` |
+| Owner colour | `you` when the unit is yours, `them` when not; the plate is **ink** either way (*ink*, 23 Sep 2026; it was paper), the wash and panels are ink | `UnitView.IsMine` |
 
 ## 3. Element inventory
 
@@ -37,13 +41,16 @@ Each `id` becomes the UXML element `name`. A builder creates exactly these; a ve
 
 | id | Shows | Data | Asset | States | Hover panel |
 |---|---|---|---|---|---|
-| `ex.portrait` | the painting: portrait wash in the lineage hue, emblem huge and faint behind, fading into paper over 210px (drift: the emblem is drawn in the light hue at 50%, as in the pinned render, not at 6%) | `view.LineageId` → `catalog.GetLineage(...).hueDark/hueLight` (**gap**), `.icon` | portrait art per hero/gear (**gap**, placeholder = wash + emblem) | enemy lineage unknown → neutral grey wash, no emblem | none |
-| `ex.name` | player name, `serif` 32 | room seat name (`client`, from the session block) | — | — | none |
-| `ex.lineage` | "Greek · your hero" / "Norse · the enemy", `serif` italic 15 | `view.LineageId`, `view.IsMine`; `null` → "Unknown lineage" | — | — | none |
+| `ex.portrait` | the painting: portrait wash in the lineage hue, emblem huge and faint behind, fading into **ink** over 210px (*ink*; it faded into paper) (drift: the emblem is drawn in the light hue at 50%, as in the pinned render, not at 6%) | `view.LineageId` → `catalog.GetLineage(...).hueDark/hueLight` (**gap**), `.icon` | portrait art per hero/gear (**gap**, placeholder = wash + emblem) | enemy lineage unknown → neutral grey wash, no emblem | none |
+| `ex.name` | player name, `display-caps` 28 at 0.14em (*ink*; was `serif` 36) | room seat name (`client`, from the session block) | — | — | none |
+| `ex.lineage` | "GREEK · YOUR HERO" / "NORSE · THE ENEMY", caps 12 at 0.24em in the owner colour (*ink*; was `serif` italic 17) | `view.LineageId`, `view.IsMine`; `null` → "Unknown lineage" | — | — | none |
 | `ex.close` | ✕ | — | `glyph.close` | — | none |
 | `ex.vitals.hp` | heart · **17** / 24 · bar | `view.Hp`, `view.MaxHp` | `glyph.health` | bar fill in owner colour | stat breakdown (§4) |
 | `ex.vitals.ap` | bolt · **1** / 4 · eggs | `view.Ap`, `view.ApPerTurn` | `glyph.ap`, `glyph.egg` | eggs hollow when spent | stat breakdown |
 | `ex.vitals.height` | arc glyph · **1** · caption "height": the level the unit stands on (it changes damage, `#damage` high ground) | `mirror` `Rules.Map[view.Position].Height` | `glyph.lobbed` | — | none |
+
+Section captions ("STATS", "BOONS", "EQUIPMENT") are caps 11 at 0.28em in the owner colour (*ink*; were `serif`
+semibold 17). Boon names are caps 14 at 0.08em (*ink*; were `serif` semibold 19).
 
 ### 3.2 Stats (caption "STATS", then a 3×2 grid)
 
@@ -75,7 +82,7 @@ unrevealed count last as `?` rows.
 
 | id | Shows | Data | Asset | States | Hover panel |
 |---|---|---|---|---|---|
-| `ex.item[slot]` | item square 28 · name (`serif` 17) · its stat line in `up` ("+2 Strength") | `view.ItemIds` → `catalog.GetItemForSlot(slot, id)`: name, `Stats` | item art square (**gap**, placeholder = lineage-hued square), slot glyph fallback | — | item panel: slot · kind; description; its stats as a tile; "Nike's Jab on this item" under Changes; for theirs "You have seen 1 of its 2 abilities" |
+| `ex.item[slot]` | item square 28 · name (caps 15 at 0.1em, *ink*; was `serif` 20) · its stat line in `up` ("+2 Strength") | `view.ItemIds` → `catalog.GetItemForSlot(slot, id)`: name, `Stats` | item art square (**gap**, placeholder = lineage-hued square), slot glyph fallback | — | item panel: slot · kind; description; its stats as a tile; "Nike's Jab on this item" under Changes; for theirs "You have seen 1 of its 2 abilities" |
 | `ex.item[slot].tile[j]` | 40px tile with the action icon, name in caps 6.5 beneath, **no numbers** (built as `ex.item[weapon].tile[0]`; the icon key rides on an `icon--<key>` class) | `view.Abilities` filtered by `SourceItemId == item` (plus innate Walk under boots) → `catalog.GetAttack(id)` / `GetMovement(id)`: name, icon | action icon (**gap**: today a letter) | `state.changed` when `BoonOverlay.OverridesFor(id)` touches cost/range/minRange/damage (the bar already computes this: `MatchSession.IsChangedByABoon`); `state.added` when `Unit.BoonOfAbility(id) != null` (a Sigil grant); `state.unseen` when `KnownEntry.Revealed == false` | attack / movement panel (§4) |
 
 The boon that changed or added an action is **not named under the item**; the tile edge is the whole
@@ -155,3 +162,4 @@ colour tokens for you/them/changed used, not literals.
   T-0011 written.
 - 2026-09-23 · built by T-0011: `Examine.uxml` / `Examine.uss`, `HoverPanel.uxml` / `HoverPanel.uss`, `ExamineView`, `ExamineModelBuilder`; gap 1 closed by `Unit.StatLines`, gap 3 by client memory (open question 4 stands), gap 4 by the lineage hues, gap 5 by seat names, gap 6 by `ex.vitals.height`. Drifts are noted in their rows.
 - 2026-09-23 · after Rohan played it: the plate is a layer over the HUD with no slide and moves nothing; any click outside closes it, a HUD click also does its own thing (`ex.scrim` removed); the type scale raised (nothing under 10px at 1080) and the greys made stronger for readability; plate 420 wide.
+- 2026-09-23 · HUD session, round 3 (Rohan): the plate goes **ink** for consistency with every other screen — the surface, the faces (caps instead of the serif) and the painting's fade change; layout, inventory and behaviour do not. Rows marked *ink*. Built by T-0013.

@@ -2,7 +2,7 @@
 project: mimas
 milestone: M2
 updated: 2026-09-23
-updated_by: opus — T-0012 built (the camera controls), at verify
+updated_by: opus — the HUD restyle designed with Rohan (canvas rounds 1–3), spec written, T-0013 approved, T-0014 at plan
 ---
 
 # Where Mimas stands
@@ -60,6 +60,21 @@ Every value is on `ArenaCameraRig` on `Cameras/vcam_Tilted` and is live in Play 
 enum there. Tab and the top-down camera are untouched. ADR-038, spec `docs/specs/2026-09-23-camera.md`, run
 report `studio/runs/R-2026-09-23-T-0012.md`, captures in `artifacts/t0012/`.
 
+**23 Sep, evening: the rest of the HUD is designed (F-hud-restyle); T-0013 approved, T-0014 at `plan`.** Rohan chose
+"restyle the rest of the HUD" for the session and decided it over three rounds on the canvas
+(https://claude.ai/artifact/K9qZcJQ115G5G685sdMAwy, page "HUD", newest at the top): **layout A as drawn** (his
+Draft 1 in ink — AP and three captioned lane rows bottom left, boons down the right edge, Resign above End
+Turn), a **turn track** (your end left, pips, a marker, the active half burning to the centre), **cost dots**,
+a **closed-eye mark on your own actions the opponent has not seen**, the **attack preview as the hover panel
+over the target**, **ink draft cards**, the **band** for round moments, an **ink void**, the **room as two
+seats facing** with **gear tiles**, and — his own point — **the examine plate goes ink** so nothing is left on
+paper (the serif leaves the build). The design is the UI book (`docs/ui/hud.md`, `between-rounds.md`,
+`lobby.md`, amended `language.md` and `examine.md`); the work order is `docs/specs/2026-09-23-hud-restyle.md`;
+ADR-039 (the owner's view carries what the opponent has seen of it — the one wire field) and ADR-040 (one
+surface; the bar and the plate share the tile model). **T-0013** (match HUD, between rounds, ink plate, the
+wire field) can land before the 10 Oct playtest; **T-0014** (lobby and room) follows it. Rohan **approved T-0013** the same
+evening; T-0014 waits until he has seen T-0013 built. **M3-5 (three maps vs two) is decided after the M2 playtest** (Rohan, 23 Sep).
+
 **461 Core tests, 58 server tests, 24 EditMode tests.** The Web build is **12.57 MiB** (was 12.38) against the 13 MB
 ratchet (fonts included). T-0010's run report: `studio/runs/R-2026-09-22-T-0010-build.md`.
 
@@ -75,12 +90,16 @@ ratchet (fonts included). T-0010's run report: `studio/runs/R-2026-09-22-T-0010-
    bar with its element word, round card, series banner with Back to room, `boonStat`/`nullify` preview
    label). One practice game in the Editor, five captures, and the verdict flips. Issue list and the small
    follow-ups (a vacuous server assertion, a mislabelled shot): `studio/runs/R-2026-09-23-verify-boons.md`.
-   **M3-5 says three ladder maps and two ship** — Rohan rewords the ledger line or a map gets built.
+   **M3-5 says three ladder maps and two ship** — Rohan decides after the M2 playtest (23 Sep): reword the
+   ledger line or build a ladder-position-2 map.
 3. **Verify T-0011, the examine plate**, in a fresh context: the run report lists the screenshots, the
    deviations (the builder reads a mirror built from the view, not `Rules`, because in practice `Rules` is the
    truth; commits 5–7 landed as one) and the round-3 preview menu item the §14 captures used.
 4. **Verifiers for the M2 set**: T-0008 (closes T-0005 and T-0006), T-0007, T-0002.
 5. **Rohan plays the camera and tunes it** (T-0012), then a verifier in a fresh context.
+6. **A fresh Opus session runs T-0013** (approved 23 Sep; spec `docs/specs/2026-09-23-hud-restyle.md`); Rohan
+   looks at it built, then approves **T-0014**. T-0013 changes the wire (one field on the owner's own view, ADR-039), so
+   it deploys together with its server like everything since T-0010.
 
 ## Current milestone: M2 — online
 
@@ -108,6 +127,8 @@ tick.
 | **T-0010** | **Boons in the game** — the room hosts the session, lineage row, draft over the board, presentation of boons and reveals, practice-mode session, nine boons | **verify — FAILED 23 Sep on evidence, not code.** Five captures from one Editor practice game make it pass; list in `R-2026-09-23-verify-boons` | builder, small |
 | T-0009 | Boons groundwork in Core | **verified PASS 23 Sep** (ledger rows are ticked with T-0010, per F-boons) | done pending T-0010 |
 | **T-0012** | **The camera** — Q/E turn, WASD pan with a limit, wheel zoom, Space home, V side-on ↔ behind you | **verify** — built 23 Sep, run report `R-2026-09-23-T-0012` | Rohan plays, then verifier |
+| **T-0013** | **The match HUD in ink** — layout A, turn track, cost dots, closed-eye mark (one wire field), preview panel, ink draft cards, the band, ink examine plate, ink void | **approved** 23 Sep — spec `docs/specs/2026-09-23-hud-restyle.md` | builder (Opus), next fresh session |
+| **T-0014** | **The lobby and the room in ink** — two seats facing, gear tiles | **plan** — same spec §8; depends on T-0013; Rohan approves after seeing T-0013 built | builder, after T-0013 |
 | **T-0011** | **The examine panel** — manuscript plate, one hover panel, `--mimas-*` tokens, `Unit.StatLines`, lineage hues, fonts | **verify** — built 23 Sep, run report `R-2026-09-23-T-0011` | verifier needed |
 | T-0008 | Finish M2 in the browser | verify — deployed and measured live 21 Sep | verifier needed |
 | T-0007 | Deploy | verify — live confirmed 21 Sep | verifier needed |
@@ -123,6 +144,7 @@ Nothing, except what waits on Rohan below.
 
 | What | Why | Since |
 |---|---|---|
+| **Approve T-0014** (the lobby and room) after seeing T-0013 built | It sits at `plan` until then | 23 Sep 2026 |
 | **Deploy** (`bash tools/deploy/deploy.sh`) | The live site predates boons. Its client cannot start a match against a post-boons server, because `room.loadout` now needs a lineage; an old tab must reload. `/health`'s content hash changes | 22 Sep 2026 |
 | **One best-of-3 against a friend on another network**, recorded as a playtest file | It is M2-1, the last evidence M2-7 needs, and M2-8 with a human opponent. It is also the only thing that will say whether the draft reads in three seconds | 21 Sep 2026 |
 | **Tune the boon numbers** — `MimasClient/Assets/_Game/Data/boons/*.json` (27 of them now), `abilities/`, `modifiers/` | Every number is a placeholder written as the spec gave it. Nothing enforces them; the tests only check shapes and rules | 22 Sep 2026 |
@@ -147,15 +169,17 @@ Nothing, except what waits on Rohan below.
 
 ## Follow-ups from T-0011 (not built, by the spec's scope)
 
-- **The action bar in the new language**: `--mimas-*` tokens instead of `--hud-*`, and the one hover panel
-  instead of its own tooltip. Then the draft cards, the round banner and the lobby.
+- ~~**The action bar in the new language** … then the draft cards, the round banner and the lobby.~~
+  **Designed 23 Sep evening → T-0013 / T-0014** (above).
 - **Art slots** the plate leaves as placeholders: portrait per hero, lineage emblems (today the mock's
   laurel/hammer/lotus strokes), item squares (today a lineage-hued gradient), action icons (today a letter;
   each tile carries its icon key as an `icon--<key>` class for a sprite to bind to).
 - **`RevealedAt` on the wire?** The enemy's boons are listed in the order this client saw them revealed;
   after a reload they fall back to grant order (`docs/ui/examine.md` open question 4). A design question.
-- **The action bar sits ~220px right of centre at 1920×1080** in the browser (it did in T-0010's captures
-  too). Not this task's; a layout bug in `MatchHud.uss` worth a small task.
+- ~~The action bar sits ~220px right of centre~~ — **fixed in `0e8c95c`** (centred in pixels from its measured
+  width); T-0013 left-anchors the bar anyway.
+- **The banner colours every line that is not "VICTORY" in the opponent's colour** (`MatchHudView` `banner--lost`),
+  the round card included. T-0013's `HudMoment` replaces it.
 
 ## Things the next agent must not rediscover
 
@@ -191,6 +215,16 @@ Nothing, except what waits on Rohan below.
 - **The asset guard reads shell variables literally**: `git add $C/…meta` is refused even when the path is
   declared. Write the paths out.
 
+- **The design canvas refuses a publish after anyone saved from the page** ("conflict … saved from inside the
+  page"), even when you re-read `project/canvas.json` with a `path`: read the artifact's URL itself
+  (`action: "read"`, no path), then publish. Re-read the index into `artifacts/UI Drafts/hud-mock/live/` right
+  before each publish (Rohan moves frames by hand; the editor caps a title note's `maxW` at 8000). The HUD
+  rounds' generators are `artifacts/UI Drafts/hud-mock/gen9.py`–`gen11.py` (1920×1080 boards, names and costs
+  read from the shipped JSON) with `gen9_index.py`–`gen11_index.py` for the index.
+- **USS has no gradients.** Every fade (the plate's wash, the painting, and after T-0013 the floors, the band,
+  the draft card wash) is a generated white-alpha texture tinted by a `--mimas-*` token (`UI/Ramps.cs`).
+- **The Arena's grey void is Unity's default procedural skybox** (`Main Camera` clears to Skybox); the Lobby's
+  background is its USS. T-0013 sets the Arena camera to solid ink.
 - **The UI book is `docs/ui/`.** One page per screen (`examine.md` first) with element ids that become UXML
   names, data sources, asset gaps and acceptance screenshots; `language.md` holds every token and maps it to a
   `--mimas-*` USS variable. Design a screen there before touching UXML. The mock canvas and its Python
