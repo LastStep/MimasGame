@@ -58,6 +58,9 @@ namespace Mimas.Client.Presentation
         /// <summary>The camera the rays are cast from.</summary>
         public Camera ActiveCamera => _camera;
 
+        /// <summary>True when the overlay claimed the pointer this frame (see <see cref="SetPointerBlocker"/>).</summary>
+        public bool PointerOverOverlay { get; private set; }
+
         /// <summary>
         /// Lets an overlay (the HUD) claim the pointer: while the predicate returns true for the current
         /// screen position no tile is hovered or clicked. Pass null to clear. Presentation cannot reference
@@ -98,6 +101,7 @@ namespace Mimas.Client.Presentation
             PointerPosition = screenPosition;
             Func<Vector2, bool> blocker = _pointerBlocker;
             bool blocked = blocker != null && blocker(screenPosition);
+            PointerOverOverlay = blocked;
             BoardHover hover = blocked ? default : Resolve(screenPosition);
 
             if (!hover.Same(_hovered))

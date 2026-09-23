@@ -631,6 +631,7 @@ GameObject:
   - component: {fileID: 1328515029}
   - component: {fileID: 1328515030}
   - component: {fileID: 1328515031}
+  - component: {fileID: 1328515032}
   m_Layer: 0
   m_Name: vcam_Tilted
   m_TagString: Untagged
@@ -710,6 +711,35 @@ MonoBehaviour:
   m_EditorClassIdentifier: Mimas.Client.Presentation::Mimas.Client.Presentation.CinemachineCameraView
   _vcam: {fileID: 1328515030}
   _fixedPose: 1
+--- !u!114 &1328515032
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1328515028}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: aec480acc85a0f7419410dc5828f9e4b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Mimas.Client.Presentation::Mimas.Client.Presentation.ArenaCameraRig
+  _defaultView: 0
+  _sideOn:
+    Pitch: 50
+    Distance: 21
+  _behindYou:
+    Pitch: 55
+    Distance: 25
+  _rotateSpeed: 90
+  _invertRotation: 0
+  _panSpeed: 10
+  _panLimitTiles: 0
+  _zoomSpeed: 2
+  _minDistance: 10
+  _maxDistance: 32
+  _smoothing: 10
+  _director: {fileID: 465304247}
+  _input: {fileID: 974342029}
 --- !u!1 &1412345781
 GameObject:
   m_ObjectHideFlags: 0
@@ -1006,6 +1036,7 @@ MonoBehaviour:
   _aimPreview: {fileID: 0}
   _rangeCircles: {fileID: 0}
   _projectiles: {fileID: 0}
+  _cameraRig: {fileID: 1328515032}
   _playback:
     SecondsPerTile: 0.35
     LeapSeconds: 0.55

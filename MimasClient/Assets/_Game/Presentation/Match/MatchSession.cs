@@ -61,6 +61,10 @@ namespace Mimas.Client.Presentation
         [Tooltip("Flies the projectile on a resolved attack. Empty falls back to the component on the board.")]
         [SerializeField] private ProjectilePlayback _projectiles;
 
+        [Header("Camera")]
+        [Tooltip("The player's camera: framed on the arena and on this seat's end of it once the board is built. Optional.")]
+        [SerializeField] private ArenaCameraRig _cameraRig;
+
         [Header("Playback")]
         [SerializeField] private MovePlaybackSettings _playback = MovePlaybackSettings.Default;
 
@@ -579,6 +583,9 @@ namespace Mimas.Client.Presentation
                 Debug.LogError("[MatchSession] The board could not be built for map '" + boardMapId + "'.", this);
                 return;
             }
+
+            // The camera frames the arena from this seat's end: your spawn, by seat, whatever the hero has done since.
+            if (_cameraRig != null) _cameraRig.Frame(_board, LocalPlayer);
 
             _driver.EventsArrived += HandleEventsArrived;
             _driver.Resynced += HandleResynced;

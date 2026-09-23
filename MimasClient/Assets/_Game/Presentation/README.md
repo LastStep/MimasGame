@@ -26,6 +26,8 @@ talks in `Mimas.Core.Geometry.Hex`; everything below talks in `Vector3`.
 | `Cameras/ICameraView.cs` | `interface` | Activate / deactivate / retarget contract, priorities as explicit ints. |
 | `Cameras/CinemachineCameraView.cs` | `MonoBehaviour` | Wraps a `CinemachineCamera` behind `ICameraView`. Handles the CM3 struct traps. |
 | `Cameras/CameraDirector.cs` | `MonoBehaviour` | Owns which view is live. Priority swap, never enable/disable. |
+| `Cameras/CameraRigMath.cs` | `static CameraRigMath`, `enum ArenaView` | Pure orbit maths: pose, view yaw per seat (Side On puts your end left), pan disc clamp, arena extent. |
+| `Cameras/ArenaCameraRig.cs` | `MonoBehaviour` | The player's camera on `vcam_Tilted`: Q/E turn, WASD pan, wheel zoom, Space home, V flips view; every value live in the Inspector (ADR-038). |
 
 ## Dependency rules
 
@@ -57,7 +59,7 @@ Input            BoardInputController _tileMask = Board
 Unit             UnitView + UnitMover
 Match            SkeletonMatchController  → Board, Input, Unit
 Cameras/
-  vcam_Tilted    CinemachineCamera + CinemachineCameraView (_fixedPose = true)
+  vcam_Tilted    CinemachineCamera + CinemachineCameraView (_fixedPose = true) + ArenaCameraRig → CameraDirector, BoardInput
   vcam_TopDown   CinemachineCamera + CinemachineCameraView (_fixedPose = true)
   CameraDirector CameraDirector       → both views
 Main Camera      Camera + CinemachineBrain (tag MainCamera)
