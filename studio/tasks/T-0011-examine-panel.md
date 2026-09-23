@@ -5,7 +5,7 @@ project: mimas
 feature: F-examine-panel
 milestone: M4
 lane: full
-status: running
+status: verify
 owner: builder
 model: opus
 worktree:
@@ -53,7 +53,7 @@ done_when:
   - "Docs: design page #examine points at the UI book; docs/ui statuses flipped; architecture, data, ADR-037, STATE, run report"
 created: 2026-09-23
 started: 2026-09-23
-finished:
+finished: 2026-09-23
 cost_usd: 0
 blocked_by:
 ---

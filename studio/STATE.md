@@ -2,7 +2,7 @@
 project: mimas
 milestone: M2
 updated: 2026-09-23
-updated_by: fable — boons verified; the examine panel designed and specced as T-0011
+updated_by: opus — T-0011 built (the examine plate), at verify
 ---
 
 # Where Mimas stands
@@ -37,9 +37,20 @@ now that they could not yesterday:
 - **Play vs bot is the whole series**: the bot prays to a random god and drafts.
 - **Nine more boons** (three per lineage, one of each kind) and a new spell, Indra's Storm.
 
-**452 Core tests (was 445), 58 server tests (was 47), 4 EditMode tests.** The Web build is **12.38 MB**
-against the 13 MB ratchet, and boots in 1.5–1.8 s on all three engines. Run report:
-`studio/runs/R-2026-09-22-T-0010-build.md`.
+**23 Sep: the examine plate is built (T-0011, F-examine-panel), at `verify`.** Click a hero with nothing
+armed and a paper plate slides in from the right: the painting in the lineage's hues with the name in a
+serif, health and action points with a bar and eggs, standing height, six stats as base then a green or red
+net, boons oldest to latest, and the four items with their actions as named tiles — violet-edged with a
+diamond when an Enchant changed one, with a triangle when a Sigil added one, dashed `?` when it is theirs
+and unseen. Rest on anything for one hover panel to the left with the numbers, the sentence, the damage
+line and what a boon changed. The enemy's plate is vermilion with grey `?` after the lane stats while a boon
+of theirs is hidden. A click anywhere off the plate only closes it; Escape and ✕ too; it stays open across
+turns. It is the first screen in the new interface language: `Theme.uss` declares every `--mimas-*` token,
+three fonts ship as Latin-subset TextCore assets, glyphs are drawn with `Painter2D`. Run report:
+`studio/runs/R-2026-09-23-T-0011.md`; screenshots in `artifacts/t0011/shots/`.
+
+**461 Core tests, 58 server tests, 14 EditMode tests.** The Web build is **12.57 MiB** (was 12.38) against the 13 MB
+ratchet (fonts included). T-0010's run report: `studio/runs/R-2026-09-22-T-0010-build.md`.
 
 ## The one thing to do next
 
@@ -54,9 +65,9 @@ against the 13 MB ratchet, and boots in 1.5–1.8 s on all three engines. Run re
    label). One practice game in the Editor, five captures, and the verdict flips. Issue list and the small
    follow-ups (a vacuous server assertion, a mislabelled shot): `studio/runs/R-2026-09-23-verify-boons.md`.
    **M3-5 says three ladder maps and two ship** — Rohan rewords the ledger line or a map gets built.
-3. **Build T-0011, the examine panel** (Opus, autonomous): spec `docs/specs/2026-09-23-examine-panel.md`, design in
-   the new UI book `docs/ui/language.md` + `docs/ui/examine.md`, render pinned under `docs/ui/mockups/`. Six rounds
-   of options on 23 Sep ended with the manuscript plate; the spec is the whole work order.
+3. **Verify T-0011, the examine plate**, in a fresh context: the run report lists the screenshots, the
+   deviations (the builder reads a mirror built from the view, not `Rules`, because in practice `Rules` is the
+   truth; commits 5–7 landed as one) and the round-3 preview menu item the §14 captures used.
 4. **Verifiers for the M2 set**: T-0008 (closes T-0005 and T-0006), T-0007, T-0002.
 
 ## Current milestone: M2 — online
@@ -84,7 +95,7 @@ tick.
 |---|---|---|---|
 | **T-0010** | **Boons in the game** — the room hosts the session, lineage row, draft over the board, presentation of boons and reveals, practice-mode session, nine boons | **verify — FAILED 23 Sep on evidence, not code.** Five captures from one Editor practice game make it pass; list in `R-2026-09-23-verify-boons` | builder, small |
 | T-0009 | Boons groundwork in Core | **verified PASS 23 Sep** (ledger rows are ticked with T-0010, per F-boons) | done pending T-0010 |
-| **T-0011** | **The examine panel** — manuscript plate, one hover panel, `--mimas-*` tokens, `Unit.StatLines`, lineage hues, fonts | **approved**, spec written 23 Sep | Opus, next fresh session |
+| **T-0011** | **The examine panel** — manuscript plate, one hover panel, `--mimas-*` tokens, `Unit.StatLines`, lineage hues, fonts | **verify** — built 23 Sep, run report `R-2026-09-23-T-0011` | verifier needed |
 | T-0008 | Finish M2 in the browser | verify — deployed and measured live 21 Sep | verifier needed |
 | T-0007 | Deploy | verify — live confirmed 21 Sep | verifier needed |
 | T-0002 | Execute the online slice | verify | verifier needed |
@@ -121,7 +132,41 @@ Nothing, except what waits on Rohan below.
 | P7 Editor practice mode | Runs a `Session` too, inside a persistent `LocalSessionHost` |
 | P8 What Resign concedes | **The series**; a disconnect forfeit too |
 
+## Follow-ups from T-0011 (not built, by the spec's scope)
+
+- **The action bar in the new language**: `--mimas-*` tokens instead of `--hud-*`, and the one hover panel
+  instead of its own tooltip. Then the draft cards, the round banner and the lobby.
+- **Art slots** the plate leaves as placeholders: portrait per hero, lineage emblems (today the mock's
+  laurel/hammer/lotus strokes), item squares (today a lineage-hued gradient), action icons (today a letter;
+  each tile carries its icon key as an `icon--<key>` class for a sprite to bind to).
+- **`RevealedAt` on the wire?** The enemy's boons are listed in the order this client saw them revealed;
+  after a reload they fall back to grant order (`docs/ui/examine.md` open question 4). A design question.
+- **The action bar sits ~220px right of centre at 1920×1080** in the browser (it did in T-0010's captures
+  too). Not this task's; a layout bug in `MatchHud.uss` worth a small task.
+
 ## Things the next agent must not rediscover
+
+- **Never call `unity command run_tests` while the Editor is in Play Mode.** The job queues behind Play
+  Mode and every later CLI command times out behind it (`editor_stop` and `unity close` included); it took
+  Rohan closing the Editor by hand on 23 Sep.
+- **Play Mode writes the dynamic font atlases into the font assets** under `UI/Fonts/` (5 KB → up to
+  730 KB each). It is a cache (`ClearDynamicDataOnBuild` is on): with the Editor **closed**,
+  `git restore MimasClient/Assets/_Game/UI/Fonts` before committing. Never commit the populated ones.
+- **Practice from the CLI:** `editor_play` on the Lobby, `SceneManager.LoadScene("Arena")` via `eval`, then
+  load it **once more** — the first Arena load from a playing Lobby comes up with no units (the session is
+  ready and the view has two units; no views were spawned). `artifacts/t0011/start.sh` does all of it.
+- **The examine plate's acceptance states** come from `Mimas/Examine/Preview round 3 (your hero | the
+  enemy)` in Play Mode (time stops; `End preview` restarts it). Captures with
+  `ScreenCapture.CaptureScreenshot` straight into `artifacts/` are native size and leave no `.meta`.
+- **A UI Toolkit hover or press can be driven** with `PointerEnterEvent.GetPooled()` / `PointerDownEvent`
+  sent to the element: the Input System's simulated mouse does not reach UI Toolkit in an unfocused Editor.
+- **A board click is read twice**: by `BoardInputController` in its `Update` and by UI Toolkit later the
+  same frame. Anything that appears under the pointer because of a board click (the examine scrim) must
+  ignore the press that made it appear — found only in the browser.
+- **The browser smoke's `click` now holds the button 80 ms**: an instant click never reads as
+  `wasPressedThisFrame`, so board clicks silently did nothing.
+- **The asset guard reads shell variables literally**: `git add $C/…meta` is refused even when the path is
+  declared. Write the paths out.
 
 - **The UI book is `docs/ui/`.** One page per screen (`examine.md` first) with element ids that become UXML
   names, data sources, asset gaps and acceptance screenshots; `language.md` holds every token and maps it to a
@@ -177,7 +222,11 @@ Nothing, except what waits on Rohan below.
 - **The VPS is shared**; `sites-enabled/laststep.cloud` belongs to another product. nginx 1.24 syntax.
 - **No secrets in the repo.** The VPS is reached only through the ssh alias `hostinger`.
 
-## Numbers, 22 Sep
+## Numbers, 23 Sep
+
+Web build **12.57 MiB** (13,180,738 B; was 12.38) against the 13 MB ratchet, with the three fonts. Smoke on
+the T-0011 build, local server: Chromium `boot 1147 / connected 1728 ms`, WebKit `1154 / 1463`, Firefox
+`1419 / 1654`, 12.6 MB transferred, no errors. 22 Sep's figures follow.
 
 Web build **12.38 MB** (was 12.31) against the 13 MB ratchet; local boot, all three engines against the
 new build: Chromium `boot 1553 ms / connected 2645 ms`, WebKit `1756 / 2257`, Firefox `1636 / 2082`,
