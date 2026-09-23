@@ -28,6 +28,34 @@ namespace Mimas.Core.Units
     }
 
     /// <summary>
+    /// One line of how a stat is made (<see cref="Unit.StatLines"/>): the rules base, one equipped item, or
+    /// one boon, with its raw amount (before any floor).
+    /// </summary>
+    public readonly struct StatLine
+    {
+        public const string BaseKind = "base";
+        public const string ItemKind = "item";
+        public const string BoonKind = "boon";
+
+        /// <summary><see cref="BaseKind"/>, <see cref="ItemKind"/> or <see cref="BoonKind"/>.</summary>
+        public string SourceKind { get; }
+
+        /// <summary>Null for the base; the item id; the boon id.</summary>
+        public string SourceId { get; }
+
+        public int Amount { get; }
+
+        public StatLine(string sourceKind, string sourceId, int amount)
+        {
+            SourceKind = sourceKind;
+            SourceId = sourceId;
+            Amount = amount;
+        }
+
+        public override string ToString() => $"{SourceKind}{(SourceId == null ? "" : ":" + SourceId)} {(Amount >= 0 ? "+" : "")}{Amount}";
+    }
+
+    /// <summary>
     /// One unit on the board: identity, owner, gear, lineage and boons, where it stands, its abilities, its
     /// modifiers, and its live numbers (hit points, action points). Abilities and modifiers are ids resolved
     /// against the <c>ContentCatalog</c>; a hero's ability list is the rules' innate abilities, then the
@@ -60,6 +88,12 @@ namespace Mimas.Core.Units
 
         private readonly List<string> _boonIds = new List<string>();
         private readonly List<string> _itemIds;
+
+        /// <summary>Parallel to <see cref="_itemIds"/>: each item's own stat block, for <see cref="StatLines"/>.</summary>
+        private readonly List<StatBlock> _itemStats;
+
+        /// <summary>The rules base block this unit was built on (the bare block for a test unit).</summary>
+        private readonly StatBlock _baseStats;
         private readonly HeightsDef _heights;
         private readonly List<HiddenSlot> _hiddenAbilitySlots = new List<HiddenSlot>();
         private readonly List<HiddenSlot> _hiddenModifierSlots = new List<HiddenSlot>();
@@ -151,12 +185,14 @@ namespace Mimas.Core.Units
             Owner = owner;
             Position = position;
             _heights = heights ?? throw new ArgumentNullException(nameof(heights));
+            _baseStats = BareStats;
             PublicStats = BareStats;
             Stats = BareStats;
             Overlay = BoonOverlay.Empty;
             Hp = Stats.Hp;
             Ap = 0;
             _itemIds = new List<string>(NoItems);
+            _itemStats = new List<StatBlock>();
         }
 
         /// <summary>A hero built from the rules' base stats and innate abilities plus four items in slot order, with no lineage and no boons.</summary>
@@ -183,14 +219,17 @@ namespace Mimas.Core.Units
             _heights = rules.Heights;
             LineageId = string.IsNullOrEmpty(lineageId) ? null : lineageId;
 
+            _baseStats = rules.BaseStats;
             StatBlock stats = rules.BaseStats;
             _itemIds = new List<string>(items.Count);
+            _itemStats = new List<StatBlock>(items.Count);
             for (int i = 0; i < items.Count; i++)
             {
                 ItemDef item = items[i];
                 if (item == null) throw new ArgumentException($"Item {i} is null.", nameof(items));
                 stats = stats.Add(item.Stats);
                 _itemIds.Add(item.Id);
+                _itemStats.Add(item.Stats);
             }
             PublicStats = stats;
 
@@ -264,6 +303,35 @@ namespace Mimas.Core.Units
         {
             Overlay.StatContributionsFor(key, _statScratch);
             return new List<StatContribution>(_statScratch);
+        }
+
+        /// <summary>
+        /// How a stat is made, in a fixed order: the rules base, then each equipped item in slot order that
+        /// contributes to the key, then each boon on the overlay in grant order with a stat effect on the key.
+        /// Zero contributions are omitted. The amounts sum to <see cref="Stats"/>[key] unless a floor applied
+        /// (the lines stay raw); the base and item lines sum to <see cref="PublicStats"/>[key]. On a mirror
+        /// the overlay holds only revealed boons, so a hidden boon is never listed (ADR-026). Read-only; a
+        /// presenter's question (design: #stats rule 3, docs/ui/examine.md §5 gap 1). Clears
+        /// <paramref name="into"/> first.
+        /// </summary>
+        public void StatLines(string statKey, List<StatLine> into)
+        {
+            if (into == null) throw new ArgumentNullException(nameof(into));
+            into.Clear();
+            if (statKey == null) return;
+
+            int baseAmount = _baseStats.Get(statKey);
+            if (baseAmount != 0) into.Add(new StatLine(StatLine.BaseKind, null, baseAmount));
+            for (int i = 0; i < _itemStats.Count; i++)
+            {
+                int amount = _itemStats[i].Get(statKey);
+                if (amount != 0) into.Add(new StatLine(StatLine.ItemKind, _itemIds[i], amount));
+            }
+            for (int i = 0; i < Overlay.StatContributions.Count; i++)
+            {
+                StatContribution c = Overlay.StatContributions[i];
+                if (c.Key == statKey && c.Amount != 0) into.Add(new StatLine(StatLine.BoonKind, c.BoonId, c.Amount));
+            }
         }
 
         /// <summary>The item that granted an ability, or null for an innate ability or an unknown id.</summary>

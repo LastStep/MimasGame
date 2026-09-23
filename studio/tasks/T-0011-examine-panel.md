@@ -5,7 +5,7 @@ project: mimas
 feature: F-examine-panel
 milestone: M4
 lane: full
-status: approved
+status: running
 owner: builder
 model: opus
 worktree:
@@ -50,7 +50,7 @@ done_when:
   - "Web build ≤ 13 MB with fonts; smoke green on three engines; console clean; EditMode and Core tests up by the spec's counts, none softened"
   - "Docs: design page #examine points at the UI book; docs/ui statuses flipped; architecture, data, ADR-037, STATE, run report"
 created: 2026-09-23
-started:
+started: 2026-09-23
 finished:
 cost_usd: 0
 blocked_by:
