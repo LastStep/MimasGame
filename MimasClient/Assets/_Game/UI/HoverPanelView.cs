@@ -144,7 +144,7 @@ namespace Mimas.Client.UI
             _note = Q(instance, "hp.note");
             _noteText = Q<Label>(instance, "hp.note.text");
             _flavour = Q<Label>(instance, "hp.flavour");
-            _root.RegisterCallback<GeometryChangedEvent>(_ => Place());
+            _root.RegisterCallback<GeometryChangedEvent>(HandleGeometryChanged);
         }
 
         /// <summary>Who showed the panel last, or null when it is hidden.</summary>
@@ -236,11 +236,26 @@ namespace Mimas.Client.UI
             _root.RemoveFromClassList("hp--visible");
         }
 
+        /// <summary>
+        /// Re-places on a real change of size (new content), not on a device pixel of rounding: at a scaled window
+        /// (1280×720 draws this at two thirds, so a device pixel is 1.5 panel pixels) where the panel's edges land
+        /// decides whether its height rounds up or down, and re-placing on that moves the edges and flips it back —
+        /// 291 ↔ 292.5 high, top 636 ↔ 638, every frame, in the browser (24 Sep 2026).
+        /// </summary>
+        private void HandleGeometryChanged(GeometryChangedEvent evt)
+        {
+            float device = _root.panel != null && _root.panel.scaledPixelsPerPoint > 0f ? 1f / _root.panel.scaledPixelsPerPoint : 1f;
+            Vector2 size = evt.newRect.size;
+            if (Mathf.Abs(size.x - _placedSize.x) <= device + 0.01f && Mathf.Abs(size.y - _placedSize.y) <= device + 0.01f) return;
+            Place();
+        }
+
         private void Place()
         {
             if (!_root.ClassListContains("hp--visible")) return;
             float width = _root.resolvedStyle.width;
             float height = _root.resolvedStyle.height;
+            _placedSize = new Vector2(width, height);
             if (float.IsNaN(width) || width <= 0f) width = 340f;
             if (float.IsNaN(height)) height = 0f;
 
@@ -281,6 +296,7 @@ namespace Mimas.Client.UI
         }
 
         private float _placedLeft = float.NaN, _placedTop = float.NaN;
+        private Vector2 _placedSize = new Vector2(float.NaN, float.NaN);
 
         private static VisualElement NumberTile(HoverNumber n)
         {
