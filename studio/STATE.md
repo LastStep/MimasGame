@@ -2,7 +2,7 @@
 project: mimas
 milestone: M2
 updated: 2026-09-24
-updated_by: opus — T-0013 built (HUD in ink, seen flags); Web build, smoke and batch EditMode wait on the Editor being closed
+updated_by: opus — T-0013 at verify (Web build 12.51 MiB, smoke ×3, EditMode 34/34; a browser-only 720 layout loop found and fixed)
 ---
 
 # Where Mimas stands
@@ -75,8 +75,17 @@ surface; the bar and the plate share the tile model). **T-0013** (match HUD, bet
 wire field) can land before the 10 Oct playtest; **T-0014** (lobby and room) follows it. Rohan **approved T-0013** the same
 evening; T-0014 waits until he has seen T-0013 built. **M3-5 (three maps vs two) is decided after the M2 playtest** (Rohan, 23 Sep).
 
-**473 Core tests, 60 server tests, 34 EditMode tests** (T-0013). The Web build is **12.57 MiB** (was 12.38) against the 13 MB
-ratchet (fonts included). T-0010's run report: `studio/runs/R-2026-09-22-T-0010-build.md`.
+**24 Sep: the match HUD is in ink (T-0013, F-hud-restyle), at `verify`.** Fourteen commits on `main`
+(`d309c8f` … `fe866ef`). A thin turn track across the top (names, round pips, the active half burning to the centre
+in the last seconds); AP and three captioned lane rows bottom left with cost dots, violet diamond/triangle for a
+boon's change, and a **closed eye on every action the opponent has not seen you use** (ADR-039's one wire field —
+it stays gone across the series); boons down the right; the attack preview as the hover panel over the target
+(reason first when refused, one `?` row); ink draft cards; round moments in a band; the examine plate in ink; the
+serif gone; the Arena on black. Captures `artifacts/t0013/shots/` (Editor, both sizes) and
+`artifacts/t0013/browser-hud/` (the Web build). Run report `studio/runs/R-2026-09-23-T-0013.md`.
+
+**473 Core tests, 60 server tests, 34 EditMode tests** (T-0013). The Web build is **12.51 MiB** (13 120 694 B; was
+12.57) against the 13 MB ratchet — the serif atlases left. T-0010's run report: `studio/runs/R-2026-09-22-T-0010-build.md`.
 
 ## The one thing to do next
 
@@ -97,9 +106,9 @@ ratchet (fonts included). T-0010's run report: `studio/runs/R-2026-09-22-T-0010-
    truth; commits 5–7 landed as one) and the round-3 preview menu item the §14 captures used.
 4. **Verifiers for the M2 set**: T-0008 (closes T-0005 and T-0006), T-0007, T-0002.
 5. **Rohan plays the camera and tunes it** (T-0012), then a verifier in a fresh context.
-6. **A fresh Opus session runs T-0013** (approved 23 Sep; spec `docs/specs/2026-09-23-hud-restyle.md`); Rohan
-   looks at it built, then approves **T-0014**. T-0013 changes the wire (one field on the owner's own view, ADR-039), so
-   it deploys together with its server like everything since T-0010.
+6. **Rohan looks at T-0013 built** (open the Arena, Play, `Mimas/HUD/Preview round 3 (…)`; or play a bot match),
+   then approves **T-0014**; **a verifier** checks T-0013 in a fresh context. T-0013 changes the wire (one field on
+   the owner's own view, ADR-039), so it deploys together with its server like everything since T-0010.
 
 ## Current milestone: M2 — online
 
@@ -127,7 +136,7 @@ tick.
 | **T-0010** | **Boons in the game** — the room hosts the session, lineage row, draft over the board, presentation of boons and reveals, practice-mode session, nine boons | **verify — FAILED 23 Sep on evidence, not code.** Five captures from one Editor practice game make it pass; list in `R-2026-09-23-verify-boons` | builder, small |
 | T-0009 | Boons groundwork in Core | **verified PASS 23 Sep** (ledger rows are ticked with T-0010, per F-boons) | done pending T-0010 |
 | **T-0012** | **The camera** — Q/E turn, WASD pan with a limit, wheel zoom, Space home, V side-on ↔ behind you | **verify** — built 23 Sep, run report `R-2026-09-23-T-0012` | Rohan plays, then verifier |
-| **T-0013** | **The match HUD in ink** — layout A, turn track, cost dots, closed-eye mark (one wire field), preview panel, ink draft cards, the band, ink examine plate, ink void | **running — built 24 Sep** (11 commits `d309c8f`…`4f2ba31`, ladder green, captures in `artifacts/t0013/shots/`). **Left, with the Editor closed:** restore `UI/Fonts`, batch EditMode, Web build + size, smoke ×3; then `verify`. Run report `R-2026-09-23-T-0013` | builder |
+| **T-0013** | **The match HUD in ink** — layout A, turn track, cost dots, closed-eye mark (one wire field), preview panel, ink draft cards, the band, ink examine plate, ink void | **verify** — built 24 Sep (14 commits `d309c8f`…`fe866ef`), ladder green 4/4, EditMode 34/34 batch, Web build 12.51 MiB, smoke green ×3, the HUD played in the browser at 720/800/1080. Run report `R-2026-09-23-T-0013` | Rohan looks, then verifier |
 | **T-0014** | **The lobby and the room in ink** — two seats facing, gear tiles | **plan** — same spec §8; depends on T-0013; Rohan approves after seeing T-0013 built | builder, after T-0013 |
 | **T-0011** | **The examine panel** — manuscript plate, one hover panel, `--mimas-*` tokens, `Unit.StatLines`, lineage hues, fonts | **verify** — built 23 Sep, run report `R-2026-09-23-T-0011` | verifier needed |
 | T-0008 | Finish M2 in the browser | verify — deployed and measured live 21 Sep | verifier needed |
@@ -187,9 +196,21 @@ Nothing, except what waits on Rohan below.
   KeyboardState(Key.V))`, then an empty `KeyboardState()` in the next eval to release; the same with a
   `MouseState` carrying `scroll` for the wheel. The rig's own polling sees them. The MCP `capture_game_view`
   refuses a `..` path, so it cannot write into `artifacts/`; use `ScreenCapture.CaptureScreenshot` from eval.
+- **The Editor never puts a real pointer on UI Toolkit, so some HUD states exist only in the browser.** A 1280×720
+  layout loop (the hover panel's height rounding by one device pixel with where its top lands; fixed `2f36241`)
+  showed only with the pointer resting on an armed tile, which Editor captures cannot do. Check the HUD in the Web
+  build: serve it (`MIMAS_WEB_PATH=<abs>/Build/Web dotnet run --project server/Mimas.Server`), then
+  `browser-smoke.mjs --viewport 1280x720 --expect "\[MatchSession\] online" --do "wait:3000,click:640,354,wait:3000,click:640,524,wait:11000,click:239,637,…"`
+  (Play vs bot, Ready, the first weapon tile; at 1280×800 add 40 to every y; at 1920×1080 Play vs bot is 960,534 and
+  Ready 960,770, the HUD ×1.5). `move:x,y` rests the pointer without pressing (the preview over a target). Count
+  `Layout update is struggling` in the output — the smoke fails on it as a console.error anyway.
+- **Batch `unity test` leaves the font caches alone; every batch Web build rewrites them.** `git restore
+  MimasClient/Assets/_Game/UI/Fonts` after each build.
 - **Never call `unity command run_tests` while the Editor is in Play Mode.** The job queues behind Play
   Mode and every later CLI command times out behind it (`editor_stop` and `unity close` included); it took
-  Rohan closing the Editor by hand on 23 Sep.
+  Rohan closing the Editor by hand on 23 Sep. **It wedged a second time outside Play Mode** (23 Sep, late, a
+  second `run_tests` right after `editor_stop`): prefer batch `unity test` with the Editor closed for EditMode
+  (34 tests, under a minute).
 - **Play Mode and the batch Web build both write the dynamic font atlases into the font assets** under `UI/Fonts/` (5 KB → up to
   730 KB each). It is a cache (`ClearDynamicDataOnBuild` is on): with the Editor **closed**,
   `git restore MimasClient/Assets/_Game/UI/Fonts` before committing. Never commit the populated ones.
@@ -279,11 +300,13 @@ Nothing, except what waits on Rohan below.
 - **The VPS is shared**; `sites-enabled/laststep.cloud` belongs to another product. nginx 1.24 syntax.
 - **No secrets in the repo.** The VPS is reached only through the ssh alias `hostinger`.
 
-## Numbers, 23 Sep
+## Numbers, 24 Sep
 
-Web build **12.57 MiB** (13,180,738 B; was 12.38) against the 13 MB ratchet, with the three fonts. Smoke on
-the T-0011 build, local server: Chromium `boot 1147 / connected 1728 ms`, WebKit `1154 / 1463`, Firefox
-`1419 / 1654`, 12.6 MB transferred, no errors. 22 Sep's figures follow.
+Web build **12.51 MiB** (13,120,694 B, `du -sb Build/Web`; the T-0011 build measured the same way was 13,175,763 B)
+against the 13 MB ratchet — the three serif atlases gone (`.data.br` −73 KB), the new HUD code in (`.wasm.br`
++16 KB). Smoke on the T-0013 build, local server: Chromium `boot 672 / connected 1119 ms`, WebKit `1130 / 1428`,
+Firefox `1472 / 1703`, 12.5 MB transferred, no errors. 23 Sep (T-0011): 12.57 MiB; Chromium `1147 / 1728`,
+WebKit `1154 / 1463`, Firefox `1419 / 1654`. 22 Sep's figures follow.
 
 Web build **12.38 MB** (was 12.31) against the 13 MB ratchet; local boot, all three engines against the
 new build: Chromium `boot 1553 ms / connected 2645 ms`, WebKit `1756 / 2257`, Firefox `1636 / 2082`,
