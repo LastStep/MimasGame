@@ -79,6 +79,41 @@ namespace Mimas.Client.Presentation
             return model;
         }
 
+        /// <summary>
+        /// Every revealed ability of one unit as the plate draws it, keyed by ability id, with the name of the item
+        /// that grants it (none for the innate walk). The action bar reads its hover panel from these (spec H §3).
+        /// </summary>
+        public static void ActionTiles(ContentCatalog catalog, PlayerView view, MatchState rules, int unitId, Dictionary<string, HudTile> into)
+        {
+            if (catalog == null) throw new ArgumentNullException(nameof(catalog));
+            into.Clear();
+            CoreUnitView seen = view != null ? view.FindUnit(unitId) : null;
+            if (seen == null) return;
+            Unit known = Unit.FromView(seen, catalog);
+            for (int i = 0; i < seen.Abilities.Count; i++)
+            {
+                KnownEntry entry = seen.Abilities[i];
+                if (!entry.Revealed || into.ContainsKey(entry.Id)) continue;
+                ItemDef item = null;
+                if (entry.SourceItemId != null) catalog.Items.TryGet(entry.SourceItemId, out item);
+                string itemName = entry.SourceItemId == null ? null : item != null ? item.Name : entry.SourceItemId;
+                into[entry.Id] = Tile(catalog, rules, seen, known, entry, itemName);
+            }
+        }
+
+        /// <summary>One unit's boons as the plate lists them (oldest to latest for your own): the boons column's circles.</summary>
+        public static List<HudBoon> BoonsOf(ContentCatalog catalog, PlayerView view, int unitId, IReadOnlyList<string> revealOrder)
+        {
+            if (catalog == null) throw new ArgumentNullException(nameof(catalog));
+            var model = new HudExamine();
+            CoreUnitView seen = view != null ? view.FindUnit(unitId) : null;
+            if (seen == null) return model.Boons;
+            LineageDef lineage = null;
+            if (seen.LineageId != null) catalog.Lineages.TryGet(seen.LineageId, out lineage);
+            AddBoons(model, catalog, seen, lineage, revealOrder);
+            return model.Boons;
+        }
+
         /// <summary>The reduced plate for a prop: name, height, health (spec E §13). Null when it is gone.</summary>
         public static HudExamine BuildProp(ContentCatalog catalog, PlayerView view, MatchState rules, int propId)
         {
@@ -282,7 +317,11 @@ namespace Mimas.Client.Presentation
             }
         }
 
-        private static HudTile Tile(ContentCatalog catalog, MatchState rules, CoreUnitView seen, Unit known, KnownEntry entry, string itemName)
+        /// <summary>
+        /// One action tile: the plate's and, through <see cref="ActionTiles"/>, the action bar's (ADR-040). Your own
+        /// revealed tiles also say whether the opponent has seen them yet (ADR-039).
+        /// </summary>
+        internal static HudTile Tile(ContentCatalog catalog, MatchState rules, CoreUnitView seen, Unit known, KnownEntry entry, string itemName)
         {
             if (!entry.Revealed)
             {
@@ -313,6 +352,7 @@ namespace Mimas.Client.Presentation
                 Revealed = true,
                 Changed = MatchSession.IsChangedByABoon(known, entry.Id),
                 Added = known.BoonOfAbility(entry.Id) != null,
+                UnseenByThem = seen.IsMine && !entry.SeenByOpponent,
                 IsMovement = def is MovementDef,
             };
             if (def == null) return tile;
@@ -505,7 +545,7 @@ namespace Mimas.Client.Presentation
         }
 
         /// <summary>The lineage's emblem glyph. The data's <c>icon</c> key names the lineage; the glyph table names the shape.</summary>
-        private static string EmblemOf(LineageDef lineage)
+        internal static string EmblemOf(LineageDef lineage)
         {
             switch (lineage.Icon ?? lineage.Id)
             {

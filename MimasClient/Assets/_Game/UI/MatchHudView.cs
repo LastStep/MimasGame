@@ -205,7 +205,7 @@ namespace Mimas.Client.UI
             // after it. Both are time passing rather than anything changing, so they are polled.
             if (_resignArmedUntil > 0f && Time.time >= _resignArmedUntil) DisarmResign();
 
-            bool showBack = !string.IsNullOrEmpty(_source.Banner) && _source.ShowBackToLobby;
+            bool showBack = _source.Moment != null && _source.Moment.ShowBack;
             if (showBack != _bannerButton.ClassListContains("banner-button--visible"))
                 _bannerButton.EnableInClassList("banner-button--visible", showBack);
 
@@ -336,8 +336,8 @@ namespace Mimas.Client.UI
             if (!_bound) return;
 
             bool mine = _source.IsMyTurn;
-            bool over = !string.IsNullOrEmpty(_source.Banner);
-            _turnOwner.text = over ? "MATCH OVER" : (mine ? "YOUR TURN  ·  " + _source.TurnNumber : OpponentTurnLabel());
+            bool over = _source.Phase == HudPhase.Over;
+            _turnOwner.text = over ? "MATCH OVER" : (mine ? "YOUR TURN" : OpponentTurnLabel());
             _turnPanel.EnableInClassList("turn-panel--theirs", !mine && !over);
             _endTurn.SetEnabled(_source.CanEndTurn);
             RefreshStatusLine();
@@ -354,7 +354,9 @@ namespace Mimas.Client.UI
 
         private void RefreshSeriesLine()
         {
-            string line = _source.SeriesLine;
+            string line = _source.RoundNumber > 0 && _source.Phase != HudPhase.Over
+                ? "ROUND " + _source.RoundNumber + " · " + _source.ScoreMine + " – " + _source.ScoreTheirs
+                : null;
             bool visible = !string.IsNullOrEmpty(line);
             _seriesLine.text = line ?? string.Empty;
             _seriesLine.EnableInClassList("series-line--visible", visible);
@@ -567,19 +569,21 @@ namespace Mimas.Client.UI
 
         private void RefreshBanner()
         {
-            string banner = _source.Banner;
-            bool visible = !string.IsNullOrEmpty(banner);
+            HudMoment moment = _source.Moment;
+            bool visible = moment != null;
+            string banner = !visible ? null
+                : moment.Kind == HudMomentKind.RoundStart ? "ROUND " + moment.Round
+                : moment.Kind == HudMomentKind.RoundResult ? "ROUND " + moment.Round + (moment.IWon ? " WON" : " LOST")
+                : moment.Kind == HudMomentKind.MatchLost ? "MATCH LOST"
+                : moment.IWon ? "VICTORY" : "DEFEAT";
             _banner.text = banner ?? string.Empty;
             _bannerPanel.EnableInClassList("banner-panel--visible", visible);
-            _banner.EnableInClassList("banner--lost", visible && banner != "VICTORY");
+            _banner.EnableInClassList("banner--lost", visible && !moment.IWon && moment.Kind != HudMomentKind.RoundStart);
 
-            string detail = _source.BannerDetail;
+            string detail = visible ? moment.Reason ?? moment.MapName : null;
             _bannerDetail.text = string.IsNullOrEmpty(detail) ? string.Empty : detail.ToUpperInvariant();
-            _bannerButton.EnableInClassList("banner-button--visible", visible && _source.ShowBackToLobby);
-
-            // Where it leads is not always the lobby any more: online it goes back to the room this match
-            // was played in, with the same code and the same two seats (ADR-032).
-            if (visible) _bannerButton.text = _source.BackLabel;
+            _bannerButton.EnableInClassList("banner-button--visible", visible && moment.ShowBack);
+            if (visible && moment.BackLabel != null) _bannerButton.text = moment.BackLabel;
         }
 
         /// <summary>The opponent's connection, when there is anything to say about it. Offline there never is.</summary>

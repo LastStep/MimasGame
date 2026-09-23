@@ -32,10 +32,25 @@ namespace Mimas.Client.Presentation
         /// <summary>
         /// A boon changed the cost, range or damage this button shows (ADR-034). The numbers here are already
         /// the changed ones; the mark says so, and it is only ever set for the local unit, whose boons it knows.
+        /// The violet edge and diamond (language §5 <c>state.changed</c>).
         /// </summary>
         public readonly bool Modified;
 
-        public HudAction(string id, string name, string description, string detail, string icon, string category, int cost, bool affordable, bool enabled, bool modified = false)
+        /// <summary>A Sigil granted it (<c>Unit.BoonOfAbility</c>): the violet edge and triangle (<c>state.added</c>).</summary>
+        public readonly bool Added;
+
+        /// <summary>The opponent has not seen it yet (<c>KnownEntry.SeenByOpponent</c> false, ADR-039): the closed eye.</summary>
+        public readonly bool UnseenByThem;
+
+        /// <summary>
+        /// The examine builder's tile for the same ability, so the bar's hover panel is the plate's panel and an
+        /// action cannot say one thing on the bar and another on the plate (ADR-040). Null only when the view
+        /// does not list it.
+        /// </summary>
+        public readonly HudTile Hover;
+
+        public HudAction(string id, string name, string description, string detail, string icon, string category, int cost, bool affordable, bool enabled,
+            bool modified = false, bool added = false, bool unseenByThem = false, HudTile hover = null)
         {
             Id = id;
             Name = name;
@@ -47,7 +62,75 @@ namespace Mimas.Client.Presentation
             Affordable = affordable;
             Enabled = enabled;
             Modified = modified;
+            Added = added;
+            UnseenByThem = unseenByThem;
+            Hover = hover;
         }
+    }
+
+    /// <summary>Where the series stands for the turn track (docs/ui/hud.md §3.1).</summary>
+    public enum HudPhase
+    {
+        /// <summary>A round is being played, starting or has just ended: the track shows its number.</summary>
+        Round,
+
+        /// <summary>The draft is open: the track reads DRAFT and nothing on it is lit.</summary>
+        Draft,
+
+        /// <summary>The series result (or the match lost) is showing: the track reads SERIES.</summary>
+        Over,
+    }
+
+    /// <summary>The four moments the band shows (docs/ui/between-rounds.md §3).</summary>
+    public enum HudMomentKind
+    {
+        RoundStart,
+        RoundResult,
+        SeriesResult,
+        MatchLost,
+    }
+
+    /// <summary>
+    /// One round moment as data (between-rounds.md §3, ADR-040): the band colours it by <see cref="IWon"/> and
+    /// <see cref="IMoveFirst"/>, never by its text. Built by <see cref="HudModel"/>.
+    /// </summary>
+    public sealed class HudMoment
+    {
+        public HudMomentKind Kind;
+
+        /// <summary>RoundStart and RoundResult: the round.</summary>
+        public int Round;
+
+        /// <summary>RoundStart: the map's display name.</summary>
+        public string MapName;
+
+        /// <summary>RoundStart: whether the local seat takes the first turn.</summary>
+        public bool IMoveFirst;
+
+        /// <summary>RoundResult and SeriesResult: whether the local seat took it.</summary>
+        public bool IWon;
+
+        /// <summary>RoundResult: the name of whoever took the round.</summary>
+        public string WinnerName;
+
+        /// <summary>The score after it, the local seat's first.</summary>
+        public int ScoreMine, ScoreTheirs;
+
+        /// <summary>How it ended ("by elimination", "opponent resigned"); MatchLost: why there is no result.</summary>
+        public string Reason;
+
+        /// <summary>SeriesResult (a beat after it lands) and MatchLost: the way out is showing.</summary>
+        public bool ShowBack;
+
+        /// <summary>"Back to room" online (the room outlives the match, ADR-032), "Back to lobby" in practice.</summary>
+        public string BackLabel;
+    }
+
+    /// <summary>One of the enemy's boons on their tag: its kind once revealed, null while it is a "?" (docs/ui/hud.md §3.5).</summary>
+    public sealed class HudBoonMark
+    {
+        /// <summary>"blessing" / "enchant" / "sigil", or null when unrevealed.</summary>
+        public string Kind;
     }
 
     /// <summary>
@@ -225,6 +308,9 @@ namespace Mimas.Client.Presentation
         /// <summary>A Sigil granted it (violet edge, triangle).</summary>
         public bool Added;
 
+        /// <summary>Your own, revealed to you and not yet seen by the opponent (ADR-039): the closed eye on the bar, one line in the panel.</summary>
+        public bool UnseenByThem;
+
         /// <summary>Null for an unseen tile.</summary>
         public HudTileNumbers Numbers;
 
@@ -277,6 +363,12 @@ namespace Mimas.Client.Presentation
         public string Attach;
 
         public string Icon;
+
+        /// <summary>The lineage's painting hues (<c>#rrggbb</c>) for the card's wash; null when the lineage is unknown.</summary>
+        public string HueDark, HueLight;
+
+        /// <summary>The slot it lands in (<c>requires.slot</c>), or null for a Blessing: the glyph at the card's foot.</summary>
+        public string Slot;
     }
 
     /// <summary>
@@ -285,7 +377,7 @@ namespace Mimas.Client.Presentation
     /// </summary>
     public sealed class HudDraft
     {
-        /// <summary>"ROUND 1 LOST · 0 – 1" — the round that just ended, in the score's own words.</summary>
+        /// <summary>"ROUND 2 TO GUEST-2869 · 1 – 1" — the round that just ended, who took it, the score yours first.</summary>
         public string Headline;
 
         /// <summary>"Choose one boon · Round 2 on Board".</summary>
@@ -342,6 +434,9 @@ namespace Mimas.Client.Presentation
         public Transform Anchor;
         public Vector3 AnchorOffset;
         public List<HudMarker> Markers = new List<HudMarker>();
+
+        /// <summary>The enemy's only: one mark per boon they hold, in grant order — its kind once revealed, a "?" until then.</summary>
+        public List<HudBoonMark> BoonMarks = new List<HudBoonMark>();
     }
 
     /// <summary>One row of the attack preview tooltip.</summary>
@@ -359,6 +454,16 @@ namespace Mimas.Client.Presentation
     {
         public int TargetUnitId;
         public string AbilityName;
+
+        /// <summary>The armed ability's icon key; the panel shows its letter until action art exists.</summary>
+        public string AbilityIcon;
+
+        /// <summary>Who or what it is aimed at: the seat's name, or the prop's.</summary>
+        public string TargetName;
+
+        /// <summary>"lobbed", "straight", "from the sky": the type line's second half.</summary>
+        public string TrajectoryWord;
+
         public int Total;
         public bool IsExact;
 
@@ -382,6 +487,9 @@ namespace Mimas.Client.Presentation
         public Vector3 WorldPosition;
         public string Headline;
         public string Detail;
+
+        /// <summary>A reveal's glyph (the boon's kind, or the lineage's emblem), drawn in <c>them</c>; null for damage, whose number is amber.</summary>
+        public string Glyph;
     }
 
     /// <summary>
@@ -405,9 +513,6 @@ namespace Mimas.Client.Presentation
 
         /// <summary>True when pressing End Turn would do something right now.</summary>
         bool CanEndTurn { get; }
-
-        /// <summary>1-based turn counter shown in the HUD; counts the local player's turns only.</summary>
-        int TurnNumber { get; }
 
         /// <summary>Action points the local acting unit has left this turn.</summary>
         int ApCurrent { get; }
@@ -442,36 +547,36 @@ namespace Mimas.Client.Presentation
         /// <summary>Cursor position in screen pixels, for placing <see cref="CursorTag"/>.</summary>
         Vector2 CursorScreenPosition { get; }
 
-        /// <summary>
-        /// "ROUND 2 · 0 – 1" above the turn owner: which round of the series this is and the score, your own
-        /// first (decided 22 Sep 2026, P2). Null before the first round.
-        /// </summary>
-        string SeriesLine { get; }
-
         /// <summary>The open draft, or null when there is none.</summary>
         HudDraft Draft { get; }
 
-        /// <summary>Centre-screen text once a round or the series is over ("VICTORY" / "DEFEAT"), else null.</summary>
-        string Banner { get; }
-
         /// <summary>
-        /// The line under the banner: how it ended, not just who won ("by elimination", "you resigned",
-        /// "opponent left"). Null while the match runs.
+        /// The round moment in the band (round card, round result, series result, match lost), or null when none
+        /// is showing (docs/ui/between-rounds.md §3). Its way out reads <c>ShowBack</c> and <c>BackLabel</c>.
         /// </summary>
-        string BannerDetail { get; }
+        HudMoment Moment { get; }
 
-        /// <summary>True once the way out of the result should appear, a beat after the banner.</summary>
-        bool ShowBackToLobby { get; }
+        /// <summary>Your own name for your end of the track: the seat's name online, "You" in practice.</summary>
+        string MyName { get; }
 
-        /// <summary>
-        /// What that way out is called. Online the room outlives the match (ADR-032), so it leads back to
-        /// the room the match was played in — "Back to room". In local practice there is no room and no
-        /// lobby to speak of: "Back to lobby".
-        /// </summary>
-        string BackLabel { get; }
-
-        /// <summary>Who is on the other side, for the turn banner. Null before the match is ready.</summary>
+        /// <summary>Who is on the other side, for their end of the track. Null before the match is ready.</summary>
         string OpponentName { get; }
+
+        /// <summary>Rounds each side has won this series, yours and theirs (the pips, P2).</summary>
+        int ScoreMine { get; }
+        int ScoreTheirs { get; }
+
+        /// <summary>Rounds to take the series: the pips per side (2 at best of 3).</summary>
+        int RoundsToWin { get; }
+
+        /// <summary>The round being played or just finished; 0 before the first.</summary>
+        int RoundNumber { get; }
+
+        /// <summary>Round, draft or over: what the middle of the track says.</summary>
+        HudPhase Phase { get; }
+
+        /// <summary>Your boons, oldest to latest, as the examine plate builds them: the circles down the right edge.</summary>
+        IReadOnlyList<HudBoon> MyBoons { get; }
 
         /// <summary>
         /// A line about the opponent's connection, or null when there is nothing to say

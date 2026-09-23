@@ -57,6 +57,16 @@ namespace Mimas.Client.Presentation
         /// <summary>There is a session. Between rounds that is still true, and Rules and View are null.</summary>
         public bool Ready { get { return _session != null; } }
         public string OpponentName { get; private set; }
+
+        /// <summary>The name this seat joined with; "You" if the client never had one (spec H §13).</summary>
+        public string MyName
+        {
+            get
+            {
+                string name = _net != null ? _net.PlayerName : null;
+                return string.IsNullOrEmpty(name) ? "You" : name;
+            }
+        }
         public string OpponentStatus { get { return _opponentStatus; } }
         public float TurnSecondsTotal { get { return _turnTotal; } }
 

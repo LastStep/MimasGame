@@ -57,6 +57,9 @@ namespace Mimas.Client.Presentation
         public bool Ready { get; private set; }
         public string OpponentName { get { return "Random Bot"; } }
 
+        /// <summary>Practice has no seat names: "You" (spec H §7.2).</summary>
+        public string MyName { get { return "You"; } }
+
         /// <summary>Nothing to say: there is no opponent to lose.</summary>
         public string OpponentStatus { get { return null; } }
 

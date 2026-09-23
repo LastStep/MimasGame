@@ -80,7 +80,7 @@ namespace Mimas.Client.Presentation
 
         private const int None = -1;
 
-        /// <summary>How long the result sits before the way out of it appears.</summary>
+        /// <summary>How long the series result sits before the way out of it appears.</summary>
         private const float BackToLobbyDelaySeconds = 3f;
 
         /// <summary>How long a "ROUND 2" card stays up before the board is the player's again.</summary>
@@ -125,9 +125,7 @@ namespace Mimas.Client.Presentation
         // HUD state.
         private readonly List<HudAction> _actions = new List<HudAction>();
         private readonly List<AbilityDef> _abilities = new List<AbilityDef>();
-
-        /// <summary>Ids of the local unit's abilities whose cost, range or damage a boon changed: the bar marks them.</summary>
-        private readonly HashSet<string> _modifiedAbilities = new HashSet<string>(StringComparer.Ordinal);
+        private List<HudBoon> _myBoons = new List<HudBoon>();
         private readonly List<Hex> _highlight = new List<Hex>();
         private readonly List<IBody> _targetScratch = new List<IBody>();
         private int _armed = None;
@@ -145,24 +143,23 @@ namespace Mimas.Client.Presentation
         private HudPreview _preview;
         private HudUnit _previewUnit;
         private string _cursorTag;
-        private string _banner;
-        private string _bannerDetail;
-        private float _backToLobbyAt = -1f;
         private bool _ready;
 
-        // The series (ADR-036): the score line above the turn owner, and the draft over the dimmed board.
-        private string _seriesLine;
+        // The series (ADR-036): the round moments in the band, and the draft over the dimmed board.
+        private HudMoment _moment;
         private HudDraft _draft;
         private float _draftOpensAt = -1f;
 
-        /// <summary>When a round card should clear itself, or -1. A result banner never clears.</summary>
-        private float _bannerClearsAt = -1f;
+        /// <summary>When a round card should clear itself, or -1. A result never clears.</summary>
+        private float _momentClearsAt = -1f;
+
+        /// <summary>When the series result's way out appears, or -1.</summary>
+        private float _backAt = -1f;
 
         private string _lastRoundHeadline;
         private MatchEndReason _lastReason = MatchEndReason.Elimination;
 
         private float _ropeSeconds = 10f;
-        private int _localTurnNumber;
 
         // ---- IMatchHudSource -------------------------------------------------------------------------
 
@@ -170,7 +167,6 @@ namespace Mimas.Client.Presentation
         public int ActiveActionIndex => _armed;
         public bool IsMyTurn => _ready && View != null && View.IsMyTurn;
         public bool CanEndTurn => CanAct;
-        public int TurnNumber => _localTurnNumber;
         public int ApCurrent => LocalUnitView != null ? LocalUnitView.Ap : 0;
         public int ApPerTurn => LocalUnitView != null ? LocalUnitView.ApPerTurn : 0;
         public float TurnSecondsRemaining => _driver != null ? _driver.TurnSecondsRemaining : 0f;
@@ -181,17 +177,45 @@ namespace Mimas.Client.Presentation
         public HudPreview Preview => _preview;
         public string CursorTag => _cursorTag;
         public Vector2 CursorScreenPosition => _input != null ? _input.PointerPosition : Vector2.zero;
-        public string SeriesLine => _seriesLine;
         public HudDraft Draft => _draft;
-        public string Banner => _banner;
-        public string BannerDetail => _bannerDetail;
-        public bool ShowBackToLobby => _backToLobbyAt >= 0f && Time.time >= _backToLobbyAt;
+        public HudMoment Moment => _moment;
+        public string MyName => _driver != null ? _driver.MyName : "You";
+        public string OpponentName => _driver != null ? _driver.OpponentName : null;
+        public int ScoreMine => Scores.Mine;
+        public int ScoreTheirs => Scores.Theirs;
+        public int RoundsToWin => _driver != null && _driver.Session != null ? _driver.Session.RoundsToWin : 0;
+        public int RoundNumber => _driver != null && _driver.Session != null ? _driver.Session.Round : 0;
+        public IReadOnlyList<HudBoon> MyBoons => _myBoons;
 
-        /// <summary>Read lazily, so it is right whenever the banner happens to ask (ADR-032).</summary>
-        public string BackLabel => NetClient.Instance != null && NetClient.Instance.PendingRoom != null
+        /// <summary>
+        /// What the middle of the track says. Draft while the cards are up (or the session is drafting and no
+        /// result is still holding the screen), Over once the series result or the lost match is showing.
+        /// </summary>
+        public HudPhase Phase
+        {
+            get
+            {
+                if (_moment != null && (_moment.Kind == HudMomentKind.SeriesResult || _moment.Kind == HudMomentKind.MatchLost)) return HudPhase.Over;
+                if (_draft != null) return HudPhase.Draft;
+                SessionView session = _driver != null ? _driver.Session : null;
+                if (session != null && session.Phase == SessionPhase.Draft && _moment == null) return HudPhase.Draft;
+                return HudPhase.Round;
+            }
+        }
+
+        private (int Mine, int Theirs) Scores
+        {
+            get
+            {
+                SessionView session = _driver != null ? _driver.Session : null;
+                return session == null ? (0, 0) : HudModel.ScoresBySeat(session.Score0, session.Score1, LocalPlayer);
+            }
+        }
+
+        /// <summary>Where the way out leads, read when it is shown: the room online (ADR-032), the lobby in practice.</summary>
+        private static string BackLabelNow => NetClient.Instance != null && NetClient.Instance.PendingRoom != null
             ? "Back to room"
             : "Back to lobby";
-        public string OpponentName => _driver != null ? _driver.OpponentName : null;
         public string OpponentStatus => _driver != null ? _driver.OpponentStatus : null;
         public bool CanResign => _driver != null && _driver.CanResign && !IsPlaying;
         public Camera WorldCamera => _input != null ? _input.ActiveCamera : Camera.main;
@@ -269,7 +293,7 @@ namespace Mimas.Client.Presentation
             net.LastResult = new MatchResult
             {
                 Won = session != null ? session.Winner == LocalPlayer : Rules != null && Rules.Winner == LocalPlayer,
-                Reason = _bannerDetail,
+                Reason = _moment != null ? _moment.Reason : null,
                 OpponentName = OpponentName,
             };
             net.ForgetMatch();
@@ -341,6 +365,8 @@ namespace Mimas.Client.Presentation
             {
                 BoonDef boon;
                 if (!_catalog.Boons.TryGet(session.MyOffers[i], out boon)) continue;
+                LineageDef lineage = null;
+                if (boon.LineageId != null) _catalog.Lineages.TryGet(boon.LineageId, out lineage);
                 draft.Cards.Add(new HudDraftCard
                 {
                     Id = boon.Id,
@@ -351,6 +377,9 @@ namespace Mimas.Client.Presentation
                     Effect = boon.Description,
                     Attach = AttachLine(boon, session),
                     Icon = boon.Icon,
+                    HueDark = lineage != null ? lineage.HueDark : null,
+                    HueLight = lineage != null ? lineage.HueLight : null,
+                    Slot = boon.Requires != null ? boon.Requires.Slot : null,
                 });
             }
 
@@ -361,9 +390,8 @@ namespace Mimas.Client.Presentation
 
             _draft = draft;
             _draftOpensAt = -1f;
-            _banner = null;
-            _bannerDetail = null;
-            _bannerClearsAt = -1f;
+            _moment = null;
+            _momentClearsAt = -1f;
             Disarm();
             DropExamine();
             RaiseStateChanged();
@@ -505,16 +533,25 @@ namespace Mimas.Client.Presentation
             // says how much time has passed and draws whatever comes back.
             _driver.Tick(Time.deltaTime);
 
-            // The "Back to lobby" button appears a beat after the banner, so the result can land first.
-            if (_backToLobbyAt >= 0f && Time.time >= _backToLobbyAt && Time.time - Time.deltaTime < _backToLobbyAt)
+            // The way out of the series result appears a beat after it, so the result can land first.
+            if (_backAt >= 0f && Time.time >= _backAt)
+            {
+                _backAt = -1f;
+                if (_moment != null)
+                {
+                    _moment.ShowBack = true;
+                    _moment.BackLabel = BackLabelNow;
+                }
                 RaiseStateChanged();
+            }
+            // Online the room's state can arrive after the result: the label follows it (ADR-032).
+            if (_moment != null && _moment.ShowBack) _moment.BackLabel = BackLabelNow;
 
             // A round card clears itself; the draft's cards drop in a beat after the round's result.
-            if (_bannerClearsAt >= 0f && Time.time >= _bannerClearsAt)
+            if (_momentClearsAt >= 0f && Time.time >= _momentClearsAt)
             {
-                _bannerClearsAt = -1f;
-                _banner = null;
-                _bannerDetail = null;
+                _momentClearsAt = -1f;
+                _moment = null;
                 RaiseStateChanged();
             }
             if (_draftOpensAt >= 0f && Time.time >= _draftOpensAt) OpenDraft();
@@ -633,8 +670,6 @@ namespace Mimas.Client.Presentation
             CollectAbilities();
             RefreshMarkers();
 
-            RefreshSeriesLine();
-
             var local = _driver as LocalMatchDriver;
             if (local != null) local.Begin();
             else ((OnlineMatchDriver)_driver).Begin(start);
@@ -726,17 +761,7 @@ namespace Mimas.Client.Presentation
         /// </summary>
         private void CollectAbilities()
         {
-            _abilities.Clear();
-            _modifiedAbilities.Clear();
-            Unit unit;
-            if (Rules == null || _localUnitId == None || !Rules.Units.TryGet(_localUnitId, out unit)) return;
-            for (int i = 0; i < unit.AbilityIds.Count; i++)
-            {
-                AbilityDef def;
-                if (!Rules.ResolveAbility(unit, unit.AbilityIds[i], out def)) continue;
-                _abilities.Add(def);
-                if (IsChangedByABoon(unit, def.Id)) _modifiedAbilities.Add(def.Id);
-            }
+            HudModel.CollectAbilities(Rules, _localUnitId, _abilities);
         }
 
         /// <summary>
@@ -834,7 +859,6 @@ namespace Mimas.Client.Presentation
                 if (_hudUnitsById.TryGetValue(View.Props[i].Id, out hud)) hud.Hp = View.Props[i].Hp;
             }
 
-            RefreshSeriesLine();
             RefreshView();
             RefreshMarkers();
             FaceNearestEnemies();
@@ -859,11 +883,10 @@ namespace Mimas.Client.Presentation
 
             // The server no longer has this match. There is no result and no winner, only a way back; say
             // that instead of leaving the player watching a board nothing can move again.
-            if (_banner == null && _driver.OpponentStatus == OnlineMatchDriver.LostStatus)
+            if ((_moment == null || _moment.Kind == HudMomentKind.RoundStart) && _driver.OpponentStatus == OnlineMatchDriver.LostStatus)
             {
-                _banner = "MATCH LOST";
-                _bannerDetail = "the server no longer has this match";
-                _backToLobbyAt = Time.time;
+                _moment = HudModel.MatchLost("the server no longer has this match", BackLabelNow);
+                _momentClearsAt = -1f;
                 Disarm();
                 DropExamine();
                 Debug.Log("[MatchSession] the match is gone from the server; offering the lobby.");
@@ -992,18 +1015,15 @@ namespace Mimas.Client.Presentation
             }
         }
 
-        /// <summary>The round card, and the score line that stays up for the whole round.</summary>
+        /// <summary>The round card in the band: the round, the map, who moves first. It clears itself.</summary>
         private void PlayRoundStarted(RoundStartedEvent round)
         {
             CloseDraft();
-            RefreshSeriesLine();
 
-            string mapName = _board != null && _board.MapData != null ? _board.MapData.Name : round.MapId;
-            bool mineFirst = round.FirstPlayer == LocalPlayer;
-            _banner = "ROUND " + round.Round;
-            _bannerDetail = mapName + (mineFirst ? " · you move first" : " · opponent moves first");
-            _backToLobbyAt = -1f;                         // a round card is not a result; there is no way out of it
-            _bannerClearsAt = Time.time + RoundCardSeconds;
+            string mapName = _board != null && _board.MapData != null ? _board.MapData.Name : MapName(round.MapId);
+            _moment = HudModel.RoundStart(round.Round, mapName, round.FirstPlayer, LocalPlayer);
+            _backAt = -1f;                                // a round card is not a result; there is no way out of it
+            _momentClearsAt = Time.time + RoundCardSeconds;
             RaiseStateChanged();
         }
 
@@ -1014,21 +1034,20 @@ namespace Mimas.Client.Presentation
         private void PlayRoundEnded(RoundEndedEvent round)
         {
             bool won = round.Winner == LocalPlayer;
-            int mine = LocalPlayer == 0 ? round.Score0 : round.Score1;
-            int theirs = LocalPlayer == 0 ? round.Score1 : round.Score0;
+            (int mine, int theirs) = HudModel.ScoresBySeat(round.Score0, round.Score1, LocalPlayer);
+            string winnerName = won ? MyName : OpponentLabel();
 
-            _banner = "ROUND " + round.Round + (won ? " WON" : " LOST");
-            _bannerDetail = mine + " – " + theirs + " · " + ReasonLine(round.Reason, won);
-            _lastRoundHeadline = "ROUND " + round.Round + (won ? " WON" : " LOST") + " · " + mine + " – " + theirs;
+            _moment = HudModel.RoundResult(round.Round, round.Winner, LocalPlayer, winnerName, round.Score0, round.Score1,
+                ReasonLine(round.Reason, won) + " · the draft opens in a moment");
+            _lastRoundHeadline = HudModel.DraftHeadline(round.Round, winnerName, mine, theirs);
             _lastReason = round.Reason;
-            _bannerClearsAt = -1f;
-            _backToLobbyAt = -1f;
-            RefreshSeriesLine();
+            _momentClearsAt = -1f;
+            _backAt = -1f;
             Disarm();
             DropExamine();
             RefreshView();
             RaiseStateChanged();
-            Debug.Log("[MatchSession] round " + round.Round + " over: " + _banner + " (" + _bannerDetail + ")");
+            Debug.Log("[MatchSession] round " + round.Round + " over: " + _lastRoundHeadline + " (" + ReasonLine(round.Reason, won) + ")");
         }
 
         private void PlayDraftPicked(DraftPickedEvent picked)
@@ -1066,19 +1085,14 @@ namespace Mimas.Client.Presentation
         {
             CloseDraft();
             bool won = over.Winner == LocalPlayer;
-            int mine = LocalPlayer == 0 ? over.Score0 : over.Score1;
-            int theirs = LocalPlayer == 0 ? over.Score1 : over.Score0;
-
-            _banner = won ? "VICTORY" : "DEFEAT";
-            _bannerDetail = "series " + mine + " – " + theirs + " · " + SeriesReasonLine(over.Reason, won);
-            _bannerClearsAt = -1f;
-            _backToLobbyAt = Time.time + BackToLobbyDelaySeconds;
-            _seriesLine = null;
+            _moment = HudModel.SeriesResult(over.Winner, LocalPlayer, over.Score0, over.Score1, SeriesReasonLine(over.Reason, won), BackLabelNow);
+            _momentClearsAt = -1f;
+            _backAt = Time.time + BackToLobbyDelaySeconds;
             Disarm();
             DropExamine();
             RefreshView();
             RaiseStateChanged();
-            Debug.Log("[MatchSession] series over: " + _banner + " (" + _bannerDetail + ").");
+            Debug.Log("[MatchSession] series over: " + (won ? "won " : "lost ") + _moment.ScoreMine + " – " + _moment.ScoreTheirs + " (" + _moment.Reason + ").");
         }
 
         private static string ReasonLine(MatchEndReason reason, bool won)
@@ -1101,19 +1115,6 @@ namespace Mimas.Client.Presentation
             }
         }
 
-        private void RefreshSeriesLine()
-        {
-            SessionView session = _driver != null ? _driver.Session : null;
-            if (session == null || session.IsOver || session.Round <= 0)
-            {
-                _seriesLine = null;
-                return;
-            }
-            int mine = LocalPlayer == 0 ? session.Score0 : session.Score1;
-            int theirs = LocalPlayer == 0 ? session.Score1 : session.Score0;
-            _seriesLine = "ROUND " + session.Round + " · " + mine + " – " + theirs;
-        }
-
         private void PlayTurnStarted(TurnStartedEvent started)
         {
             for (int i = 0; i < _hudUnits.Count; i++)
@@ -1124,8 +1125,6 @@ namespace Mimas.Client.Presentation
                 if (!Rules.Units.TryGet(hud.Id, out unit) || unit.Owner != started.Player) continue;
                 hud.Ap = unit.IsAlive ? unit.ApPerTurn : 0;
             }
-
-            if (started.Player == LocalPlayer) _localTurnNumber++;
 
             Disarm();
             RefreshView();
@@ -1138,18 +1137,13 @@ namespace Mimas.Client.Presentation
         /// </summary>
         private void ShowSeriesResultFromView(SessionView session)
         {
-            if (_banner != null) return;
+            if (_moment != null && (_moment.Kind == HudMomentKind.SeriesResult || _moment.Kind == HudMomentKind.MatchLost)) return;
             bool won = session.Winner == LocalPlayer;
-            int mine = LocalPlayer == 0 ? session.Score0 : session.Score1;
-            int theirs = LocalPlayer == 0 ? session.Score1 : session.Score0;
-
-            _banner = won ? "VICTORY" : "DEFEAT";
-            _bannerDetail = "series " + mine + " – " + theirs + " · " + ReasonLine(_lastReason, won);
-            _bannerClearsAt = -1f;
-            _seriesLine = null;
+            _moment = HudModel.SeriesResult(session.Winner, LocalPlayer, session.Score0, session.Score1, ReasonLine(_lastReason, won), BackLabelNow);
+            _momentClearsAt = -1f;
             DropExamine();
-            _backToLobbyAt = Time.time + BackToLobbyDelaySeconds;
-            Debug.Log("[MatchSession] series found over on resync: player " + session.Winner + " wins " + _bannerDetail + ".");
+            _backAt = Time.time + BackToLobbyDelaySeconds;
+            Debug.Log("[MatchSession] series found over on resync: player " + session.Winner + " wins " + _moment.ScoreMine + " – " + _moment.ScoreTheirs + ".");
         }
 
         private void PlayMove(UnitMovedEvent moved)
@@ -1216,7 +1210,7 @@ namespace Mimas.Client.Presentation
                     {
                         UnitId = targetId,
                         WorldPosition = impact,
-                        Headline = "-" + damage,
+                        Headline = "−" + damage,
                         Detail = detail,
                     });
                 }
@@ -1308,8 +1302,9 @@ namespace Mimas.Client.Presentation
             if (!_revealOrder.TryGetValue(revealed.UnitId, out order)) _revealOrder[revealed.UnitId] = order = new List<string>();
             if (!order.Contains(revealed.BoonId)) order.Add(revealed.BoonId);
             RaiseFlyover(revealed.UnitId,
-                "Revealed: " + (known ? boon.Name : revealed.BoonId),
-                known ? LineageName(boon.LineageId) + " · " + KindName(boon.Kind) : null);
+                "Revealed · " + (known ? boon.Name : revealed.BoonId),
+                known ? LineageName(boon.LineageId) + " · " + KindName(boon.Kind) : null,
+                known ? boon.Kind : null);
             RefreshView();
             RefreshMarkers();
             RefreshExamine();
@@ -1323,13 +1318,13 @@ namespace Mimas.Client.Presentation
 
             HudUnit hud;
             if (_hudUnitsById.TryGetValue(revealed.UnitId, out hud)) hud.LineageTag = name;
-            RaiseFlyover(revealed.UnitId, "Lineage revealed: " + name, null);
+            RaiseFlyover(revealed.UnitId, "Lineage revealed · " + name, null, lineage != null ? ExamineModelBuilder.EmblemOf(lineage) : null);
             RefreshView();
             RefreshExamine();
             RaiseStateChanged();
         }
 
-        private void RaiseFlyover(int unitId, string headline, string detail)
+        private void RaiseFlyover(int unitId, string headline, string detail, string glyph)
         {
             Action<HudFlyover> handler = Flyover;
             if (handler == null) return;
@@ -1337,7 +1332,7 @@ namespace Mimas.Client.Presentation
             Vector3 at = _unitViews.TryGetValue(unitId, out view) && view != null
                 ? view.transform.position + new Vector3(0f, _overlayHeight, 0f)
                 : Vector3.zero;
-            handler(new HudFlyover { UnitId = unitId, WorldPosition = at, Headline = headline, Detail = detail });
+            handler(new HudFlyover { UnitId = unitId, WorldPosition = at, Headline = headline, Detail = detail, Glyph = glyph });
         }
 
         private Vector3 TargetOverlayPosition(AttackResolvedEvent attack)
@@ -1388,6 +1383,14 @@ namespace Mimas.Client.Presentation
             RebuildActions();
             RefreshExamine();
             RefreshEmphasis();
+            RefreshMyBoons();
+        }
+
+        /// <summary>Your boons for the column down the right edge, as the plate lists them. Between rounds there is no view: keep the last.</summary>
+        private void RefreshMyBoons()
+        {
+            if (View == null || _localUnitId == None) return;
+            _myBoons = ExamineModelBuilder.BoonsOf(_catalog, View, _localUnitId, null);
         }
 
         private void RefreshMarkers()
@@ -1423,21 +1426,16 @@ namespace Mimas.Client.Presentation
                     LineageDef lineage;
                     hud.LineageTag = _catalog.Lineages.TryGet(unit.LineageId, out lineage) ? lineage.Name : unit.LineageId;
                 }
+
+                // Theirs carry one mark per boon, seen or not (docs/ui/hud.md §3.5).
+                if (!hud.IsProp) HudModel.BoonMarks(_catalog, unit, hud.BoonMarks);
             }
         }
 
+        /// <summary>The bar, each action carrying the plate's tile for it and its flags (spec H §7.2, ADR-040).</summary>
         private void RebuildActions()
         {
-            _actions.Clear();
-            Mimas.Core.Match.UnitView me = LocalUnitView;
-            bool canAct = CanAct;
-            for (int i = 0; i < _abilities.Count; i++)
-            {
-                AbilityDef def = _abilities[i];
-                bool affordable = me != null && me.Ap >= def.Cost;
-                _actions.Add(new HudAction(def.Id, def.Name, def.Description, DescribeAttackRules(def as AttackDef),
-                    def.Icon, def.Category, def.Cost, affordable, canAct && affordable, _modifiedAbilities.Contains(def.Id)));
-            }
+            HudModel.BuildActions(_catalog, View, Rules, _localUnitId, _abilities, CanAct, _actions, DescribeAttackRules);
         }
 
         private void RefreshEmphasis()
@@ -1481,12 +1479,7 @@ namespace Mimas.Client.Presentation
         /// <summary>"You" and "Random Bot" in practice (§13); online, this seat's name and the opponent's.</summary>
         private string SeatName(bool mine)
         {
-            if (mine)
-            {
-                NetClient net = NetClient.Instance;
-                string own = net != null && _driver is OnlineMatchDriver ? net.PlayerName : null;
-                return string.IsNullOrEmpty(own) ? "You" : own;
-            }
+            if (mine) return MyName;
             string theirs = OpponentName;
             return string.IsNullOrEmpty(theirs) ? "Opponent" : theirs;
         }
@@ -1878,11 +1871,15 @@ namespace Mimas.Client.Presentation
             DamageBreakdown breakdown = PreviewDamage(attack, target);
             if (breakdown == null) return;
 
+            bool isProp = !(target is Unit);
             var preview = new HudPreview
             {
                 TargetUnitId = target.Id,
-                TargetIsProp = !(target is Unit),
+                TargetIsProp = isProp,
                 AbilityName = attack.Name,
+                AbilityIcon = attack.Icon,
+                TargetName = TargetName(target),
+                TrajectoryWord = HudModel.TrajectoryWord(attack.Trajectory),
                 Total = breakdown.Total,
                 IsExact = breakdown.IsExact,
                 BlockedReason = blockedReason,
@@ -1890,10 +1887,9 @@ namespace Mimas.Client.Presentation
             for (int i = 0; i < breakdown.Lines.Count; i++)
             {
                 DamageLine line = breakdown.Lines[i];
-                preview.Lines.Add(new HudPreviewLine { Label = DescribeLine(line), Amount = line.Amount });
+                preview.Lines.Add(new HudPreviewLine { Label = DescribeLine(line, isProp), Amount = line.Amount });
             }
-            if (breakdown.UnknownCount > 0)
-                preview.Lines.Add(new HudPreviewLine { Label = breakdown.UnknownCount == 1 ? "Unrevealed passive" : breakdown.UnknownCount + " unrevealed passives", Unknown = true });
+            HudModel.AddHiddenLine(preview.Lines, breakdown.UnknownCount);
 
             _preview = preview;
             HudUnit hud;
@@ -1957,13 +1953,32 @@ namespace Mimas.Client.Presentation
             _blockingPropId = None;
         }
 
-        private string DescribeLine(DamageLine line)
+        /// <summary>The seat's name for a hero, the prop's own name for a prop: the preview's "on …" line.</summary>
+        private string TargetName(IBody target)
+        {
+            var unit = target as Unit;
+            if (unit != null) return SeatName(unit.Owner == LocalPlayer);
+            Mimas.Core.Match.PropView prop = View != null ? View.FindProp(target.Id) : null;
+            PropDef def;
+            return prop != null && _catalog.Props.TryGet(prop.DefId, out def) ? def.Name : "it";
+        }
+
+        /// <summary>
+        /// The rules' own lines in the preview's words (docs/ui/hud.md §5): Base, Strength or Magic, their armour
+        /// in the lane, then each known modifier by name.
+        /// </summary>
+        private string DescribeLine(DamageLine line, bool targetIsProp)
         {
             switch (line.Kind)
             {
                 case DamageLineKind.Base: return "Base";
-                case DamageLineKind.Power: return Capitalise(StatBlock.DamageTypeOf(line.Id)) + " power";
-                case DamageLineKind.Defense: return Capitalise(StatBlock.DamageTypeOf(line.Id)) + " defense";
+                case DamageLineKind.Power:
+                {
+                    string type = StatBlock.DamageTypeOf(line.Id);
+                    return type == AbilityCategories.Weapon ? "Strength" : type == AbilityCategories.Spell ? "Magic" : Capitalise(type) + " power";
+                }
+                case DamageLineKind.Defense:
+                    return (targetIsProp ? "Its armour · " : "Their armour · ") + StatBlock.DamageTypeOf(line.Id);
 
                 // A Blessing's strength is its own line, and it says which god's (ADR-035).
                 case DamageLineKind.BoonStat:

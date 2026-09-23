@@ -55,6 +55,9 @@ namespace Mimas.Client.Presentation
         /// <summary>Who is on the other side, for the HUD.</summary>
         string OpponentName { get; }
 
+        /// <summary>This seat's own name for its end of the turn track: the room's seat name online, "You" in practice.</summary>
+        string MyName { get; }
+
         /// <summary>
         /// A line about the opponent's connection, or null when there is nothing to say:
         /// "Opponent disconnected · 47 s", "Reconnecting…", "Match lost".
