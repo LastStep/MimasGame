@@ -53,6 +53,7 @@ namespace Mimas.Client.UI
         private HudExamine _model;
         private string _renderedSignature;
         private int _closedByScrimFrame = -10;
+        private int _openedFrame = -10;
         private IVisualElementScheduledItem _pendingHover;
 
         private readonly Dictionary<string, Texture2D> _paintings = new Dictionary<string, Texture2D>(StringComparer.Ordinal);
@@ -60,6 +61,16 @@ namespace Mimas.Client.UI
         private Texture2D _washTexture;
 
         public bool IsOpen => _model != null;
+
+        /// <summary>The plate's width as laid out (<c>--mimas-plate-w</c>), for the HUD to make room.</summary>
+        public float PlateWidth
+        {
+            get
+            {
+                float width = _plate.resolvedStyle.width;
+                return float.IsNaN(width) || width <= 0f ? 380f : width;
+            }
+        }
 
         /// <param name="hudRoot">The HUD's root: the window the hover panel is clamped inside and the scrim covers.</param>
         /// <param name="examine">The instance of Examine.uxml.</param>
@@ -106,6 +117,14 @@ namespace Mimas.Client.UI
             // keeps it from UI Toolkit; SwallowsBoardPointer keeps it from the board's own raycast.
             _scrim.RegisterCallback<PointerDownEvent>(evt =>
             {
+                // The press that opened the plate is read by the board in its Update and then, later in the
+                // same frame (or the next, on the Web), dispatched by UI Toolkit onto the scrim it just
+                // revealed. That press opened the plate; it must not also close it.
+                if (Time.frameCount - _openedFrame <= 2)
+                {
+                    evt.StopPropagation();
+                    return;
+                }
                 _closedByScrimFrame = Time.frameCount;
                 evt.StopPropagation();
                 _close_();
@@ -137,6 +156,7 @@ namespace Mimas.Client.UI
                 return;
             }
 
+            if (!_root.ClassListContains("ex--open")) _openedFrame = Time.frameCount;
             string signature = Signature(model);
             if (signature != _renderedSignature)
             {

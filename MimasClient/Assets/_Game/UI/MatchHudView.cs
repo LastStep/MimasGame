@@ -286,6 +286,7 @@ namespace Mimas.Client.UI
             }
 
             _examineView = new ExamineView(_root, examineMount, hoverMount, HandleExamineClose);
+            _actionBar.RegisterCallback<GeometryChangedEvent>(HandleActionBarGeometry);
 
             _draftConfirm.clicked += HandleDraftConfirmClicked;
             _endTurn.clicked += HandleEndTurnClicked;
@@ -493,12 +494,30 @@ namespace Mimas.Client.UI
             }
         }
 
-        /// <summary>The plate is ExamineView's; the HUD only makes room for it (End Turn steps left).</summary>
+        /// <summary>The plate is ExamineView's; the HUD only makes room for it (End Turn steps left, the bar re-centres).</summary>
         private void RefreshExamine()
         {
             HudExamine examine = _source.Examine;
             _examineView.Render(examine);
             _root.EnableInClassList("hud--examining", examine != null);
+            CentreActionBar();
+        }
+
+        private void HandleActionBarGeometry(GeometryChangedEvent evt) => CentreActionBar();
+
+        /// <summary>
+        /// Centres the bar in pixels from its measured width. MatchHud.uss centres it with <c>translate: -50%</c>,
+        /// which UI Toolkit resolved once, while the bar held only its action-point group, and never again as
+        /// the sections were added: in the browser it sat ~220px right of centre. While the examine plate is
+        /// open the bar centres in the board left of the plate, so it and End Turn both clear it at 1280×720.
+        /// </summary>
+        private void CentreActionBar()
+        {
+            if (_actionBar == null || _examineView == null) return;
+            float width = _actionBar.resolvedStyle.width;
+            if (float.IsNaN(width) || width <= 0f) return;
+            float shift = _examineView.IsOpen ? -_examineView.PlateWidth * 0.5f : 0f;
+            _actionBar.style.translate = new Translate(shift - width * 0.5f, 0f);
         }
 
         private void RefreshPreview()

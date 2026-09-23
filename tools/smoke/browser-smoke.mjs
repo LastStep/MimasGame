@@ -230,7 +230,9 @@ async function runSteps(page, spec, dir, say, browserName = 'chromium') {
       if (!box) throw new Error('cannot click: #unity-canvas has no box');
       await page.mouse.move(box.x + x, box.y + y);
       await page.waitForTimeout(120);
-      await page.mouse.click(box.x + x, box.y + y);
+      // Held for a few frames, as a hand does: a press and release inside one frame never reads as
+      // wasPressedThisFrame to the Input System, so a board click would silently do nothing.
+      await page.mouse.click(box.x + x, box.y + y, { delay: 80 });
       say(`click ${x},${y} (canvas-relative)`);
     } else if (verb === 'key') {
       await page.keyboard.press(first);
