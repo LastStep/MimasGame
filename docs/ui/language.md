@@ -93,7 +93,7 @@ Shapes carry meaning so it survives any colour, the art, and colour-blindness.
 | `glyph.ap` | bolt, stroke | action points | `Icons/bolt` | built (`Glyphs.cs`) |
 | `glyph.egg` | egg, hollow / filled | one AP, spent / held | drawn in USS (border-radius), no asset | drift: drawn by `Glyphs.cs` (Painter2D), not USS |
 | `glyph.cost` | 5px dot ×n, 3 apart, centred 5px above the tile's bottom edge | an action's AP cost, on its action-bar tile (never a digit; HUD round 1) | drawn in USS | built (T-0013) |
-| `glyph.unseen-by-them` | closed eye: a lid arc with three short lashes, 11px, at the tile's top-left | an action of **yours** the opponent has not seen yet (HUD round 1). Not the struck eye: that is `glyph.nosight` | `Glyphs.cs` path `eye-closed` | built (T-0013): on the bar's tiles; the plate's own tiles do not draw it, their hover panel says it |
+| `glyph.unseen-by-them` | closed eye: a lid arc with three short lashes, 11px, at the tile's top-left | an action of **yours** the opponent has not seen yet (HUD round 1). Not the struck eye: that is `glyph.nosight` | `Glyphs.cs` path `eye-closed` | built (T-0013): on the action bar's tiles, and "They have not seen this yet." in their hover panel; the examine plate's tiles show neither (`examine.md` §3.4 has no such state) |
 | `glyph.blessing` | circle | Blessing (filled when it is the starting one) | `Icons/kind-blessing` | built (`Glyphs.cs`) |
 | `glyph.enchant` | diamond | Enchant | `Icons/kind-enchant` | built (`Glyphs.cs`) |
 | `glyph.sigil` | triangle | Sigil | `Icons/kind-sigil` | built (`Glyphs.cs`) |
