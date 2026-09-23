@@ -9,9 +9,6 @@
     <Style src="Examine.uss" />
     <ui:VisualElement name="ex.root" class="ex-root" picking-mode="Ignore">
 
-        <!-- Behind the plate, over the board: the catcher that closes it (E10). Inserted and removed by the view. -->
-        <ui:VisualElement name="ex.scrim" class="ex-scrim" />
-
         <!-- The plate throws a dark wash onto the board, so it reads as a layer, not a window. -->
         <ui:VisualElement name="ex.wash" class="ex-wash" picking-mode="Ignore" />
 

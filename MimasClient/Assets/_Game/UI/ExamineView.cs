@@ -9,8 +9,9 @@ namespace Mimas.Client.UI
 {
     /// <summary>
     /// Binds <c>Examine.uxml</c> to a <see cref="HudExamine"/> and owns the one hover panel
-    /// (<c>HoverPanel.uxml</c>), the scrim and the open/close slide (docs/ui/examine.md, spec E §7.3, §7.10,
-    /// §7.11). Not a MonoBehaviour: <see cref="MatchHudView"/> keeps the document and makes one of these from
+    /// (<c>HoverPanel.uxml</c>) and the close-on-any-outside-press rule (docs/ui/examine.md §2, spec E §7.3,
+    /// §7.10, §7.11). The plate is a layer over the whole HUD: it appears and goes without a slide and moves
+    /// nothing else. Not a MonoBehaviour: <see cref="MatchHudView"/> keeps the document and makes one of these from
     /// the two template instances in <c>MatchHud.uxml</c>. It formats numbers and picks classes; every word
     /// it shows was composed by the presenter, and every colour is a token (the painting's hues are data).
     /// </summary>
@@ -23,7 +24,6 @@ namespace Mimas.Client.UI
 
         private readonly VisualElement _hudRoot;
         private readonly VisualElement _root;
-        private readonly VisualElement _scrim;
         private readonly VisualElement _wash;
         private readonly VisualElement _plate;
         private readonly VisualElement _portrait;
@@ -52,8 +52,8 @@ namespace Mimas.Client.UI
 
         private HudExamine _model;
         private string _renderedSignature;
-        private int _closedByScrimFrame = -10;
         private int _openedFrame = -10;
+        private readonly EventCallback<PointerDownEvent> _onAnyPress;
         private IVisualElementScheduledItem _pendingHover;
 
         private readonly Dictionary<string, Texture2D> _paintings = new Dictionary<string, Texture2D>(StringComparer.Ordinal);
@@ -62,20 +62,10 @@ namespace Mimas.Client.UI
 
         public bool IsOpen => _model != null;
 
-        /// <summary>The plate's width as laid out (<c>--mimas-plate-w</c>), for the HUD to make room.</summary>
-        public float PlateWidth
-        {
-            get
-            {
-                float width = _plate.resolvedStyle.width;
-                return float.IsNaN(width) || width <= 0f ? 380f : width;
-            }
-        }
-
-        /// <param name="hudRoot">The HUD's root: the window the hover panel is clamped inside and the scrim covers.</param>
+        /// <param name="hudRoot">The HUD's root: every press on the HUD passes through it, and the hover panel is clamped inside it.</param>
         /// <param name="examine">The instance of Examine.uxml.</param>
         /// <param name="hoverPanel">The instance of HoverPanel.uxml.</param>
-        /// <param name="close">What ✕, the scrim and Escape call: the presenter's CloseExamine.</param>
+        /// <param name="close">What ✕ and a press outside the plate call: the presenter's CloseExamine.</param>
         public ExamineView(VisualElement hudRoot, VisualElement examine, VisualElement hoverPanel, Action close)
         {
             _hudRoot = hudRoot ?? throw new ArgumentNullException(nameof(hudRoot));
@@ -87,7 +77,6 @@ namespace Mimas.Client.UI
             examine.style.left = 0; examine.style.top = 0; examine.style.right = 0; examine.style.bottom = 0;
 
             _root = Require(examine, "ex.root");
-            _scrim = Require(examine, "ex.scrim");
             _wash = Require(examine, "ex.wash");
             _plate = Require(examine, "ex.plate");
             _portrait = Require(examine, "ex.portrait");
@@ -113,22 +102,12 @@ namespace Mimas.Client.UI
 
             _hover = new HoverPanel(hoverPanel ?? throw new ArgumentNullException(nameof(hoverPanel)));
 
-            // The scrim swallows the off-plate click: it closes and does nothing else (E10). Stopping it here
-            // keeps it from UI Toolkit; SwallowsBoardPointer keeps it from the board's own raycast.
-            _scrim.RegisterCallback<PointerDownEvent>(evt =>
-            {
-                // The press that opened the plate is read by the board in its Update and then, later in the
-                // same frame (or the next, on the Web), dispatched by UI Toolkit onto the scrim it just
-                // revealed. That press opened the plate; it must not also close it.
-                if (Time.frameCount - _openedFrame <= 2)
-                {
-                    evt.StopPropagation();
-                    return;
-                }
-                _closedByScrimFrame = Time.frameCount;
-                evt.StopPropagation();
-                _close_();
-            });
+            // Any press on the HUD outside the plate closes it, and then carries on to whatever it hit: the
+            // action bar and End Turn stay usable with the plate open (Rohan, 23 Sep 2026). Trickle-down, so
+            // it is seen on the way to the button and nothing can stop it first. A press on the board never
+            // reaches UI Toolkit; the presenter closes the plate for that one.
+            _onAnyPress = OnAnyPress;
+            _hudRoot.RegisterCallback(_onAnyPress, TrickleDown.TrickleDown);
             _close.RegisterCallback<ClickEvent>(evt => { evt.StopPropagation(); _close_(); });
 
             _hudRoot.RegisterCallback<GeometryChangedEvent>(evt => ApplyWindowHeight(evt.newRect.height));
@@ -138,13 +117,18 @@ namespace Mimas.Client.UI
             RegisterHover(_vitalsAp, () => StatContent(_model != null ? _model.FindStat("ap") : null));
         }
 
-        /// <summary>
-        /// True for the frame the scrim closed the plate on and the next: the board reads the mouse in its own
-        /// Update, which may run after UI Toolkit has already removed the scrim from under the pointer.
-        /// </summary>
-        public bool SwallowsBoardPointer => Time.frameCount - _closedByScrimFrame <= 1;
+        private void OnAnyPress(PointerDownEvent evt)
+        {
+            if (_model == null) return;
+            // The press that opened the plate (read by the board in its Update) can reach UI Toolkit a moment
+            // later, on the Web a frame later. It opened the plate; it must not also close it.
+            if (Time.frameCount - _openedFrame <= 2) return;
+            var target = evt.target as VisualElement;
+            if (target != null && (target == _plate || _plate.Contains(target))) return;
+            _close_();
+        }
 
-        /// <summary>Draws the model, or slides the plate out when it is null.</summary>
+        /// <summary>Draws the model, or hides the plate when it is null.</summary>
         public void Render(HudExamine model)
         {
             _model = model;
@@ -169,6 +153,7 @@ namespace Mimas.Client.UI
 
         public void Dispose()
         {
+            _hudRoot.UnregisterCallback(_onAnyPress, TrickleDown.TrickleDown);
             HideHover();
             foreach (Texture2D texture in _paintings.Values) UnityEngine.Object.Destroy(texture);
             foreach (Texture2D texture in _squares.Values) UnityEngine.Object.Destroy(texture);
@@ -569,7 +554,10 @@ namespace Mimas.Client.UI
             Texture2D texture;
             if (_paintings.TryGetValue(key, out texture) && texture != null) return texture;
 
-            const int w = 96, h = 64;
+            // Big enough that the plate never magnifies it more than ~2x at 1080 (a 96×64 texture was
+            // visibly soft at large windows), dithered by half a level so the long dark-to-paper ramp
+            // does not band.
+            const int w = 224, h = 112;
             texture = NewTexture(w, h);
             var pixels = new Color[w * h];
             for (int y = 0; y < h; y++)
@@ -588,6 +576,8 @@ namespace Mimas.Client.UI
                     c = Color.Lerp(c, dark * 0.85f, pool * 0.6f);
                     float fade = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.40f, 1.0f, v));
                     c = Color.Lerp(c, paper, fade);
+                    float dither = (Hash(x, y) - 0.5f) / 255f;
+                    c.r += dither; c.g += dither; c.b += dither;
                     c.a = 1f;
                     pixels[y * w + x] = c;
                 }
@@ -604,7 +594,7 @@ namespace Mimas.Client.UI
             Texture2D texture;
             if (_squares.TryGetValue(key, out texture) && texture != null) return texture;
 
-            const int size = 16;
+            const int size = 48;
             texture = NewTexture(size, size);
             var pixels = new Color[size * size];
             for (int y = 0; y < size; y++)
@@ -646,6 +636,14 @@ namespace Mimas.Client.UI
                 filterMode = FilterMode.Bilinear,
                 hideFlags = HideFlags.DontSave,
             };
+        }
+
+        /// <summary>A fixed 0..1 value per pixel, for dithering; deterministic so the painting never shimmers.</summary>
+        private static float Hash(int x, int y)
+        {
+            uint h = (uint)(x * 374761393 + y * 668265263);
+            h = (h ^ (h >> 13)) * 1274126177u;
+            return (h ^ (h >> 16)) / (float)uint.MaxValue;
         }
 
         private static float Radial(float u, float v, float cu, float cv, float radius)
@@ -814,7 +812,7 @@ namespace Mimas.Client.UI
             if (!_root.ClassListContains("hp--visible")) return;
             float width = _root.resolvedStyle.width;
             float height = _root.resolvedStyle.height;
-            if (float.IsNaN(width) || width <= 0f) width = 300f;
+            if (float.IsNaN(width) || width <= 0f) width = 340f;
             if (float.IsNaN(height)) height = 0f;
 
             Vector2 origin = _container.worldBound.position;

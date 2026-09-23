@@ -125,7 +125,9 @@ namespace Mimas.Client.UI
             Color color = _tint ?? _color;
             painter.strokeColor = color;
             painter.fillColor = color;
-            painter.lineWidth = Mathf.Max(0.75f, _stroke * scale);
+            // A floor of 1.1 panel units: at 11px a 1.5/24 stroke is 0.7px, and at a 1280×720 window the HUD
+            // draws at two thirds of that, which read as a grey smudge rather than a line.
+            painter.lineWidth = Mathf.Max(1.1f, _stroke * scale);
             painter.lineCap = LineCap.Round;
             painter.lineJoin = LineJoin.Round;
 

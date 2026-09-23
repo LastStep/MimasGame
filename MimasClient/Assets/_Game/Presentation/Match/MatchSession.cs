@@ -225,8 +225,11 @@ namespace Mimas.Client.Presentation
             }
 
             _armed = index;
-            _examinedUnitId = None;                      // arming replaces examine; the board is now targeting
+            // Arming replaces examine; the board is now targeting. The model goes too: leaving it drawn left
+            // the plate up over a board that could no longer be clicked, with nothing able to close it.
+            _examinedUnitId = None;
             _examinedPropId = None;
+            _examine = null;
             PaintOptions();
             RaiseStateChanged();
         }
@@ -269,11 +272,16 @@ namespace Mimas.Client.Presentation
             SceneManager.LoadScene("Lobby");
         }
 
+        /// <summary>
+        /// Closes the plate, whatever put it up: a unit, a prop, or a model with no id behind it (the Editor
+        /// preview). Asking only about the ids is what once made a plate impossible to close.
+        /// </summary>
         public void CloseExamine()
         {
-            if (_examinedUnitId == None && _examinedPropId == None) return;
+            if (_examinedUnitId == None && _examinedPropId == None && _examine == null) return;
             _examinedUnitId = None;
             _examinedPropId = None;
+            _examine = null;
             RefreshView();
             RaiseStateChanged();
         }
@@ -1605,6 +1613,15 @@ namespace Mimas.Client.Presentation
         private void HandleClicked(BoardHover hover)
         {
             if (!_ready) return;
+
+            // A click on the board while the plate is open only closes it (docs/ui/examine.md §2): it
+            // neither selects what it hit nor examines another unit. Clicks on the HUD close it from the
+            // view's side and still do their own thing.
+            if (_armed == None && _examine != null)
+            {
+                CloseExamine();
+                return;
+            }
 
             if (!hover.Any)
             {

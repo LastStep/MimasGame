@@ -45,10 +45,6 @@
             <ui:Button name="banner-button" class="banner-button" text="Back to lobby" />
         </ui:VisualElement>
 
-        <!-- Right: the examine plate (docs/ui/examine.md), driven by ExamineView. Here in the tree so the
-             bar, End Turn and Resign below it stay above its scrim and still take clicks. -->
-        <ui:Instance template="Examine" name="examine-mount" picking-mode="Ignore" />
-
         <!-- Bottom centre: action points, then one section per category, filled at runtime from IMatchHudSource. -->
         <ui:VisualElement name="tooltip" class="tooltip" picking-mode="Ignore">
             <ui:Label name="tooltip-title" class="tooltip-title" text="Move" />
@@ -83,6 +79,10 @@
                 </ui:VisualElement>
             </ui:VisualElement>
         </ui:VisualElement>
+
+        <!-- Right: the examine plate (docs/ui/examine.md), driven by ExamineView. Last but one in the tree, so
+             it is a layer over the whole HUD: it covers End Turn rather than moving it. -->
+        <ui:Instance template="Examine" name="examine-mount" picking-mode="Ignore" />
 
         <!-- The one hover panel, over everything (docs/ui/language.md §6). -->
         <ui:Instance template="HoverPanel" name="hover-mount" picking-mode="Ignore" />

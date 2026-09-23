@@ -21,20 +21,7 @@
     --ex-accent: var(--mimas-paper-them);
 }
 
-/* ---- the scrim and the wash ------------------------------------------------------------------ */
-
-.ex-scrim {
-    position: absolute;
-    left: 0;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    display: none;
-}
-
-.ex--open .ex-scrim {
-    display: flex;
-}
+/* ---- the wash ---------------------------------------------------------------------------------- */
 
 /* A white ramp drawn by the view, tinted to the wash token: ink at 45% at the plate, nothing 200px out. */
 .ex-wash {
@@ -45,13 +32,11 @@
     width: 200px;
     -unity-background-image-tint-color: var(--mimas-wash);
     -unity-background-scale-mode: stretch-to-fill;
-    opacity: 0;
-    transition-property: opacity;
-    transition-duration: 0.16s;
+    display: none;
 }
 
 .ex--open .ex-wash {
-    opacity: 1;
+    display: flex;
 }
 
 /* ---- the plate --------------------------------------------------------------------------------- */
@@ -67,22 +52,20 @@
     padding-bottom: 0;
     padding-left: var(--mimas-plate-pad-x);
     padding-right: var(--mimas-plate-pad-x);
-    translate: 100% 0;
-    transition-property: translate;
-    transition-duration: 0.16s;
-    transition-timing-function: ease-out-cubic;
     overflow: hidden;
+    display: none;
 }
 
+/* A layer over the HUD: it is there or it is not. No slide, and nothing else moves for it. */
 .ex--open .ex-plate {
-    translate: 0 0;
+    display: flex;
 }
 
 /* The painting bleeds to the plate's edges; its height is set by the view (210, or 120 below 900px). */
 .ex-portrait {
     margin-top: -22px;                              /* bleeds through --mimas-plate-pad */
-    margin-left: -20px;                             /* and through --mimas-plate-pad-x */
-    margin-right: -20px;
+    margin-left: -22px;                             /* and through --mimas-plate-pad-x */
+    margin-right: -22px;
     height: 210px;
     flex-shrink: 0;
     justify-content: flex-end;
@@ -119,7 +102,7 @@
 
 .ex-name {
     -unity-font-definition: var(--mimas-font-serif);
-    font-size: var(--mimas-text-32);
+    font-size: var(--mimas-text-36);
     color: var(--mimas-paper-fg);
     margin: 0;
     padding: 0;
@@ -127,7 +110,7 @@
 
 .ex-lineage {
     -unity-font-definition: var(--mimas-font-serif-italic);
-    font-size: var(--mimas-text-15);
+    font-size: var(--mimas-text-17);
     color: var(--mimas-paper-fg-2);
     margin: 0;
     padding: 0;
@@ -161,8 +144,8 @@
 }
 
 .ex-body .unity-scroll-view__content-container {
-    padding-top: 14px;
-    padding-bottom: var(--mimas-plate-pad);
+    padding-top: 10px;
+    padding-bottom: 14px;
     padding-right: 6px;
 }
 
@@ -215,7 +198,7 @@
 .ex-vital {
     flex-direction: row;
     align-items: center;
-    height: 38px;
+    height: 40px;
 }
 
 .ex-vitals-second {
@@ -225,8 +208,8 @@
 }
 
 .ex-vital-glyph {
-    width: 16px;
-    height: 16px;
+    width: 18px;
+    height: 18px;
     margin-right: 10px;
 }
 
@@ -236,7 +219,7 @@
 
 .ex-vital-value {
     -unity-font-definition: var(--mimas-font-display);
-    font-size: var(--mimas-text-34);
+    font-size: var(--mimas-text-38);
     color: var(--mimas-paper-fg);
     margin: 0;
     padding: 0;
@@ -245,7 +228,7 @@
 
 .ex-vital-max {
     -unity-font-definition: var(--mimas-font-caps);
-    font-size: var(--mimas-text-10);
+    font-size: var(--mimas-text-12);
     color: var(--mimas-paper-fg-3);
     margin: 6px 0 0 8px;
     padding: 0;
@@ -269,8 +252,8 @@
 }
 
 .ex-egg {
-    width: 12px;
-    height: 12px;
+    width: 13px;
+    height: 13px;
     margin-right: 4px;
     --glyph-color: var(--ex-accent);
     --glyph-stroke: 2.4;
@@ -282,15 +265,15 @@
 }
 
 .ex-height-glyph {
-    width: 14px;
-    height: 14px;
+    width: 16px;
+    height: 16px;
     margin-right: 6px;
     --glyph-color: var(--mimas-paper-fg-3);
 }
 
 .ex-height-value {
     -unity-font-definition: var(--mimas-font-display);
-    font-size: var(--mimas-text-17);
+    font-size: var(--mimas-text-20);
     color: var(--mimas-paper-fg);
     margin: 0;
     padding: 0;
@@ -298,7 +281,7 @@
 
 .ex-height-caption {
     -unity-font-definition: var(--mimas-font-caps);
-    font-size: var(--mimas-text-7-5);
+    font-size: var(--mimas-text-11);
     letter-spacing: var(--mimas-caps-tracking);
     color: var(--mimas-paper-fg-3);
     margin: 3px 0 0 6px;
@@ -307,7 +290,7 @@
 
 .ex-description {
     -unity-font-definition: var(--mimas-font-body);
-    font-size: var(--mimas-text-12);
+    font-size: var(--mimas-text-14);
     color: var(--mimas-paper-fg-2);
     white-space: normal;
     margin: 0;
@@ -334,10 +317,10 @@
 
 .ex-caption {
     -unity-font-definition: var(--mimas-font-serif-semibold);
-    font-size: var(--mimas-text-15);
+    font-size: var(--mimas-text-17);
     letter-spacing: var(--mimas-caps-tracking);
     color: var(--ex-accent);
-    margin: 0 0 6px 0;
+    margin: 0 0 4px 0;
     padding: 0;
 }
 
@@ -352,7 +335,7 @@
 .ex-stat {
     width: 33.33%;
     flex-direction: column;
-    padding: 3px 0 6px 0;
+    padding: 2px 0 4px 0;
 }
 
 .ex-stat-numbers {
@@ -362,7 +345,7 @@
 
 .ex-stat-base {
     -unity-font-definition: var(--mimas-font-display);
-    font-size: var(--mimas-text-24);
+    font-size: var(--mimas-text-28);
     color: var(--mimas-paper-fg);
     margin: 0;
     padding: 0;
@@ -370,7 +353,7 @@
 
 .ex-stat-net {
     -unity-font-definition: var(--mimas-font-caps);
-    font-size: var(--mimas-text-12);
+    font-size: var(--mimas-text-14);
     margin: 0 0 4px 6px;
     padding: 0;
 }
@@ -394,21 +377,21 @@
 }
 
 .ex-stat-glyph {
-    width: 9px;
-    height: 9px;
+    width: 11px;
+    height: 11px;
     margin-right: 5px;
     --glyph-color: var(--mimas-paper-fg-3);
 }
 
 .ex-stat-caption {
     -unity-font-definition: var(--mimas-font-caps);
-    font-size: var(--mimas-text-7-5);
+    font-size: var(--mimas-text-11);
     letter-spacing: var(--mimas-caps-tracking);
     color: var(--mimas-paper-fg-3);
     margin: 0;
     padding: 0;
     white-space: normal;
-    max-width: 80px;
+    max-width: 104px;
 }
 
 /* ---- boons ------------------------------------------------------------------------------------- */
@@ -421,20 +404,20 @@
 .ex-boon {
     flex-direction: row;
     align-items: center;
-    height: 25px;
+    height: 28px;
     margin-bottom: var(--mimas-gap-row);
 }
 
 .ex-boon-glyph {
-    width: 12px;
-    height: 12px;
+    width: 14px;
+    height: 14px;
     margin-right: 14px;
     --glyph-color: var(--ex-accent);
 }
 
 .ex-boon-name {
     -unity-font-definition: var(--mimas-font-serif-semibold);
-    font-size: var(--mimas-text-16);
+    font-size: var(--mimas-text-19);
     color: var(--mimas-paper-fg);
     flex-grow: 1;
     margin: 0;
@@ -443,7 +426,7 @@
 
 .ex-boon-on {
     -unity-font-definition: var(--mimas-font-body);
-    font-size: var(--mimas-text-10);
+    font-size: var(--mimas-text-12);
     color: var(--mimas-paper-fg-3);
     margin: 0;
     padding: 0;
@@ -465,7 +448,7 @@
     bottom: 0;
     -unity-text-align: middle-center;
     -unity-font-definition: var(--mimas-font-caps);
-    font-size: var(--mimas-text-7-5);
+    font-size: var(--mimas-text-10);
     margin: 0;
     padding: 0;
 }
@@ -484,12 +467,12 @@
 .ex-item-head {
     flex-direction: row;
     align-items: center;
-    height: 32px;
+    height: 34px;
 }
 
 .ex-item-square {
-    width: 28px;
-    height: 28px;
+    width: 30px;
+    height: 30px;
     margin-right: 10px;
     -unity-background-scale-mode: stretch-to-fill;
     align-items: center;
@@ -505,7 +488,7 @@
 
 .ex-item-name {
     -unity-font-definition: var(--mimas-font-serif-semibold);
-    font-size: var(--mimas-text-17);
+    font-size: var(--mimas-text-20);
     color: var(--mimas-paper-fg);
     flex-grow: 1;
     margin: 0;
@@ -514,7 +497,7 @@
 
 .ex-item-stat {
     -unity-font-definition: var(--mimas-font-body);
-    font-size: var(--mimas-text-10);
+    font-size: var(--mimas-text-12);
     color: var(--mimas-paper-up);
     margin: 0;
     padding: 0;
@@ -522,20 +505,20 @@
 
 .ex-item-note {
     -unity-font-definition: var(--mimas-font-body);
-    font-size: var(--mimas-text-10);
+    font-size: var(--mimas-text-12);
     color: var(--mimas-paper-fg-3);
-    margin: 2px 0 0 38px;
+    margin: 2px 0 0 40px;
     padding: 0;
 }
 
 .ex-tiles {
     flex-direction: row;
     flex-wrap: wrap;
-    margin: 4px 0 0 38px;
+    margin: 2px 0 0 40px;
 }
 
 .ex-tile {
-    width: 56px;
+    width: 76px;
     align-items: center;
     margin-right: 0;
     margin-bottom: 0;
@@ -553,7 +536,7 @@
 
 .ex-tile-letter {
     -unity-font-definition: var(--mimas-font-caps);
-    font-size: var(--mimas-text-13-5);
+    font-size: var(--mimas-text-15);
     color: var(--mimas-paper-fg-2);
     margin: 0;
     padding: 0;
@@ -561,12 +544,13 @@
 
 .ex-tile-name {
     -unity-font-definition: var(--mimas-font-caps);
-    font-size: var(--mimas-text-6-5);
+    font-size: var(--mimas-text-10);
     letter-spacing: var(--mimas-caps-tracking);
     color: var(--mimas-paper-fg-3);
     -unity-text-align: upper-center;
-    margin: 4px 0 0 0;
-    padding: 0;
+    margin: 3px 0 0 0;
+    padding: 0 2px 0 2px;
+    width: 100%;
     white-space: normal;
 }
 

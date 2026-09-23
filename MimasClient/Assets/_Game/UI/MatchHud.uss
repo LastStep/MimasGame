@@ -474,13 +474,7 @@
     background-color: var(--hud-ember);
 }
 
-/* ---- examine: the plate is Examine.uxml / Examine.uss; here only what it does to the rest --------- */
-
-/* The plate is full height on the right, so End Turn and Resign step 380px left while it is open (§13). */
-.hud--examining .end-turn,
-.hud--examining .resign {
-    right: 404px;
-}
+/* ---- examine: the plate is Examine.uxml / Examine.uss, a layer over the HUD that moves nothing ---- */
 
 /* ex.ring: a 1px ring in the owner's colour around the examined unit's tag (language §5 state.selected). */
 .ex-ring {

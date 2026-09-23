@@ -64,14 +64,14 @@
 }
 
 .hp-tile-glyph {
-    width: 20px;
-    height: 20px;
+    width: 22px;
+    height: 22px;
     --glyph-color: var(--hp-accent);
 }
 
 .hp-tile-letter {
     -unity-font-definition: var(--mimas-font-caps);
-    font-size: var(--mimas-text-17);
+    font-size: var(--mimas-text-20);
     color: var(--mimas-fg);
     margin: 0;
     padding: 0;
@@ -84,7 +84,7 @@
 
 .hp-name {
     -unity-font-definition: var(--mimas-font-caps);
-    font-size: var(--mimas-text-17);
+    font-size: var(--mimas-text-20);
     letter-spacing: var(--mimas-caps-tracking-wide);
     color: var(--mimas-fg);
     margin: 0;
@@ -94,7 +94,7 @@
 
 .hp-type {
     -unity-font-definition: var(--mimas-font-caps);
-    font-size: var(--mimas-text-7-5);
+    font-size: var(--mimas-text-11);
     letter-spacing: var(--mimas-caps-tracking);
     color: var(--mimas-fg-3);
     margin: 3px 0 0 0;
@@ -111,7 +111,7 @@
 }
 
 .hp-number {
-    min-width: 50px;
+    min-width: 56px;
     flex-direction: column;
     align-items: center;
     background-color: var(--mimas-number-ground);
@@ -120,14 +120,14 @@
 }
 
 .hp-number-glyph {
-    width: 11px;
-    height: 11px;
+    width: 13px;
+    height: 13px;
     --glyph-color: var(--mimas-fg-3);
 }
 
 .hp-number-value {
     -unity-font-definition: var(--mimas-font-display);
-    font-size: var(--mimas-text-17);
+    font-size: var(--mimas-text-20);
     color: var(--mimas-fg);
     margin: 3px 0 0 0;
     padding: 0;
@@ -135,7 +135,7 @@
 
 .hp-number-label {
     -unity-font-definition: var(--mimas-font-caps);
-    font-size: var(--mimas-text-6-5);
+    font-size: var(--mimas-text-10);
     letter-spacing: var(--mimas-caps-tracking);
     color: var(--mimas-fg-3);
     margin: 2px 0 0 0;
@@ -165,7 +165,7 @@
 
 .hp-row-label {
     -unity-font-definition: var(--mimas-font-body);
-    font-size: var(--mimas-text-11-5);
+    font-size: var(--mimas-text-13);
     color: var(--mimas-fg-2);
     margin: 0;
     padding: 0;
@@ -173,7 +173,7 @@
 
 .hp-row-amount {
     -unity-font-definition: var(--mimas-font-display);
-    font-size: var(--mimas-text-13-5);
+    font-size: var(--mimas-text-15);
     color: var(--mimas-fg);
     margin: 0;
     padding: 0;
@@ -196,7 +196,7 @@
 
 .hp-text {
     -unity-font-definition: var(--mimas-font-body);
-    font-size: var(--mimas-text-12);
+    font-size: var(--mimas-text-14);
     color: var(--mimas-fg);
     white-space: normal;
     margin: 0 0 8px 0;
@@ -205,7 +205,7 @@
 
 .hp-damageline {
     -unity-font-definition: var(--mimas-font-body);
-    font-size: var(--mimas-text-11-5);
+    font-size: var(--mimas-text-13);
     color: var(--mimas-amount);
     white-space: normal;
     margin: 0 0 8px 0;
@@ -224,15 +224,15 @@
 }
 
 .hp-change-glyph {
-    width: 7px;
-    height: 7px;
+    width: 8px;
+    height: 8px;
     margin-right: 7px;
     --glyph-color: var(--mimas-changed);
 }
 
 .hp-change-text {
     -unity-font-definition: var(--mimas-font-body);
-    font-size: var(--mimas-text-10-5);
+    font-size: var(--mimas-text-12);
     color: var(--mimas-changed);
     white-space: normal;
     margin: 0;
@@ -242,7 +242,7 @@
 
 .hp-conditions {
     -unity-font-definition: var(--mimas-font-body);
-    font-size: var(--mimas-text-10);
+    font-size: var(--mimas-text-12);
     color: var(--mimas-fg-3);
     white-space: normal;
     margin: 0 0 6px 0;
@@ -252,7 +252,7 @@
 .hp-flavour {
     -unity-font-definition: var(--mimas-font-body);
     -unity-font-style: italic;
-    font-size: var(--mimas-text-10-5);
+    font-size: var(--mimas-text-12);
     color: var(--mimas-fg-3);
     white-space: normal;
     margin: 2px 0 0 0;

@@ -494,13 +494,10 @@ namespace Mimas.Client.UI
             }
         }
 
-        /// <summary>The plate is ExamineView's; the HUD only makes room for it (End Turn steps left, the bar re-centres).</summary>
+        /// <summary>The plate is ExamineView's, a layer over the HUD; nothing here moves for it.</summary>
         private void RefreshExamine()
         {
-            HudExamine examine = _source.Examine;
-            _examineView.Render(examine);
-            _root.EnableInClassList("hud--examining", examine != null);
-            CentreActionBar();
+            _examineView.Render(_source.Examine);
         }
 
         private void HandleActionBarGeometry(GeometryChangedEvent evt) => CentreActionBar();
@@ -508,16 +505,14 @@ namespace Mimas.Client.UI
         /// <summary>
         /// Centres the bar in pixels from its measured width. MatchHud.uss centres it with <c>translate: -50%</c>,
         /// which UI Toolkit resolved once, while the bar held only its action-point group, and never again as
-        /// the sections were added: in the browser it sat ~220px right of centre. While the examine plate is
-        /// open the bar centres in the board left of the plate, so it and End Turn both clear it at 1280×720.
+        /// the sections were added: in the browser it sat ~220px right of centre.
         /// </summary>
         private void CentreActionBar()
         {
-            if (_actionBar == null || _examineView == null) return;
+            if (_actionBar == null) return;
             float width = _actionBar.resolvedStyle.width;
             if (float.IsNaN(width) || width <= 0f) return;
-            float shift = _examineView.IsOpen ? -_examineView.PlateWidth * 0.5f : 0f;
-            _actionBar.style.translate = new Translate(shift - width * 0.5f, 0f);
+            _actionBar.style.translate = new Translate(-width * 0.5f, 0f);
         }
 
         private void RefreshPreview()
@@ -1064,8 +1059,6 @@ namespace Mimas.Client.UI
         private bool IsPointerOverHud(Vector2 screenPosition)
         {
             if (!_bound || _root == null) return false;
-            // The off-plate click that closed examine is the plate's, even if the scrim is already gone (E10).
-            if (_examineView != null && _examineView.SwallowsBoardPointer) return true;
             IPanel panel = _root.panel;
             if (panel == null) return false;
             Vector2 panelPosition = RuntimePanelUtils.ScreenToPanel(panel, screenPosition);
