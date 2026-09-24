@@ -197,7 +197,7 @@ Nothing, except what waits on Rohan below.
 | **Look at the lobby and the room** (T-0014) and the HUD (T-0013) built; then say whether translucent fills should match the canvas exactly | Every `you at N%` fill draws ~60% brighter than the canvas (linear colour space); matching it is a change to every screen | 24 Sep 2026 |
 | **The verification round's remaining questions** — M1-1…3 seeded by a builder; M2-2's wording; M3-5 and M3-6's wording; may a builder widen its own `allows_assets` | Ledger and process calls only you can make (T-0011 and T-0001 closed 24 Sep). Details: `R-2026-09-24-verify-round.md` "Rohan" | 24 Sep 2026 |
 | **Do not run `deploy.sh --rollback`** | It deletes the previous build and reports success (T-0007). A builder fix is first in the queue | 24 Sep 2026 |
-| **Deploy** (`bash tools/deploy/deploy.sh`) | The live site predates boons. Its client cannot start a match against a post-boons server, because `room.loadout` now needs a lineage; an old tab must reload. `/health`'s content hash changes | 22 Sep 2026 |
+| **Deploy** — a fresh Web build from `f3c205d` is in `Build/Web` and smoke-tested on three engines, so `bash tools/deploy/deploy.sh --skip-build` (PowerShell: `& 'C:\Program Files\Git\bin\bash.exe' tools/deploy/deploy.sh --skip-build`) ships it with a matching server | The live site predates boons. Its client cannot start a match against a post-boons server, because `room.loadout` now needs a lineage; an old tab must reload. `/health`'s content hash changes | 22 Sep 2026 |
 | **One best-of-3 against a friend on another network**, recorded as a playtest file | It is M2-1, the last evidence M2-7 needs, and M2-8 with a human opponent. It is also the only thing that will say whether the draft reads in three seconds | 21 Sep 2026 |
 | **Tune the boon numbers** — `MimasClient/Assets/_Game/Data/boons/*.json` (27 of them now), `abilities/`, `modifiers/` | Every number is a placeholder written as the spec gave it. Nothing enforces them; the tests only check shapes and rules | 22 Sep 2026 |
 | **Play one bot match at `?perf=1`** and say what the meter showed | The only instrument that sees your 144 Hz vsync; unblocks T-0003 | 18 Sep 2026 |
@@ -373,6 +373,12 @@ Nothing, except what waits on Rohan below.
 - **No secrets in the repo.** The VPS is reached only through the ssh alias `hostinger`.
 
 ## Numbers, 24 Sep
+
+**The build ready to deploy** (24 Sep, after the round, for Rohan's deploy): `Build/Web` from `f3c205d`, batch through
+`WebBuild.Build`, **13,130,142 B (12.52 MiB)** — +12 KB on T-0014's with no client change between (not investigated).
+Local server + that build, 1280×720, Play vs bot into a live match: Chromium `boot 721 ms`, WebKit `2285`, Firefox
+`1894`, 12.5 MB each, all OK — no page error, no console.error; client and server content hash `647914b4…`. Logs and
+shots `artifacts/verify-round/smoke-*`. Ladder at `f3c205d` GREEN 4/4 (473 / 60).
 
 T-0014: Web build **13,117,682 B** (12.51 MiB; −3 KB); smoke on it, local server, 1280×720, Play vs bot to a match:
 Chromium `boot 1329 ms`, WebKit `1248`, Firefox `1638`, 12.5 MB each. The Chromium boot is up from T-0013's 672 ms; the

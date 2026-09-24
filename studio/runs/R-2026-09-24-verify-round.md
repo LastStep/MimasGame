@@ -273,6 +273,15 @@ side by side if only one of them uses the Editor.
   own commits (list under "A builder, small", item 6). Corrects the builder on one point: `HandleResynced` clearing the
   queue is not the cause — the round's opening batch is never queued. No ledger flip; after a pass: M3-3, M3-4, M3-5
   and the draft half of M3-6 (both of the last two need Rohan first).
+- **Rohan, after the round:** "T-0011: pass", "T-0001: pass and ignore, probably redundant now" → both `done`
+  (`f3c205d`; T-0011's done-when #5 amended to his 23 Sep rework). Then: "do any due diligence needed, then push all
+  commits, and ready up a web build. i will deploy and then check things online."
+- Due diligence before the push: ladder GREEN 4/4 at `f3c205d` (473 / 60); `ledger check` ok · 19; the 167 outgoing
+  commits scanned for private keys, API keys, tokens, passwords, key/credential files and blobs over 20 MB — none.
+- Web build, batch, Editor closed, at `f3c205d`: success, **13,130,142 B (12.52 MiB)**; font caches restored after.
+  Served locally with the matching server; smoke Play vs bot into a live match at 1280×720 on Chromium / WebKit /
+  Firefox: all OK (boot 721 / 2285 / 1894 ms, 12.5 MB, content hash `647914b4…` on both ends); `match.png` looked at —
+  round 1 vs the random bot, units on the board, the ink HUD. Local server stopped. Nothing deployed (Rohan's).
 - The lead removed `grep.exe.stackdump` (an msys crash dump the T-0007 verifier's `grep -P` left at the repo root).
 - Asset-guard false positive (the lead): a `cat >> <this report> <<EOF` append was refused because its prose named the
   builder agent definition's path. The write target was this report only; re-done with the Edit tool.
