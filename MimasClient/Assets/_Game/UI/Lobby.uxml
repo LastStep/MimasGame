@@ -1,59 +1,80 @@
-<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" xsi="http://www.w3.org/2001/XMLSchema-instance" engine="UnityEngine.UIElements" editor="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" xmlns:mimas="Mimas.Client.UI" editor-extension-mode="False">
+    <!--
+        The lobby and the room in ink (docs/ui/lobby.md, spec H §8). Every element of the book's inventory exists
+        by its id as the element's name; rows that repeat are built by LobbyView under the named containers with
+        the same ids: the gear tiles "room.preset[0]"… under room.gear.tiles (one per preset, however many there
+        are) and the lineage rows "room.lineage[0]"… under room.god.rows (the catalogue's first three by id).
+    -->
     <Style src="Lobby.uss" />
     <ui:VisualElement name="lobby-root" class="lobby-root">
+        <!-- The three lineage washes on the ink (lb.wash): a generated texture, the hues from data. -->
+        <ui:VisualElement name="lb.wash" class="lb-wash" picking-mode="Ignore" />
 
-        <!-- One panel at a time. You pick a name and a way in here; you pick your gear once you can see
-             who you are playing (OPT-0001). -->
-        <ui:VisualElement name="lobby-panel" class="panel">
-            <ui:Label class="title" text="MIMAS" />
-            <ui:Label name="last-result" class="last-result" text="" />
+        <!-- ~~~~ The lobby (lobby.md §2): one centred column, 420 wide. ~~~~ -->
+        <ui:VisualElement name="lobby-panel" class="panel lb-panel">
+            <ui:VisualElement class="lb-column">
+                <ui:Label name="lb.title" class="lb-title" text="MIMAS" />
+                <ui:Label name="lb.last" class="lb-last" text="" />
 
-            <ui:Label class="field-label" text="NAME" />
-            <ui:TextField name="name" class="field" max-length="24" />
+                <ui:Label name="lb.name.caption" class="caption lb-caption" text="NAME" />
+                <ui:TextField name="lb.name" class="field lb-name" max-length="24" />
 
-            <ui:Button name="play-bot" class="button button--primary" text="Play vs bot" />
-            <ui:Button name="create-room" class="button" text="Create room" />
+                <ui:Button name="lb.play-bot" class="button button--primary lb-play-bot" text="PLAY VS BOT" />
+                <ui:Button name="lb.create" class="button button--plain lb-create" text="CREATE ROOM" />
 
-            <ui:VisualElement class="join-row">
-                <ui:TextField name="join-code" class="field field--code" max-length="4" />
-                <ui:Button name="join-room" class="button button--join" text="Join room" />
+                <ui:VisualElement class="lb-join-row">
+                    <ui:TextField name="lb.join.code" class="field lb-join-code" max-length="4" placeholder-text="CODE" hide-placeholder-on-focus="true" />
+                    <ui:Button name="lb.join" class="button button--plain lb-join" text="JOIN ROOM" />
+                </ui:VisualElement>
+
+                <ui:Label name="lb.status" class="status lb-status" text="" />
             </ui:VisualElement>
-
-            <ui:Label name="status" class="status" text="" />
-            <ui:Label name="server" class="server" text="" />
+            <ui:Label name="lb.server" class="lb-server" text="" />
         </ui:VisualElement>
 
-        <!-- The room: the code to send a friend, who is here, and what you are wearing. -->
-        <ui:VisualElement name="room-panel" class="panel">
-            <ui:Label class="field-label" text="ROOM CODE" />
-            <ui:Label name="room-code" class="room-code" text="FROG" />
-            <ui:VisualElement class="room-actions">
-                <ui:Button name="copy-link" class="button button--quiet" text="Copy link" />
-                <ui:Button name="copy-code" class="button button--quiet" text="Copy code" />
+        <!-- ~~~~ The room (lobby.md §3): two seats facing, you always on the left. ~~~~ -->
+        <ui:VisualElement name="room-panel" class="panel room-panel">
+            <ui:VisualElement class="room-head">
+                <ui:Label name="room.code.caption" class="caption room-code-caption" text="ROOM CODE" />
+                <ui:Label name="room.code" class="room-code" text="FROG" />
+                <ui:VisualElement class="room-copy-row">
+                    <ui:Button name="room.copy-link" class="button button--quiet" text="COPY LINK" />
+                    <ui:Button name="room.copy-code" class="button button--quiet room-copy-code" text="COPY CODE" />
+                </ui:VisualElement>
             </ui:VisualElement>
 
-            <ui:VisualElement class="seats">
-                <ui:Label name="seat-0" class="seat" text="" />
-                <ui:Label name="seat-1" class="seat" text="" />
+            <ui:VisualElement class="room-seats">
+                <!-- You: your name, your gear, who you pray to. -->
+                <ui:VisualElement name="room.you" class="room-seat room-seat--you">
+                    <ui:Label name="room.you.caption" class="room-seat-caption room-seat-caption--you" text="YOU" />
+                    <ui:Label name="room.you.name" class="room-seat-name" text="" />
+
+                    <ui:Label name="room.gear.caption" class="caption room-group-caption" text="GEAR" />
+                    <ui:VisualElement name="room.gear.tiles" class="room-gear-tiles" />
+
+                    <ui:Label name="room.god.caption" class="caption room-group-caption" text="PRAY TO" />
+                    <ui:VisualElement name="room.god.rows" class="room-god-rows" />
+                </ui:VisualElement>
+
+                <ui:VisualElement name="room.divider" class="room-divider" picking-mode="Ignore" />
+
+                <!-- Them: a name and whether they are ready. Never their gear or their god (#q-online-room-loadout). -->
+                <ui:VisualElement name="room.them" class="room-seat room-seat--them">
+                    <ui:Label name="room.them.caption" class="room-seat-caption room-seat-caption--them" text="THEM" />
+                    <ui:Label name="room.them.name" class="room-seat-name room-seat-name--them" text="" />
+                    <ui:VisualElement name="room.them.state" class="room-them-state">
+                        <ui:VisualElement name="room.them.state.dot" class="room-them-dot" picking-mode="Ignore" />
+                        <ui:Label name="room.them.state.text" class="room-them-state-text" text="" />
+                    </ui:VisualElement>
+                    <ui:Label name="room.them.note" class="room-them-note" text="Their gear shows when the round starts. Their god shows itself." />
+                </ui:VisualElement>
             </ui:VisualElement>
 
-            <ui:Label class="field-label" text="LOADOUT" />
-            <ui:DropdownField name="preset" class="field" />
-
-            <!-- Who you pray to (design #lineage). Filled from the catalogue in id order; the other seat
-                 never sees which one you chose. -->
-            <ui:Label class="field-label" text="LINEAGE" />
-            <ui:VisualElement name="lineage-row" class="lineage-row">
-                <ui:Button name="lineage-0" class="button lineage" text="" />
-                <ui:Button name="lineage-1" class="button lineage" text="" />
-                <ui:Button name="lineage-2" class="button lineage" text="" />
+            <ui:VisualElement class="room-foot">
+                <ui:Button name="room.ready" class="button button--primary room-ready" text="READY" />
+                <ui:Button name="room.leave" class="button button--quiet room-leave" text="LEAVE ROOM" />
+                <ui:Label name="room.status" class="status room-status" text="" />
             </ui:VisualElement>
-
-            <ui:Button name="ready" class="button button--primary" text="Ready" />
-            <ui:Button name="leave-room" class="button button--quiet" text="Leave room" />
-
-            <ui:Label name="room-status" class="status" text="" />
         </ui:VisualElement>
-
     </ui:VisualElement>
 </ui:UXML>

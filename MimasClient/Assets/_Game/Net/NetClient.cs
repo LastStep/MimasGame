@@ -24,6 +24,11 @@ namespace Mimas.Client.Net
         public bool Won;
         public string Reason;
         public string OpponentName;
+
+        /// <summary>The series score, yours first, when the match left one (the lobby's "SERIES 2 – 1", docs/ui/lobby.md §2).</summary>
+        public bool HasScore;
+        public int ScoreMine;
+        public int ScoreTheirs;
     }
 
     /// <summary>

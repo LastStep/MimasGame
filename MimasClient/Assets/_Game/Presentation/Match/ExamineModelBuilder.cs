@@ -544,8 +544,11 @@ namespace Mimas.Client.Presentation
             return catalog.Lineages.TryGet(lineageId, out lineage) ? lineage.Name : lineageId;
         }
 
-        /// <summary>The lineage's emblem glyph. The data's <c>icon</c> key names the lineage; the glyph table names the shape.</summary>
-        internal static string EmblemOf(LineageDef lineage)
+        /// <summary>
+        /// The lineage's emblem glyph. The data's <c>icon</c> key names the lineage; the glyph table names the shape.
+        /// Public so the room's lineage rows draw the same emblem as the plate (T-0014).
+        /// </summary>
+        public static string EmblemOf(LineageDef lineage)
         {
             switch (lineage.Icon ?? lineage.Id)
             {

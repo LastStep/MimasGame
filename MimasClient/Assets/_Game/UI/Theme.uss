@@ -48,6 +48,13 @@
     --mimas-floor: rgba(11, 11, 14, 0.86);
     --mimas-floor-top: rgba(11, 11, 14, 0.62);
 
+    /* The lobby and the room (docs/ui/lobby.md, T-0014): a selected lineage row (`you` at 7%); a plain button's
+       edge (bone at 22%) and ground, also the unselected lineage row's (ink at 25%); the server line (bone at 30%). */
+    --mimas-you-07: rgba(95, 211, 200, 0.07);
+    --mimas-bone-22: rgba(239, 233, 220, 0.22);
+    --mimas-bone-30: rgba(239, 233, 220, 0.30);
+    --mimas-ink-25: rgba(11, 11, 14, 0.25);
+
     /* Row hover ground (§5 state.hover: fg at 4.5%). */
     --mimas-hover: rgba(239, 233, 220, 0.045);
 
@@ -95,6 +102,11 @@
     --mimas-tracking-15: 24px;
     --mimas-tracking-20: 28px;
     --mimas-tracking-38: 30px;
+
+    /* The lobby's two wide ones, also em × 100 (docs/ui/lobby.md): the MIMAS title at 0.60em, the room code and the
+       code field at 0.50em. */
+    --mimas-tracking-title: 60px;
+    --mimas-tracking-code: 50px;
 
     /* ---- §4 space and shape ---- */
     --mimas-plate-w: 420px;

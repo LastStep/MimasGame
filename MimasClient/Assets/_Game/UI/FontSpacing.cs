@@ -23,6 +23,13 @@ namespace Mimas.Client.UI
 
         private const BindingFlags Fields = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
 
+        /// <summary>
+        /// Every character tracked text can show. Tracked text is always capitals (USS has no text-transform, so the
+        /// views upper-case it): the letters, the digits and the punctuation the HUD and the lobby print. Sentences are
+        /// set in the body face with no letter-spacing, where the flag changes nothing.
+        /// </summary>
+        private const string TrackedCharacters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 .,:;!?'’-–—·/()+−×%#&";
+
         private static readonly HashSet<FontAsset> Repaired = new HashSet<FontAsset>();
         private static bool _warned;
 
@@ -38,6 +45,12 @@ namespace Mimas.Client.UI
             if (font == null || !Repaired.Add(font)) return;
             try
             {
+                // A dynamic font fetches a glyph's kerning pairs when the glyph is first drawn, flag and all, so a letter
+                // first drawn after this repair brought the flag back: the series band read "V I C TORY" whenever the
+                // lobby had drawn first, and the lobby itself was never repaired ("YOU", "LE AVE") — found by T-0014 on
+                // 24 Sep 2026. Adding every tracked character first means none arrives afterwards.
+                if (font.atlasPopulationMode != AtlasPopulationMode.Static) font.TryAddCharacters(TrackedCharacters, true);
+
                 object table = font.fontFeatureTable;
                 if (table == null) return;
                 Type type = table.GetType();

@@ -1,19 +1,11 @@
-/* Lobby and room. One centred column, the same palette as the match HUD, nothing else on screen. */
+/*
+ * The lobby and the room in the ink language (docs/ui/lobby.md; spec H §8). Every colour, face, size and tracking
+ * is a --mimas-* token from Theme.uss: no literal colour and no palette of its own. Pixel positions are the book's
+ * at the 1920×1080 the panel scales from (the match HUD's panel settings; 1280×720 draws them at two thirds).
+ * Radius 0 everywhere; the only round thing is the other seat's ready dot (language §4: dots).
+ */
 
 @import url("Theme.uss");
-
-:root {
-    --lobby-bg: rgb(10, 12, 17);
-    --panel: rgba(18, 21, 28, 0.94);
-    --edge: rgba(255, 255, 255, 0.08);
-    --text: rgb(240, 242, 246);
-    --text-dim: rgba(240, 242, 246, 0.6);
-    --text-faint: rgba(240, 242, 246, 0.35);
-    --accent: rgb(120, 200, 255);
-    --accent-soft: rgba(120, 200, 255, 0.16);
-    --field: rgba(255, 255, 255, 0.06);
-    --good: rgb(120, 230, 120);
-}
 
 .lobby-root {
     position: absolute;
@@ -21,19 +13,26 @@
     top: 0;
     right: 0;
     bottom: 0;
-    align-items: center;
-    justify-content: center;
-    background-color: var(--lobby-bg);
+    background-color: var(--mimas-ink);
 }
 
+/* The three lineage washes (lb.wash): a generated texture laid over the ink (Ramps.LobbyWash). */
+.lb-wash {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    -unity-background-scale-mode: stretch-to-fill;
+}
+
+/* One panel at a time. */
 .panel {
-    width: 480px;
-    max-width: 92%;
-    padding: 32px 36px 28px 36px;
-    background-color: var(--panel);
-    border-radius: 18px;
-    border-width: 1px;
-    border-color: var(--edge);
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
     display: none;
 }
 
@@ -41,208 +40,574 @@
     display: flex;
 }
 
-.title {
-    align-self: center;
-    margin-bottom: 4px;
-    color: var(--text);
-    font-size: 40px;
-    letter-spacing: 14px;
-    -unity-font-style: bold;
-}
+/* ---- shared --------------------------------------------------------------------------------------- */
 
-/* "Victory vs Random Bot · by elimination". Hidden until there is one. */
-.last-result {
-    align-self: center;
-    margin-bottom: 18px;
-    color: var(--text-dim);
-    font-size: 12px;
-    letter-spacing: 2px;
-    -unity-font-style: bold;
-    display: none;
-}
-
-.last-result--visible {
-    display: flex;
-}
-
-.field-label {
-    margin-top: 14px;
-    margin-bottom: 6px;
-    color: var(--text-faint);
-    font-size: 11px;
-    letter-spacing: 3px;
-    -unity-font-style: bold;
-}
-
-.field {
+.caption {
     margin: 0;
-}
-
-.field > .unity-base-field__input,
-.field > .unity-base-text-field__input,
-.field .unity-base-popup-field__input {
-    background-color: var(--field);
-    border-radius: 10px;
-    border-width: 1px;
-    border-color: var(--edge);
-    padding: 9px 12px;
-    color: var(--text);
-    font-size: 15px;
-}
-
-/* A room code is four characters and always upper case: give it room and spacing to be read aloud. */
-.field--code {
-    flex-grow: 1;
-    margin-right: 10px;
-}
-
-.field--code > .unity-base-text-field__input {
-    font-size: 18px;
-    letter-spacing: 6px;
-    -unity-font-style: bold;
-    -unity-text-align: middle-center;
-}
-
-.join-row {
-    flex-direction: row;
-    align-items: center;
-    margin-top: 10px;
-}
-
-.button {
-    margin-top: 10px;
-    padding: 12px 20px;
-    background-color: var(--field);
-    border-radius: 12px;
-    border-width: 1px;
-    border-color: var(--edge);
-    color: var(--text);
-    font-size: 15px;
-    letter-spacing: 1px;
-    -unity-font-style: bold;
-    transition-property: background-color, scale;
-    transition-duration: 0.1s;
-}
-
-.button:hover {
-    background-color: var(--accent-soft);
-    scale: 1.02 1.02;
-}
-
-.button:active {
-    scale: 0.98 0.98;
-}
-
-.button:disabled {
-    opacity: 0.3;
-}
-
-.button--primary {
-    margin-top: 22px;
-    background-color: var(--accent-soft);
-    border-color: var(--accent);
-    color: var(--text);
-}
-
-.button--quiet {
-    background-color: rgba(0, 0, 0, 0);
-    color: var(--text-dim);
-    font-size: 13px;
-}
-
-.button--join {
-    margin-top: 0;
-    width: 150px;
-}
-
-/* Copy link and Copy code side by side: the link is for a chat window, the code is for a phone call. */
-.room-actions {
-    flex-direction: row;
-    justify-content: center;
-}
-
-.room-actions > .button {
-    margin-left: 6px;
-    margin-right: 6px;
+    padding: 0;
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-10);
+    letter-spacing: var(--mimas-tracking-11);
+    color: var(--mimas-fg-3);
 }
 
 .status {
-    margin-top: 18px;
+    margin: 0;
+    padding: 0;
+    min-height: 16px;
+    -unity-font-definition: var(--mimas-font-body);
+    font-size: var(--mimas-text-12);
+    color: var(--mimas-fg-3);
+    -unity-text-align: middle-center;
+    white-space: normal;
+}
+
+.button {
+    margin: 0;
+    padding: 0;
+    border-radius: 0;
+    border-width: 1px;
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-14);
+    letter-spacing: var(--mimas-tracking-15);
+    color: var(--mimas-fg);
+    -unity-text-align: middle-center;
+    white-space: nowrap;
+}
+
+.button:disabled {
+    opacity: 0.36;
+}
+
+/* Primary: a 1px `you` edge on `you` at 14% (Play vs bot, Ready). */
+.button--primary {
+    border-color: var(--mimas-you);
+    background-color: var(--mimas-you-14);
+}
+
+.button--primary:hover {
+    background-color: var(--mimas-you-18);
+}
+
+.button--primary:active {
+    background-color: var(--mimas-you-28);
+}
+
+/* Plain: bone at 22% on ink at 25% (Create room, Join room). */
+.button--plain {
+    border-color: var(--mimas-bone-22);
+    background-color: var(--mimas-ink-25);
+}
+
+.button--plain:hover {
+    border-color: var(--mimas-fg-3);
+    background-color: var(--mimas-hover);
+}
+
+.button--plain:active {
+    background-color: var(--mimas-you-10);
+}
+
+/* Quiet: type only, caps 12 in fg-2 (Copy link, Copy code, Leave room). */
+.button--quiet {
+    height: 28px;
+    padding: 0 26px;
+    border-width: 0;
+    background-color: var(--mimas-clear);
+    font-size: var(--mimas-text-12);
+    color: var(--mimas-fg-2);
+}
+
+.button--quiet:hover,
+.button--quiet:active {
+    background-color: var(--mimas-clear);
+    color: var(--mimas-fg);
+}
+
+/* A 52-tall field on `tile` with a 1px `hair` edge, body 15. */
+.field {
+    margin: 0;
+    padding: 0;
+}
+
+.field > .unity-base-text-field__input {
+    margin: 0;
+    padding: 0 16px;
+    height: 52px;
+    border-radius: 0;
+    border-width: 1px;
+    border-color: var(--mimas-hair);
+    background-color: var(--mimas-tile);
+    -unity-font-definition: var(--mimas-font-body);
+    font-size: var(--mimas-text-15);
+    color: var(--mimas-fg);
+    --unity-cursor-color: var(--mimas-fg);
+    --unity-selection-color: var(--mimas-you-28);
+}
+
+.field > .unity-base-text-field__input:hover {
+    border-color: var(--mimas-bone-22);
+}
+
+.field:focus > .unity-base-text-field__input,
+.field > .unity-base-text-field__input:focus {
+    border-color: var(--mimas-you-55);
+}
+
+.field .unity-base-text-field__input--placeholder {
+    color: var(--mimas-fg-3);
+}
+
+/* ---- the lobby (lobby.md §2) ---------------------------------------------------------------------- */
+
+.lb-panel {
+    align-items: center;
+    justify-content: center;
+}
+
+.lb-column {
+    width: 420px;
+}
+
+/* "MIMAS", display 38 at 0.6em. UI Toolkit adds no tracking after the last letter, so no padding balances it
+   (the canvas needed 0.6em on the left; here it pushed the word 12px right). */
+.lb-title {
     align-self: center;
-    color: var(--text-dim);
-    font-size: 13px;
-    letter-spacing: 1px;
-    min-height: 18px;
+    margin: 0 0 22px 0;
+    padding: 0;
+    -unity-font-definition: var(--mimas-font-display);
+    font-size: var(--mimas-text-38);
+    letter-spacing: var(--mimas-tracking-title);
+    color: var(--mimas-fg);
+    -unity-text-align: middle-center;
 }
 
-.server {
-    margin-top: 10px;
+/* The last result, caps 11: `you` for a win, `them` for a loss; hidden when there is none. */
+.lb-last {
+    display: none;
     align-self: center;
-    color: var(--text-faint);
-    font-size: 10px;
-    letter-spacing: 1px;
+    margin: -6px 0 48px 0;
+    padding: 0;
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-11);
+    letter-spacing: var(--mimas-tracking-11);
+    color: var(--mimas-you);
+    -unity-text-align: middle-center;
 }
 
-/* ---- room ------------------------------------------------------------------------------------- */
-
-.room-code {
-    align-self: center;
-    margin-bottom: 4px;
-    color: var(--accent);
-    font-size: 52px;
-    letter-spacing: 16px;
-    -unity-font-style: bold;
+.lb-last--visible {
+    display: flex;
 }
 
-.seats {
-    margin-top: 22px;
-    padding: 12px 14px;
-    background-color: var(--field);
-    border-radius: 12px;
+.lb-last--lost {
+    color: var(--mimas-them);
 }
 
-.seat {
-    color: var(--text);
-    font-size: 14px;
-    padding: 4px 0;
+.lb-caption {
+    margin-bottom: 10px;
 }
 
-.seat--ready {
-    color: var(--good);
+.lb-play-bot {
+    height: 52px;
+    margin-top: 30px;
 }
 
-.seat--empty {
-    color: var(--text-faint);
+.lb-create {
+    height: 52px;
+    margin-top: 12px;
 }
 
-/* ---- the lineage row (design #lineage; decided 22 Sep 2026) ------------------------------------ */
-/* Three gods side by side under the preset. The column is at most 480 px, so each card is a third of
-   it with the name, the one-line description and what it starts you with; under 400 px they stack. */
-
-/* USS has no media queries, so the row wraps instead: three across at 480 px, stacked when the column
-   is too narrow for a 120 px card. */
-.lineage-row {
+.lb-join-row {
     flex-direction: row;
-    flex-wrap: wrap;
+    justify-content: space-between;
+    margin-top: 12px;
+}
+
+/* The code field: display 20 at 0.5em, centred, "CODE" as its placeholder. */
+.lb-join-code {
+    width: 204px;
+}
+
+.lb-join-code > .unity-base-text-field__input {
+    padding: 0;
+    -unity-font-definition: var(--mimas-font-display);
+    font-size: var(--mimas-text-20);
+    letter-spacing: var(--mimas-tracking-code);
+    -unity-text-align: middle-center;
+}
+
+.lb-join {
+    width: 204px;
+    height: 52px;
+}
+
+.lb-status {
+    margin-top: 28px;
+}
+
+/* The socket URL, body 10, bone at 30%, 28 from the bottom. */
+.lb-server {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 28px;
+    margin: 0;
+    padding: 0;
+    -unity-font-definition: var(--mimas-font-body);
+    font-size: var(--mimas-text-10);
+    color: var(--mimas-bone-30);
+    -unity-text-align: middle-center;
+}
+
+/* ---- the room (lobby.md §3) ----------------------------------------------------------------------- */
+
+.room-head {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 64px;
+    align-items: center;
+}
+
+/* The four letters, display 56 at 0.5em: the only 56 in the game. */
+.room-code {
+    margin: 14px 0 0 0;
+    padding: 0;
+    -unity-font-definition: var(--mimas-font-display);
+    font-size: var(--mimas-text-56);
+    letter-spacing: var(--mimas-tracking-code);
+    color: var(--mimas-fg);
+    -unity-text-align: middle-center;
+}
+
+.room-copy-row {
+    flex-direction: row;
+    margin-top: 14px;
+}
+
+.room-copy-code {
+    margin-left: 26px;
+}
+
+/* You left, them right, a divider between: centred as one row so the sides stay put at any window width. */
+.room-seats {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 330px;
+    flex-direction: row;
+    justify-content: center;
+    align-items: flex-start;
+}
+
+.room-seat {
+    width: 520px;
+}
+
+.room-seat--them {
+    align-items: flex-end;
+}
+
+.room-divider {
+    width: 2px;
+    height: 420px;
+    margin: 10px 199px 0 199px;
+    -unity-background-scale-mode: stretch-to-fill;
+    -unity-background-image-tint-color: var(--mimas-hair);
+}
+
+.room-seat-caption {
+    margin: 0;
+    padding: 0;
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-11);
+    letter-spacing: var(--mimas-tracking-11);
+}
+
+.room-seat-caption--you {
+    color: var(--mimas-you);
+}
+
+.room-seat-caption--them {
+    color: var(--mimas-them);
+}
+
+.room-seat-name {
+    margin: 8px 0 0 0;
+    padding: 0;
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-28);
+    letter-spacing: var(--mimas-caps-tracking-wide);
+    color: var(--mimas-fg);
+}
+
+.room-seat-name--them {
+    color: var(--mimas-fg-2);
+    -unity-text-align: upper-right;
+}
+
+.room-seat--waiting .room-seat-name--them {
+    color: var(--mimas-fg-3);
+}
+
+.room-group-caption {
+    margin-top: 26px;
+    margin-bottom: 12px;
+}
+
+/* ---- gear: one tile per preset, sharing the 520 width, 8 apart ---- */
+
+.room-gear-tiles {
+    flex-direction: row;
+}
+
+.room-preset {
+    flex-grow: 1;
+    flex-basis: 0;
+    height: 74px;
+    margin: 0 0 0 8px;
+    padding: 0 6px;
+    border-radius: 0;
+    border-width: 1px;
+    border-color: var(--mimas-hair);
+    background-color: var(--mimas-tile);
+    align-items: center;
+    justify-content: center;
+}
+
+.room-preset--first {
+    margin-left: 0;
+}
+
+.room-preset:hover {
+    border-color: var(--mimas-bone-22);
+    background-color: var(--mimas-tile);
+}
+
+.room-preset--selected,
+.room-preset--selected:hover {
+    border-color: var(--mimas-you);
+    background-color: var(--mimas-you-10);
+}
+
+.room-preset:disabled {
+    opacity: 0.36;
+}
+
+.room-preset-glyphs {
+    flex-direction: row;
+}
+
+.room-preset-glyph {
+    width: 18px;
+    height: 18px;
+    margin: 0 5px;
+    --glyph-color: var(--mimas-fg-2);
+}
+
+.room-preset--selected .room-preset-glyph {
+    --glyph-color: var(--mimas-fg);
+}
+
+.room-preset-name {
+    margin: 9px 0 0 0;
+    padding: 0;
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-10);
+    letter-spacing: var(--mimas-caps-tracking-wide);
+    color: var(--mimas-fg-3);
+    -unity-text-align: middle-center;
+    white-space: normal;
+}
+
+.room-preset--selected .room-preset-name {
+    color: var(--mimas-fg);
+}
+
+/* ---- pray to: three rows 520 wide, 6 apart ---- */
+
+.room-lineage {
+    flex-direction: row;
+    align-items: center;
+    width: 520px;
+    margin: 6px 0 0 0;
+    padding: 12px 16px 12px 14px;
+    border-radius: 0;
+    border-width: 0 0 0 2px;
+    border-color: var(--mimas-clear);
+    background-color: var(--mimas-ink-25);
+    white-space: normal;
+}
+
+.room-lineage--first {
+    margin-top: 0;
+}
+
+.room-lineage:hover {
+    background-color: var(--mimas-hover);
+}
+
+.room-lineage--selected,
+.room-lineage--selected:hover {
+    border-color: var(--mimas-you);
+    background-color: var(--mimas-you-07);
+}
+
+.room-lineage:disabled {
+    opacity: 0.36;
+}
+
+.room-lineage-swatch {
+    width: 52px;
+    height: 52px;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    -unity-background-scale-mode: stretch-to-fill;
+}
+
+.room-lineage-emblem {
+    width: 26px;
+    height: 26px;
+    --glyph-color: var(--mimas-fg);
+    --glyph-stroke: 1.3;
+}
+
+.room-lineage-text {
+    flex-shrink: 1;
+    flex-grow: 1;
+    margin-left: 16px;
+}
+
+.room-lineage-name {
+    margin: 0;
+    padding: 0;
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-15);
+    letter-spacing: var(--mimas-tracking-15);
+    color: var(--mimas-fg-2);
+    -unity-text-align: upper-left;
+}
+
+.room-lineage-line {
+    margin: 6px 0 0 0;
+    padding: 0;
+    -unity-font-definition: var(--mimas-font-body);
+    font-size: var(--mimas-text-12);
+    color: var(--mimas-fg-3);
+    -unity-text-align: upper-left;
+    white-space: normal;
+}
+
+.room-lineage-blessing {
+    flex-direction: row;
+    align-items: center;
     margin-top: 6px;
 }
 
-.lineage {
-    flex-grow: 1;
-    flex-basis: 120px;
-    margin-left: 4px;
-    margin-right: 4px;
-    margin-top: 4px;
-    padding: 10px 8px;
-    font-size: 13px;
-    letter-spacing: 0;
-    white-space: normal;
-    -unity-text-align: upper-left;
-    color: var(--text-dim);
+.room-lineage-blessing-glyph {
+    width: 9px;
+    height: 9px;
+    --glyph-color: var(--mimas-fg-3);
 }
 
-.lineage--selected {
-    background-color: var(--accent-soft);
-    border-color: var(--accent);
-    color: var(--text);
+.room-lineage-blessing-text {
+    margin: 0 0 0 8px;
+    padding: 0;
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-10);
+    letter-spacing: var(--mimas-caps-tracking-wide);
+    color: var(--mimas-fg-3);
+    -unity-text-align: upper-left;
+}
+
+/* Selected: the name and the Blessing line brighten. */
+.room-lineage--selected .room-lineage-name {
+    color: var(--mimas-fg);
+}
+
+.room-lineage--selected .room-lineage-line {
+    color: var(--mimas-fg-2);
+}
+
+.room-lineage--selected .room-lineage-blessing-glyph {
+    --glyph-color: var(--mimas-you);
+}
+
+.room-lineage--selected .room-lineage-blessing-text {
+    color: var(--mimas-you);
+}
+
+/* ---- them: a name, a dot and READY / CHOOSING, and one note ---- */
+
+.room-them-state {
+    flex-direction: row;
+    align-items: center;
+    margin-top: 26px;
+}
+
+.room-them-dot {
+    width: 9px;
+    height: 9px;
+    margin-right: 12px;
+    border-radius: 5px;
+    border-width: 1px;
+    border-color: var(--mimas-them);
+    background-color: var(--mimas-clear);
+}
+
+.room-them-dot--ready {
+    background-color: var(--mimas-them);
+}
+
+.room-them-state-text {
+    margin: 0;
+    padding: 0;
+    -unity-font-definition: var(--mimas-font-caps);
+    font-size: var(--mimas-text-13);
+    letter-spacing: var(--mimas-tracking-11);
+    color: var(--mimas-them);
+}
+
+.room-them-note {
+    max-width: 300px;
+    margin: 26px 0 0 0;
+    padding: 0;
+    -unity-font-definition: var(--mimas-font-body);
+    font-size: var(--mimas-text-12);
+    color: var(--mimas-fg-3);
+    -unity-text-align: upper-right;
+    white-space: normal;
+}
+
+/* An empty seat shows only its waiting line. */
+.room-seat--waiting .room-them-state,
+.room-seat--waiting .room-them-note {
+    display: none;
+}
+
+/* ---- the foot: Ready, Leave, the status line ---- */
+
+.room-foot {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 70px;
+    align-items: center;
+}
+
+/* Ready is the one 320-wide button (language §4 button): caps 15 at 0.28em. */
+.room-ready {
+    width: 320px;
+    height: 58px;
+    font-size: var(--mimas-text-15);
+    letter-spacing: var(--mimas-tracking-11);
+}
+
+.room-leave {
+    margin-top: 14px;
+}
+
+.room-status {
+    margin-top: 14px;
 }

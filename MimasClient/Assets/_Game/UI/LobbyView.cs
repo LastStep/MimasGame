@@ -22,14 +22,19 @@ namespace Mimas.Client.UI
     /// them in the order they clicked, which is a coordination problem wearing a matchmaking hat.
     /// </para>
     /// </summary>
+    /// <para>
+    /// The look is the ink language (docs/ui/lobby.md, T-0014): one column for the lobby; the room as two seats
+    /// facing — you always on the left whichever seat you hold, the other seat only a name and whether it is ready —
+    /// with your gear as one tile per preset and the three lineages as rows. The state machine is unchanged.
+    /// </para>
     [DisallowMultipleComponent]
     [RequireComponent(typeof(UIDocument))]
     public sealed class LobbyView : MonoBehaviour
     {
-        [Tooltip("The kits the room's dropdown offers. Assets/_Game/Settings/LoadoutPresets.asset.")]
+        [Tooltip("The kits the room's gear tiles offer, one tile each. Assets/_Game/Settings/LoadoutPresets.asset.")]
         [SerializeField] private LoadoutPresets _presets;
 
-        [Tooltip("Where the lineage row's names, descriptions and starting Blessings come from. The Content object in this scene.")]
+        [Tooltip("Where the lineage rows' names, descriptions, hues and starting Blessings come from. The Content object in this scene.")]
         [SerializeField] private ContentBootstrap _content;
 
         [Tooltip("Scene loaded when the match starts.")]
@@ -38,6 +43,7 @@ namespace Mimas.Client.UI
         private UIDocument _document;
         private NetClient _net;
 
+        private VisualElement _wash;
         private VisualElement _lobbyPanel;
         private VisualElement _roomPanel;
         private TextField _name;
@@ -52,12 +58,18 @@ namespace Mimas.Client.UI
         private Label _roomCode;
         private Button _copyLink;
         private Button _copyCode;
-        private Label _seat0;
-        private Label _seat1;
-        private DropdownField _preset;
-        private VisualElement _lineageRow;
-        private readonly Button[] _lineageButtons = new Button[LineageSlots];
-        private readonly Action[] _lineageHandlers = new Action[LineageSlots];
+        private Label _youName;
+        private VisualElement _them;
+        private Label _themName;
+        private VisualElement _themDot;
+        private Label _themState;
+        private VisualElement _divider;
+        private VisualElement _gearTiles;
+        private readonly List<Button> _presetTiles = new List<Button>();
+        private readonly List<Action> _presetHandlers = new List<Action>();
+        private VisualElement _godRows;
+        private readonly List<Button> _lineageButtons = new List<Button>();
+        private readonly List<Action> _lineageHandlers = new List<Action>();
         private readonly List<LineageDef> _lineages = new List<LineageDef>();
         private Button _ready;
         private Button _leaveRoom;
@@ -65,11 +77,14 @@ namespace Mimas.Client.UI
 
         private const int LineageSlots = 3;
 
+        /// <summary><c>--mimas-ink</c>, which the lobby's wash is mixed onto (USS variables cannot be read from C#).</summary>
+        private static readonly Color Ink = new Color32(11, 11, 14, 255);
+
         private string _code;
         private string _lineage;
         private int _mySeat;
         private bool _inRoom;
-        private bool _isReady;
+        private RoomChoice _choice = new RoomChoice(0);
         private bool _busy;
         private bool _loading;
         private bool _bound;
@@ -141,10 +156,8 @@ namespace Mimas.Client.UI
                 JObject room = _net.ConsumePendingRoom();
                 if (room != null)
                 {
-                    _isReady = false;
-                    _ready.text = "Ready";
-                    _preset.SetEnabled(true);
-                    SetLineageRowEnabled(true);
+                    _choice.UnReady();
+                    ApplyReadyState();
                     ShowRoom(room);
                     SetRoomStatus(ResultLine(result, OpponentPresent(room)));
                     return;
@@ -168,34 +181,38 @@ namespace Mimas.Client.UI
             VisualElement root = _document != null ? _document.rootVisualElement : null;
             if (root == null) return false;
 
+            _wash = root.Q<VisualElement>("lb.wash");
             _lobbyPanel = root.Q<VisualElement>("lobby-panel");
             _roomPanel = root.Q<VisualElement>("room-panel");
-            _name = root.Q<TextField>("name");
-            _joinCode = root.Q<TextField>("join-code");
-            _playBot = root.Q<Button>("play-bot");
-            _createRoom = root.Q<Button>("create-room");
-            _joinRoom = root.Q<Button>("join-room");
-            _status = root.Q<Label>("status");
-            _server = root.Q<Label>("server");
-            _lastResult = root.Q<Label>("last-result");
+            _name = root.Q<TextField>("lb.name");
+            _joinCode = root.Q<TextField>("lb.join.code");
+            _playBot = root.Q<Button>("lb.play-bot");
+            _createRoom = root.Q<Button>("lb.create");
+            _joinRoom = root.Q<Button>("lb.join");
+            _status = root.Q<Label>("lb.status");
+            _server = root.Q<Label>("lb.server");
+            _lastResult = root.Q<Label>("lb.last");
 
-            _roomCode = root.Q<Label>("room-code");
-            _copyLink = root.Q<Button>("copy-link");
-            _copyCode = root.Q<Button>("copy-code");
-            _seat0 = root.Q<Label>("seat-0");
-            _seat1 = root.Q<Label>("seat-1");
-            _preset = root.Q<DropdownField>("preset");
-            _lineageRow = root.Q<VisualElement>("lineage-row");
-            for (int i = 0; i < LineageSlots; i++) _lineageButtons[i] = root.Q<Button>("lineage-" + i);
-            _ready = root.Q<Button>("ready");
-            _leaveRoom = root.Q<Button>("leave-room");
-            _roomStatus = root.Q<Label>("room-status");
+            _roomCode = root.Q<Label>("room.code");
+            _copyLink = root.Q<Button>("room.copy-link");
+            _copyCode = root.Q<Button>("room.copy-code");
+            _youName = root.Q<Label>("room.you.name");
+            _them = root.Q<VisualElement>("room.them");
+            _themName = root.Q<Label>("room.them.name");
+            _themDot = root.Q<VisualElement>("room.them.state.dot");
+            _themState = root.Q<Label>("room.them.state.text");
+            _divider = root.Q<VisualElement>("room.divider");
+            _gearTiles = root.Q<VisualElement>("room.gear.tiles");
+            _godRows = root.Q<VisualElement>("room.god.rows");
+            _ready = root.Q<Button>("room.ready");
+            _leaveRoom = root.Q<Button>("room.leave");
+            _roomStatus = root.Q<Label>("room.status");
 
-            if (_lobbyPanel == null || _roomPanel == null || _name == null || _joinCode == null || _playBot == null
+            if (_wash == null || _lobbyPanel == null || _roomPanel == null || _name == null || _joinCode == null || _playBot == null
                 || _createRoom == null || _joinRoom == null || _status == null || _server == null || _lastResult == null
-                || _roomCode == null || _copyLink == null || _copyCode == null || _seat0 == null || _seat1 == null || _preset == null
-                || _ready == null || _leaveRoom == null || _roomStatus == null || _lineageRow == null
-                || Array.IndexOf(_lineageButtons, null) >= 0)
+                || _roomCode == null || _copyLink == null || _copyCode == null || _youName == null || _them == null
+                || _themName == null || _themDot == null || _themState == null || _divider == null || _gearTiles == null
+                || _godRows == null || _ready == null || _leaveRoom == null || _roomStatus == null)
             {
                 Debug.LogError("[LobbyView] Lobby.uxml is missing one of the named elements.", this);
                 enabled = false;
@@ -206,10 +223,12 @@ namespace Mimas.Client.UI
                 ? "Guest-" + UnityEngine.Random.Range(1000, 10000)
                 : _net.PlayerName;
 
-            _preset.choices = _presets != null ? _presets.Names() : new List<string>();
-            if (_preset.choices.Count > 0) _preset.index = 0;
+            // The lobby is the first screen, so its fonts are repaired here, before any of its text is drawn.
+            FontSpacing.RepairLoaded();
 
+            BuildPresetTiles();
             BindLineages();
+            _divider.style.backgroundImage = new StyleBackground(Ramps.BothEndsVertical(0.2f));
 
             _server.text = _net != null ? _net.ResolvedUrl : "";
 
@@ -220,13 +239,6 @@ namespace Mimas.Client.UI
             _copyCode.clicked += HandleCopyCode;
             _ready.clicked += HandleReady;
             _leaveRoom.clicked += HandleLeaveRoom;
-            _preset.RegisterValueChangedCallback(HandlePresetChanged);
-            for (int i = 0; i < LineageSlots; i++)
-            {
-                int slot = i;
-                _lineageHandlers[i] = () => HandleLineageClicked(slot);
-                _lineageButtons[i].clicked += _lineageHandlers[i];
-            }
 
             // Room codes are upper case everywhere; typing them in lower case should still work.
             _joinCode.RegisterValueChangedCallback(e =>
@@ -261,9 +273,8 @@ namespace Mimas.Client.UI
             _copyCode.clicked -= HandleCopyCode;
             _ready.clicked -= HandleReady;
             _leaveRoom.clicked -= HandleLeaveRoom;
-            _preset.UnregisterValueChangedCallback(HandlePresetChanged);
-            for (int i = 0; i < LineageSlots; i++)
-                if (_lineageHandlers[i] != null) _lineageButtons[i].clicked -= _lineageHandlers[i];
+            for (int i = 0; i < _presetTiles.Count; i++) _presetTiles[i].clicked -= _presetHandlers[i];
+            for (int i = 0; i < _lineageButtons.Count; i++) _lineageButtons[i].clicked -= _lineageHandlers[i];
             _bound = false;
         }
 
@@ -343,7 +354,7 @@ namespace Mimas.Client.UI
         {
             if (_net == null || !_inRoom) return;
 
-            LoadoutPresets.Entry entry = _presets != null ? _presets.Get(Mathf.Max(0, _preset.index)) : null;
+            LoadoutPresets.Entry entry = _presets != null ? _presets.Get(_choice.PresetIndex) : null;
             if (entry == null)
             {
                 SetRoomStatus("No loadout presets are configured.");
@@ -357,17 +368,80 @@ namespace Mimas.Client.UI
                 return;
             }
 
-            _isReady = !_isReady;
-            _net.Send(Messages.RoomLoadout, BuildLoadout(_isReady));
-            _ready.text = _isReady ? "Not ready" : "Ready";
-            _preset.SetEnabled(!_isReady);
-            SetLineageRowEnabled(!_isReady);
+            bool ready = _choice.ToggleReady();
+            _net.Send(Messages.RoomLoadout, BuildLoadout(ready));
+            ApplyReadyState();
         }
 
-        /// <summary>Changing your mind about gear un-readies you, so the match cannot start on a stale choice.</summary>
-        private void HandlePresetChanged(ChangeEvent<string> e)
+        /// <summary>
+        /// A gear tile: selects it, and — as the dropdown's change did — un-readies you, so the match cannot start on a
+        /// stale choice. The tiles are disabled while you are ready, so in practice the un-ready never has work to do.
+        /// </summary>
+        private void HandlePresetClicked(int index)
         {
+            if (!_choice.SelectPreset(index)) return;
+            RefreshPresetTiles();
             UnReady();
+        }
+
+        /// <summary>Ready's label and what it locks: the gear tiles and the lineage rows are disabled while you are ready.</summary>
+        private void ApplyReadyState()
+        {
+            _ready.text = _choice.Ready ? "NOT READY" : "READY";
+            for (int i = 0; i < _presetTiles.Count; i++) _presetTiles[i].SetEnabled(!_choice.Ready);
+            SetLineageRowEnabled(!_choice.Ready);
+        }
+
+        // ---- gear: one tile per preset (docs/ui/lobby.md §3 room.preset[i]; spec H §8) -------------------
+
+        /// <summary>
+        /// One tile per <see cref="LoadoutPresets"/> entry, however many there are, sharing the row: the weapon's and
+        /// the boots' slot glyphs over the preset's name. The first is selected on every scene load, as the dropdown's
+        /// was.
+        /// </summary>
+        private void BuildPresetTiles()
+        {
+            _gearTiles.Clear();
+            _presetTiles.Clear();
+            _presetHandlers.Clear();
+            int count = _presets != null ? _presets.Count : 0;
+            _choice = new RoomChoice(count);
+
+            for (int i = 0; i < count; i++)
+            {
+                LoadoutPresets.Entry entry = _presets.Get(i);
+                var tile = new Button { name = "room.preset[" + i + "]", text = string.Empty };
+                tile.AddToClassList("room-preset");
+                if (i == 0) tile.AddToClassList("room-preset--first");
+
+                var glyphs = new VisualElement { pickingMode = PickingMode.Ignore };
+                glyphs.AddToClassList("room-preset-glyphs");
+                var weapon = new Glyph(HoverContents.SlotShape("weapon"));
+                weapon.AddToClassList("room-preset-glyph");
+                var boots = new Glyph(HoverContents.SlotShape("boots"));
+                boots.AddToClassList("room-preset-glyph");
+                glyphs.Add(weapon);
+                glyphs.Add(boots);
+                tile.Add(glyphs);
+
+                var label = new Label((entry != null ? entry.Name : string.Empty).ToUpperInvariant()) { pickingMode = PickingMode.Ignore };
+                label.AddToClassList("room-preset-name");
+                tile.Add(label);
+
+                int index = i;
+                Action handler = () => HandlePresetClicked(index);
+                tile.clicked += handler;
+                _presetTiles.Add(tile);
+                _presetHandlers.Add(handler);
+                _gearTiles.Add(tile);
+            }
+            RefreshPresetTiles();
+        }
+
+        private void RefreshPresetTiles()
+        {
+            for (int i = 0; i < _presetTiles.Count; i++)
+                _presetTiles[i].EnableInClassList("room-preset--selected", i == _choice.PresetIndex);
         }
 
         /// <summary>Changing your god does exactly what changing your gear does, and is remembered the same way.</summary>
@@ -385,17 +459,14 @@ namespace Mimas.Client.UI
 
         private void UnReady()
         {
-            if (!_isReady) return;
-            _isReady = false;
-            _ready.text = "Ready";
-            _preset.SetEnabled(true);
-            SetLineageRowEnabled(true);
+            if (!_choice.UnReady()) return;
+            ApplyReadyState();
             if (_net != null) _net.Send(Messages.RoomLoadout, BuildLoadout(false));
         }
 
         private JObject BuildLoadout(bool ready)
         {
-            LoadoutPresets.Entry entry = _presets != null ? _presets.Get(Mathf.Max(0, _preset.index)) : null;
+            LoadoutPresets.Entry entry = _presets != null ? _presets.Get(_choice.PresetIndex) : null;
             var loadout = new JObject();
             if (entry != null)
             {
@@ -407,11 +478,13 @@ namespace Mimas.Client.UI
             return new JObject { ["loadout"] = loadout, ["lineage"] = _lineage ?? "", ["ready"] = ready };
         }
 
-        // ---- the lineage row (design: #lineage; decided 22 Sep 2026, P1) --------------------------------
+        // ---- pray to: the lineage rows (design: #lineage; docs/ui/lobby.md §3 room.lineage[i]) ------------
 
         /// <summary>
-        /// Fills the three buttons from the catalogue, in id order. Nothing about a lineage is written in
-        /// C#: the name, the line under it and the Blessing it starts you with are all data (golden rule 5).
+        /// One row per lineage — the catalogue's first three, in id order — each a swatch in the lineage's hues with
+        /// its emblem, the name, its line and the Blessing it starts you with. Nothing about a lineage is written in
+        /// C#: the name, the line, the hues and the Blessing are all data (golden rule 5). The same hues wash the
+        /// lobby's ground (<c>lb.wash</c>).
         /// </summary>
         private void BindLineages()
         {
@@ -425,23 +498,73 @@ namespace Mimas.Client.UI
             }
             else
             {
-                Debug.LogWarning("[LobbyView] No ContentBootstrap; the lineage row cannot be filled.", this);
+                Debug.LogWarning("[LobbyView] No ContentBootstrap; the lineage rows cannot be filled.", this);
             }
 
             _lineage = PlayerPrefs.GetString(NetClient.LineagePref, "");
             if (_lineages.Count > 0 && !_lineages.Exists(l => l.Id == _lineage)) _lineage = _lineages[0].Id;
 
-            for (int i = 0; i < LineageSlots; i++)
+            _godRows.Clear();
+            _lineageButtons.Clear();
+            _lineageHandlers.Clear();
+            var washes = new List<Color>();
+            for (int i = 0; i < _lineages.Count; i++)
             {
-                bool has = i < _lineages.Count;
-                _lineageButtons[i].style.display = has ? DisplayStyle.Flex : DisplayStyle.None;
-                if (!has) continue;
                 LineageDef lineage = _lineages[i];
+                Color dark, light;
+                bool hued = ColorUtility.TryParseHtmlString(lineage.HueDark ?? string.Empty, out dark)
+                    & ColorUtility.TryParseHtmlString(lineage.HueLight ?? string.Empty, out light);
+                if (hued) washes.Add(dark);
+
+                string id = "room.lineage[" + i + "]";
+                var row = new Button { name = id, text = string.Empty };
+                row.AddToClassList("room-lineage");
+                if (i == 0) row.AddToClassList("room-lineage--first");
+
+                var swatch = new VisualElement { name = id + ".swatch", pickingMode = PickingMode.Ignore };
+                swatch.AddToClassList("room-lineage-swatch");
+                if (hued) swatch.style.backgroundImage = new StyleBackground(Ramps.Swatch(dark, light));
+                var emblem = new Glyph(ExamineModelBuilder.EmblemOf(lineage)) { name = id + ".emblem" };
+                emblem.AddToClassList("room-lineage-emblem");
+                swatch.Add(emblem);
+                row.Add(swatch);
+
+                var text = new VisualElement { pickingMode = PickingMode.Ignore };
+                text.AddToClassList("room-lineage-text");
+                text.Add(Text(id + ".name", (lineage.Name ?? lineage.Id).ToUpperInvariant(), "room-lineage-name"));
+                if (!string.IsNullOrEmpty(lineage.Description))
+                    text.Add(Text(id + ".line", lineage.Description, "room-lineage-line"));
                 string blessing = BlessingName(catalog, lineage);
-                _lineageButtons[i].text = lineage.Name + "\n" + lineage.Description
-                    + (blessing != null ? "\nStarts with " + blessing : "");
+                if (blessing != null)
+                {
+                    var starts = new VisualElement { name = id + ".blessing", pickingMode = PickingMode.Ignore };
+                    starts.AddToClassList("room-lineage-blessing");
+                    var circle = new Glyph("blessing") { Filled = true };
+                    circle.AddToClassList("room-lineage-blessing-glyph");
+                    starts.Add(circle);
+                    starts.Add(Text(null, ("Starts with " + blessing).ToUpperInvariant(), "room-lineage-blessing-text"));
+                    text.Add(starts);
+                }
+                row.Add(text);
+
+                int slot = i;
+                Action handler = () => HandleLineageClicked(slot);
+                row.clicked += handler;
+                _lineageButtons.Add(row);
+                _lineageHandlers.Add(handler);
+                _godRows.Add(row);
             }
+
+            _wash.style.backgroundImage = washes.Count > 0 ? new StyleBackground(Ramps.LobbyWash(washes, Ink)) : new StyleBackground(StyleKeyword.None);
             RefreshLineageRow();
+        }
+
+        private static Label Text(string name, string text, string className)
+        {
+            var label = new Label(text) { pickingMode = PickingMode.Ignore };
+            if (name != null) label.name = name;
+            label.AddToClassList(className);
+            return label;
         }
 
         private static string BlessingName(ContentCatalog catalog, LineageDef lineage)
@@ -453,13 +576,13 @@ namespace Mimas.Client.UI
 
         private void RefreshLineageRow()
         {
-            for (int i = 0; i < LineageSlots; i++)
-                _lineageButtons[i].EnableInClassList("lineage--selected", i < _lineages.Count && _lineages[i].Id == _lineage);
+            for (int i = 0; i < _lineageButtons.Count; i++)
+                _lineageButtons[i].EnableInClassList("room-lineage--selected", i < _lineages.Count && _lineages[i].Id == _lineage);
         }
 
         private void SetLineageRowEnabled(bool enabled)
         {
-            for (int i = 0; i < LineageSlots; i++) _lineageButtons[i].SetEnabled(enabled);
+            for (int i = 0; i < _lineageButtons.Count; i++) _lineageButtons[i].SetEnabled(enabled);
         }
 
         private void HandleLeaveRoom()
@@ -532,7 +655,8 @@ namespace Mimas.Client.UI
 
                 case Messages.RoomLeft:
                     _inRoom = false;
-                    _isReady = false;
+                    _choice.UnReady();
+                    ApplyReadyState();
                     _code = null;
                     ShowLobby();
                     break;
@@ -584,7 +708,8 @@ namespace Mimas.Client.UI
             if (!_bound) return;
             _busy = false;
             _inRoom = false;
-            _isReady = false;
+            _choice.UnReady();
+            ApplyReadyState();
             SetButtonsEnabled(true);
             ShowLobby();
             SetStatus("Match lost");
@@ -629,23 +754,48 @@ namespace Mimas.Client.UI
             SetStatus("");
 
             var seats = p["seats"] as JArray;
-            if (seats != null && seats.Count == 2)
-            {
-                DrawSeat(_seat0, seats[0] as JObject, 0);
-                DrawSeat(_seat1, seats[1] as JObject, 1);
-            }
+            bool waitingForSomeone = DrawSeats(seats);
+            SetRoomStatus(waitingForSomeone ? "Send the code to a friend." : _choice.Ready ? "Waiting for your opponent…" : "Pick your gear and your god.");
+        }
 
-            bool waitingForSomeone = seats != null && seats.Count == 2 && !(seats[1 - _mySeat] as JObject).Value<bool>("present");
-            SetRoomStatus(waitingForSomeone ? "Send the code to a friend." : _isReady ? "Waiting for your opponent…" : "Pick your gear and your god.");
+        /// <summary>
+        /// You on the left, whichever seat you hold; them on the right with only a name and whether they are ready
+        /// (docs/ui/lobby.md §3). A seat the server sent nothing for reads as empty rather than throwing. Returns
+        /// whether the other seat is waiting for a player.
+        /// </summary>
+        private bool DrawSeats(JArray seats)
+        {
+            RoomSeat you = ReadSeat(seats, RoomLayout.LeftSeat(_mySeat));
+            string myName = you != null && !string.IsNullOrEmpty(you.Name) ? you.Name : _net != null ? _net.PlayerName : null;
+            _youName.text = (string.IsNullOrEmpty(myName) ? "You" : myName).ToUpperInvariant();
+
+            OtherSeatText other = RoomLayout.Other(ReadSeat(seats, RoomLayout.RightSeat(_mySeat)));
+            _themName.text = other.Name;
+            _themState.text = other.State;
+            _themDot.EnableInClassList("room-them-dot--ready", other.Ready);
+            _them.EnableInClassList("room-seat--waiting", other.Waiting);
+            return other.Waiting;
+        }
+
+        private static RoomSeat ReadSeat(JArray seats, int index)
+        {
+            if (seats == null || index < 0 || index >= seats.Count) return null;
+            var seat = seats[index] as JObject;
+            if (seat == null) return null;
+            return new RoomSeat
+            {
+                Name = seat.Value<string>("name"),
+                Present = seat.Value<bool>("present"),
+                Ready = seat.Value<bool>("ready"),
+                Bot = seat.Value<bool>("bot"),
+            };
         }
 
         /// <summary>Is the other seat still filled? A room whose opponent left is still a room.</summary>
         private bool OpponentPresent(JObject room)
         {
-            var seats = room["seats"] as JArray;
-            if (seats == null || seats.Count != 2) return false;
-            var other = seats[1 - room.Value<int>("youAre")] as JObject;
-            return other != null && other.Value<bool>("present");
+            RoomSeat other = ReadSeat(room["seats"] as JArray, RoomLayout.RightSeat(room.Value<int>("youAre")));
+            return other != null && other.Present;
         }
 
         /// <summary>
@@ -662,35 +812,19 @@ namespace Mimas.Client.UI
             return line + tail;
         }
 
-        private void DrawSeat(Label label, JObject seat, int index)
-        {
-            if (seat == null) return;
-            string name = seat.Value<string>("name");
-            bool present = seat.Value<bool>("present");
-            bool ready = seat.Value<bool>("ready");
-            bool bot = seat.Value<bool>("bot");
-
-            string who = string.IsNullOrEmpty(name) ? "Waiting for a player…" : name;
-            if (index == _mySeat) who += "  (you)";
-
-            string state = !present ? "" : ready ? "  ·  Ready" : bot ? "" : "  ·  Choosing…";
-            label.text = who + state;
-            label.EnableInClassList("seat--ready", present && ready);
-            label.EnableInClassList("seat--empty", !present);
-        }
-
+        /// <summary>"VICTORY VS GUEST-2869 · SERIES 2 – 1" in `you` for a win, `them` for a loss; hidden when there is none.</summary>
         private void ShowLastResult()
         {
             MatchResult result = _net != null ? _net.LastResult : null;
             bool has = result != null;
             if (has)
             {
-                string line = (result.Won ? "Victory" : "Defeat") + " vs " + (result.OpponentName ?? "opponent");
-                if (!string.IsNullOrEmpty(result.Reason)) line += "  ·  " + result.Reason;
-                _lastResult.text = line;
+                _lastResult.text = RoomLayout.LastResultLine(result.Won, result.OpponentName, result.HasScore,
+                    result.ScoreMine, result.ScoreTheirs, result.Reason);
+                _lastResult.EnableInClassList("lb-last--lost", !result.Won);
                 _net.LastResult = null;
             }
-            _lastResult.EnableInClassList("last-result--visible", has);
+            _lastResult.EnableInClassList("lb-last--visible", has);
         }
 
         private void SetButtonsEnabled(bool enabled)

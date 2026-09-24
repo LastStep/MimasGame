@@ -295,6 +295,9 @@ namespace Mimas.Client.Presentation
                 Won = session != null ? session.Winner == LocalPlayer : Rules != null && Rules.Winner == LocalPlayer,
                 Reason = _moment != null ? _moment.Reason : null,
                 OpponentName = OpponentName,
+                HasScore = session != null,
+                ScoreMine = ScoreMine,
+                ScoreTheirs = ScoreTheirs,
             };
             net.ForgetMatch();
             SceneManager.LoadScene("Lobby");
