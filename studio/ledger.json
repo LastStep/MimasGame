@@ -1,6 +1,6 @@
 {
   "project": "mimas",
-  "updated": "2026-09-17",
+  "updated": "2026-09-24",
   "note": "Seeded 17 Sep 2026 from the done-when in docs/roadmap.md, then realigned the same day to the decisions locked in docs/specs/2026-09-17-online-slice.md (ADR-026..028). M2-2 is worded neutrally because how two players meet -- queue or room codes -- is open as OPT-0001. Criteria are written once and then only `passes` moves, flipped by the verifier through `node tools/ledger.mjs pass` with evidence. M1 entries are marked passing from the 15 Sep milestone and the 16 Sep playtest; everything else starts false, including work that looks finished, because no verifier has been through it.",
   "criteria": [
     {
@@ -77,11 +77,11 @@
       "id": "M2-4",
       "milestone": "M2",
       "text": "The turn clock is server-authoritative and a timeout arrives as EndTurnCommand(Timeout), resolved by the rules like any other command",
-      "passes": false,
-      "passed_by": null,
-      "passed_at": null,
-      "task": null,
-      "evidence": null
+      "passes": true,
+      "passed_by": "verifier",
+      "passed_at": "2026-09-24",
+      "task": "T-0002",
+      "evidence": "Verifier 24 Sep (R-2026-09-17-T-0002): Room.cs:373 at 9291363 applies EndTurnCommand(Timeout) through TryApply; server test Turn_TimesOut_ServerEndsTurn over real sockets; Rules_ShippedFile_HasTheClock (30000 ms); live 30 s timeout in the Editor server log (room QC5S); rung 5 green at HEAD 0a46b79 (60/60)"
     },
     {
       "id": "M2-5",
@@ -97,11 +97,11 @@
       "id": "M2-6",
       "milestone": "M2",
       "text": "Resign and disconnect-forfeit both end the match with the right result, through ResignCommand",
-      "passes": false,
-      "passed_by": null,
-      "passed_at": null,
-      "task": null,
-      "evidence": null
+      "passes": true,
+      "passed_by": "verifier",
+      "passed_at": "2026-09-24",
+      "task": "T-0002",
+      "evidence": "Verifier 24 Sep (R-2026-09-17-T-0002): MatchState.ApplyResign ends with Resign/Forfeit; Room.cs:394 at 9291363 applies ResignCommand(Disconnect) after the grace; server tests Resign_EndsMatch_OpponentWins (winner 1, resign) and Disconnect_BeyondGrace_Forfeit (winner 0, forfeit); Core Resign_Disconnect_EndsWithForfeit; artifacts/online-result.png; green at HEAD 0a46b79. Separate defect filed: a crafted room.leave mid-match bypasses both paths (Room.Leave has no phase guard)"
     },
     {
       "id": "M2-7",
