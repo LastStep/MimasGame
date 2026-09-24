@@ -101,6 +101,12 @@ fixed) — fixed in `FontSpacing`. Run report `studio/runs/R-2026-09-24-T-0014.m
 
 ## The one thing to do next
 
+**Next agent session (Rohan, 24 Sep): the parallel verification round** — one fresh `verifier` per task at `verify`
+(T-0014, T-0013, T-0011, T-0012, T-0008, T-0007, T-0002, T-0001), all at once, findings into one round report. How to
+run it safely in parallel (ladder by the lead first, no Unity for verifiers, ledger flips one at a time) and the
+prompt for each verifier: **`studio/plans/2026-09-24-parallel-verification.md`**. T-0010 needs a builder's five
+captures first; that can run beside the round.
+
 1. **The M2 playtest, which only Rohan can do:** send the link to one person who is not Rohan, on another
    network, and play them — now a best-of-3 with a draft. That one evening is M2-1, the step-4 evidence for
    M2-7, and M2-8 with a human on the other seat. Record it as `studio/playtests/<date>-<name>.md`.
