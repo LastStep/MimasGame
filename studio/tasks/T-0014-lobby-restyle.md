@@ -5,7 +5,7 @@ project: mimas
 feature: F-hud-restyle
 milestone: M4
 lane: full
-status: running
+status: verify
 owner: builder
 model: opus
 worktree:
@@ -32,7 +32,7 @@ done_when:
   - "Docs: design #presentation Lobby; the UI book status; architecture; STATE; run report"
 created: 2026-09-23
 started: 2026-09-24
-finished:
+finished: 2026-09-24
 cost_usd: 0
 blocked_by:
 ---
@@ -58,4 +58,5 @@ Anything in the Arena; remembering the preset across scene loads; showing the ot
 ## Notes
 
 - 23 Sep 2026: Rohan approved T-0013 only; this task stays at `plan` until he has seen T-0013 built.
-- 24 Sep 2026: Rohan approved it in chat ("lets execute t-0014"); running.
+- 24 Sep 2026: Rohan approved it in chat ("lets execute t-0014"); built the same day, at `verify`. Run report
+  `studio/runs/R-2026-09-24-T-0014.md`.

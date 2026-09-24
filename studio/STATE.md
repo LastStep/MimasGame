@@ -2,7 +2,7 @@
 project: mimas
 milestone: M2
 updated: 2026-09-24
-updated_by: opus — T-0013 at verify (Web build 12.51 MiB, smoke ×3, EditMode 34/34; a browser-only 720 layout loop found and fixed)
+updated_by: opus — T-0014 at verify (the lobby and the room in ink; EditMode 40/40, Web build 12.51 MiB, smoke ×3, seat 2 from the browser)
 ---
 
 # Where Mimas stands
@@ -84,7 +84,19 @@ it stays gone across the series); boons down the right; the attack preview as th
 serif gone; the Arena on black. Captures `artifacts/t0013/shots/` (Editor, both sizes) and
 `artifacts/t0013/browser-hud/` (the Web build). Run report `studio/runs/R-2026-09-23-T-0013.md`.
 
-**473 Core tests, 60 server tests, 34 EditMode tests** (T-0013). The Web build is **12.51 MiB** (13 120 694 B; was
+**24 Sep, later: the lobby and the room are in ink (T-0014, F-hud-restyle), at `verify`.** Rohan said "lets execute
+t-0014" on 24 Sep; three commits (`7932513`, `eacc750`, `90e4475`) plus the studio one. The lobby is one ink column
+over three faint washes in the gods' colours, with the last result and the series score ("VICTORY VS GUEST-4417 ·
+SERIES 1 – 0"). The room puts **you on the left whichever seat you hold**, with your name, **one gear tile per
+preset** (no dropdown) and the three gods as rows with a coloured square and emblem; **them on the right** with only
+a name and READY / CHOOSING (RANDOM BOT · READY for the bot, WAITING FOR A PLAYER when empty). Ready locks the tiles
+and the gods. Nothing about how a room works changed. Two things found on the way: **translucent colours draw ~60%
+brighter than the canvas** (the project is linear; every screen, the HUD too — a follow-up below), and **the kerning
+fix of T-0013 did not survive glyphs drawn after it** ("V I C TORY" came back; the lobby's own captions were never
+fixed) — fixed in `FontSpacing`. Run report `studio/runs/R-2026-09-24-T-0014.md`; captures `artifacts/t0014/shots/`
+(items 1–5, both sizes) and `artifacts/t0014/seat2-*/` (seat 2 in the browser).
+
+**473 Core tests, 60 server tests, 40 EditMode tests** (T-0014). The Web build is **12.51 MiB** (13 117 682 B after T-0014; 13 120 694 B after T-0013; was
 12.57) against the 13 MB ratchet — the serif atlases left. T-0010's run report: `studio/runs/R-2026-09-22-T-0010-build.md`.
 
 ## The one thing to do next
@@ -106,8 +118,8 @@ serif gone; the Arena on black. Captures `artifacts/t0013/shots/` (Editor, both 
    truth; commits 5–7 landed as one) and the round-3 preview menu item the §14 captures used.
 4. **Verifiers for the M2 set**: T-0008 (closes T-0005 and T-0006), T-0007, T-0002.
 5. **Rohan plays the camera and tunes it** (T-0012), then a verifier in a fresh context.
-6. **Rohan looks at T-0013 built** (open the Arena, Play, `Mimas/HUD/Preview round 3 (…)`; or play a bot match),
-   then approves **T-0014**; **a verifier** checks T-0013 in a fresh context. T-0013 changes the wire (one field on
+6. **Rohan looks at T-0013 and T-0014 built** (play a bot match from the lobby, or open the Arena, Play,
+   `Mimas/HUD/Preview round 3 (…)`); **verifiers** check T-0013 and T-0014 in a fresh context. T-0013 changes the wire (one field on
    the owner's own view, ADR-039), so it deploys together with its server like everything since T-0010.
 
 ## Current milestone: M2 — online
@@ -137,7 +149,7 @@ tick.
 | T-0009 | Boons groundwork in Core | **verified PASS 23 Sep** (ledger rows are ticked with T-0010, per F-boons) | done pending T-0010 |
 | **T-0012** | **The camera** — Q/E turn, WASD pan with a limit, wheel zoom, Space home, V side-on ↔ behind you | **verify** — built 23 Sep, run report `R-2026-09-23-T-0012` | Rohan plays, then verifier |
 | **T-0013** | **The match HUD in ink** — layout A, turn track, cost dots, closed-eye mark (one wire field), preview panel, ink draft cards, the band, ink examine plate, ink void | **verify** — built 24 Sep (14 commits `d309c8f`…`fe866ef`), ladder green 4/4, EditMode 34/34 batch, Web build 12.51 MiB, smoke green ×3, the HUD played in the browser at 720/800/1080. Run report `R-2026-09-23-T-0013` | Rohan looks, then verifier |
-| **T-0014** | **The lobby and the room in ink** — two seats facing, gear tiles | **plan** — same spec §8; depends on T-0013; Rohan approves after seeing T-0013 built | builder, after T-0013 |
+| **T-0014** | **The lobby and the room in ink** — two seats facing, you always left, gear tiles, lineage rows | **verify** — built 24 Sep (`7932513`, `eacc750`, `90e4475`), ladder green 4/4, EditMode 40/40 batch, Web build 12.51 MiB, smoke green ×3, seat 2 played from the browser. Run report `R-2026-09-24-T-0014` | Rohan looks, then verifier |
 | **T-0011** | **The examine panel** — manuscript plate, one hover panel, `--mimas-*` tokens, `Unit.StatLines`, lineage hues, fonts | **verify** — built 23 Sep, run report `R-2026-09-23-T-0011` | verifier needed |
 | T-0008 | Finish M2 in the browser | verify — deployed and measured live 21 Sep | verifier needed |
 | T-0007 | Deploy | verify — live confirmed 21 Sep | verifier needed |
@@ -153,7 +165,7 @@ Nothing, except what waits on Rohan below.
 
 | What | Why | Since |
 |---|---|---|
-| **Approve T-0014** (the lobby and room) after seeing T-0013 built | It sits at `plan` until then | 23 Sep 2026 |
+| **Look at the lobby and the room** (T-0014) and the HUD (T-0013) built; then say whether translucent fills should match the canvas exactly | Every `you at N%` fill draws ~60% brighter than the canvas (linear colour space); matching it is a change to every screen | 24 Sep 2026 |
 | **Deploy** (`bash tools/deploy/deploy.sh`) | The live site predates boons. Its client cannot start a match against a post-boons server, because `room.loadout` now needs a lineage; an old tab must reload. `/health`'s content hash changes | 22 Sep 2026 |
 | **One best-of-3 against a friend on another network**, recorded as a playtest file | It is M2-1, the last evidence M2-7 needs, and M2-8 with a human opponent. It is also the only thing that will say whether the draft reads in three seconds | 21 Sep 2026 |
 | **Tune the boon numbers** — `MimasClient/Assets/_Game/Data/boons/*.json` (27 of them now), `abilities/`, `modifiers/` | Every number is a placeholder written as the spec gave it. Nothing enforces them; the tests only check shapes and rules | 22 Sep 2026 |
@@ -187,6 +199,12 @@ Nothing, except what waits on Rohan below.
   after a reload they fall back to grant order (`docs/ui/examine.md` open question 4). A design question.
 - ~~The action bar sits ~220px right of centre~~ — **fixed in `0e8c95c`** (centred in pixels from its measured
   width); T-0013 left-anchors the bar anyway.
+- **Translucent tokens draw brighter than the canvas** (found by T-0014, 24 Sep): the project is linear
+  (`m_ActiveColorSpace: 1`), so UI Toolkit blends `you` at 14% over ink to rgb(42, 90, 88) where the canvas has
+  (31, 56, 60). Every screen, the HUD included. This Unity has no `PanelSettings.forceGammaRendering`. Options: tokens as
+  pre-mixed opaque colours where the ground is known, or alphas re-derived for linear blending. Rohan's call (it changes
+  every screen); the lobby's wash already does the first (`Ramps.LobbyWash` mixes onto the ink).
+- **The gear tiles all show the sword and the boot** (the book's slot glyphs); per-item icons wait for art.
 - **The banner colours every line that is not "VICTORY" in the opponent's colour** (`MatchHudView` `banner--lost`),
   the round card included. T-0013's `HudMoment` replaces it.
 
@@ -200,10 +218,21 @@ Nothing, except what waits on Rohan below.
   layout loop (the hover panel's height rounding by one device pixel with where its top lands; fixed `2f36241`)
   showed only with the pointer resting on an armed tile, which Editor captures cannot do. Check the HUD in the Web
   build: serve it (`MIMAS_WEB_PATH=<abs>/Build/Web dotnet run --project server/Mimas.Server`), then
-  `browser-smoke.mjs --viewport 1280x720 --expect "\[MatchSession\] online" --do "wait:3000,click:640,354,wait:3000,click:640,524,wait:11000,click:239,637,…"`
-  (Play vs bot, Ready, the first weapon tile; at 1280×800 add 40 to every y; at 1920×1080 Play vs bot is 960,534 and
-  Ready 960,770, the HUD ×1.5). `move:x,y` rests the pointer without pressing (the preview over a target). Count
+  `browser-smoke.mjs --viewport 1280x720 --expect "\[MatchSession\] online" --do "wait:3000,click:640,357,wait:3000,click:640,605,wait:11000,click:239,637,…"`
+  (Play vs bot, Ready, the first weapon tile). **The lobby moved with T-0014:** at 1280×720 Play vs bot is 640,357 and
+  Ready 640,605; at 1920×1080 960,535 and 960,908 (both measured); the HUD's positions are unchanged (×1.5 at 1080). `move:x,y` rests the pointer without pressing (the preview over a target). Count
   `Layout update is struggling` in the output — the smoke fails on it as a console.error anyway.
+- **A second player without a second browser:** `node artifacts/t0014/seat.mjs create|join <CODE> [ready,resign]
+  [name]` is a guest on the real protocol (auth, room, loadout, a resign 12 s into the series); Node 22's built-in
+  WebSocket, nothing to install. It is how T-0014 took every room state in the Editor.
+- **UI Toolkit buttons can be pressed from `eval`** by sending `NavigationSubmitEvent.GetPooled()` to the button
+  (`artifacts/t0014/click.cs`); `eval` wants `FindAnyObjectByType` (FindFirst is obsolete and fails the compile) and
+  `UQueryExtensions.Q<T>(root, name)` spelled out (the extension method is not found there).
+- **Open a scene from `eval` through `EditorBuildSettings.scenes[i].path`**: the asset guard refuses any command text
+  holding the scene's file extension, a read-only open included. The Editor starts on an untitled scene after `unity open`.
+- **A dynamic font brings a glyph's kerning pairs back flagged when the glyph is first drawn**, so clearing the flag
+  once is not enough: `FontSpacing` adds every tracked character before clearing, and both the lobby and the HUD call it
+  at bind. Any new screen with tracked text calls `FontSpacing.RepairLoaded()` when it binds.
 - **Batch `unity test` leaves the font caches alone; every batch Web build rewrites them.** `git restore
   MimasClient/Assets/_Game/UI/Fonts` after each build.
 - **Never call `unity command run_tests` while the Editor is in Play Mode.** The job queues behind Play
@@ -301,6 +330,10 @@ Nothing, except what waits on Rohan below.
 - **No secrets in the repo.** The VPS is reached only through the ssh alias `hostinger`.
 
 ## Numbers, 24 Sep
+
+T-0014: Web build **13,117,682 B** (12.51 MiB; −3 KB); smoke on it, local server, 1280×720, Play vs bot to a match:
+Chromium `boot 1329 ms`, WebKit `1248`, Firefox `1638`, 12.5 MB each. The Chromium boot is up from T-0013's 672 ms; the
+lobby now rasterises ~60 capitals per font at bind (`FontSpacing`) — not measured apart. EditMode 40.
 
 Web build **12.51 MiB** (13,120,694 B, `du -sb Build/Web`; the T-0011 build measured the same way was 13,175,763 B)
 against the 13 MB ratchet — the three serif atlases gone (`.data.br` −73 KB), the new HUD code in (`.wasm.br`
