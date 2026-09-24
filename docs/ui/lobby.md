@@ -1,6 +1,6 @@
 # The lobby and the room
 
-_Status: **proposed** (chosen by Rohan on 23 Sep 2026 in the HUD session, canvas round 3). Design anchors:
+_Status: **built** (T-0014, 24 Sep 2026; chosen by Rohan on 23 Sep 2026 in the HUD session, canvas round 3). Design anchors:
 `#online` (rules 1, 2, 3, 9), `#presentation` (Lobby), `#character-select` (the launch shape: a preset and a
 lineage in the room), `#lineage`, `#hidden-info`. Language: `docs/ui/language.md`. Mock:
 https://claude.ai/artifact/K9qZcJQ115G5G685sdMAwy, page "HUD", round 3: **"Lobby · the way in"** and
@@ -23,7 +23,7 @@ everything (`lb.wash`). One centred column, 420 wide.
 | id | Shows | Data |
 |---|---|---|
 | `lb.title` | "MIMAS", display 38 at 0.6em, `fg` | — |
-| `lb.last` | the last result: "VICTORY VS GUEST-2869 · SERIES 2 – 1", caps 11, `you` for a win, `them` for a loss; hidden when there is none | today's `last-result` |
+| `lb.last` | the last result: "VICTORY VS GUEST-2869 · SERIES 2 – 1", caps 11, `you` for a win, `them` for a loss; hidden when there is none. When the score does not explain the result (a resignation before the rounds decide it) the reason follows: "… · SERIES 0 – 0 · OPPONENT RESIGNED" | today's `last-result`; the series score is carried in `MatchResult` since T-0014 |
 | `lb.name.caption`, `lb.name` | "NAME", caps 10 `fg-3`; a 420 × 52 field on `tile` with a 1px `hair` edge, `body` 15 | today's `name` |
 | `lb.play-bot` | 420 × 52 primary: 1px `you` edge, `you` at 14%, "PLAY VS BOT" caps 14 | today's `play-bot` |
 | `lb.create` | 420 × 52 plain: 1px bone at 22%, ink at 25%, "CREATE ROOM" | today's `create-room` |
@@ -42,7 +42,7 @@ the camera and the turn track, whichever seat you hold (the view knows `_mySeat`
 | `room.code` | the four letters, display **56** at 0.5em (the only 56 in the game) | today's `room-code` | — |
 | `room.copy-link`, `room.copy-code` | "COPY LINK", "COPY CODE": quiet buttons, caps 12 `fg-2`, 26 apart | today's handlers and `WebClipboard` | the confirmation goes to `room.status` as today |
 | `room.you.caption`, `room.you.name` | "YOU", caps 11 `you`; your name, caps 28 `fg` | your seat | — |
-| `room.gear.caption`, `room.preset[i]` | "GEAR", caps 10 `fg-3`; **one tile per preset**, 74 tall, sharing the 520 width, 8 apart: the weapon's and the boots' slot glyphs (18) over the preset's name (caps 10) | `LoadoutPresets` (four today; the row takes however many there are) | selected: 1px `you` edge, `you` at 10%, text `fg`; others `hair` edge, `tile` ground, text `fg-3`; disabled while ready |
+| `room.gear.caption`, `room.preset[i]` | "GEAR", caps 10 `fg-3`; **one tile per preset**, 74 tall, sharing the 520 width, 8 apart: the weapon's and the boots' slot glyphs (18) over the preset's name (caps 10). Built as written: every tile shows the sword and the boot, the names tell them apart (the canvas drew per-item placeholder glyphs; item icons are an art slot) | `LoadoutPresets` (four today; the row takes however many there are) | selected: 1px `you` edge, `you` at 10%, text `fg`; others `hair` edge, `tile` ground, text `fg-3`; disabled while ready |
 | `room.god.caption`, `room.lineage[i]` | "PRAY TO", caps 10 `fg-3`; three rows 520 wide, 6 apart: a 52 square in the lineage's hues with its emblem · the name caps 15 · its line (`body` 12) · a Blessing circle and "STARTS WITH ATHENA'S GUARD" caps 10 | the catalogue's first three lineages by id, as today | selected: 2px `you` left edge, `you` at 7%; the name and the Blessing line brighten; disabled while ready |
 | `room.divider` | a 2px vertical `hair` line at the centre, fading at both ends, 420 tall | — | — |
 | `room.them.caption`, `room.them.name` | "THEM", caps 11 `them`; their name, caps 28 `fg-2`; "WAITING FOR A PLAYER" in `fg-3` when the seat is empty | the other seat | — |
@@ -54,6 +54,12 @@ the camera and the turn track, whichever seat you hold (the view knows `_mySeat`
 
 The other seat never shows their gear or their god (`#q-online-room-loadout` stays open, and hidden).
 A bot's seat reads "RANDOM BOT" and "READY".
+
+**Built (T-0014).** Rows that repeat are built by `LobbyView` under named containers with the ids above
+(`room.preset[0]`… under `room.gear.tiles`, `room.lineage[0]`… under `room.god.rows`, each row's parts
+`room.lineage[i].swatch` / `.emblem` / `.name` / `.line` / `.blessing`); the two sides are `room.you` and `room.them`.
+The pure rules (which seat is drawn where, what the other seat says, the preset choice, the result line) are
+`UI/RoomLayout`.
 
 ## 4. Behaviour kept from today
 
@@ -73,6 +79,22 @@ Captures at 1920×1080 and 1280×720 against the canvas boards:
 4. The room as seat 2 (you still on the left).
 5. The room after a result, with the after-result line.
 
+## Drift (what the build does that this page does not say)
+
+Both measured against the canvas on 24 Sep 2026 (T-0014).
+
+- **Translucent fills draw brighter than the canvas.** The project renders in linear
+  space, so a token such as `you` at 14% blends half as bright again as a browser blends it: Ready's fill is
+  rgb(42, 90, 88) where the board has (31, 56, 60), the selected gear tile (34, 77, 74) against (22, 41, 44). The lobby's
+  wash is mixed onto the ink in gamma values and drawn opaque, so it matches; the fills do not. The same holds for
+  every translucent token in the HUD. Not decided: a follow-up in STATE.
+- **No balancing padding on the wide-tracked words.** The canvas pads "MIMAS" and the
+  room code on the left by their tracking; UI Toolkit adds no tracking after the last letter, so the padding would
+  push them right. None is used.
+
 ## Change log
 
 - 2026-09-23 · written from the HUD session (canvas round 3); status proposed.
+- 2026-09-24 · built by T-0014 (`Lobby.uxml` / `.uss`, `LobbyView`, `RoomLayout`, `Ramps.LobbyWash` / `Swatch` /
+  `BothEndsVertical`). Captures in `artifacts/t0014/shots/` (items 1–5 at 1920×1080 and 1280×720, from the Editor)
+  and `artifacts/t0014/seat2-*/` (item 4 from the browser). Drifts above.

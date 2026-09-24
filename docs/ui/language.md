@@ -32,7 +32,7 @@ except the painting.
 | `ink` | every plate, the void behind the HUD | `#0b0b0e` | — | `--mimas-ink` | built |
 | `ink-2` | a raised plate (hover panel) | `#121217` | — | `--mimas-ink-2` | built |
 | `paper` | ~~the examine plate~~ | — | `#e9e2d2` | `--mimas-paper` | **retired** 23 Sep 2026 (the plate is ink); the variable may stay until nothing reads it |
-| `void` | the world behind the board: the Arena and Lobby cameras' background | `#0b0b0e` (= `ink`) | — | camera clear colour, not USS | built (Arena, T-0013); the Lobby's is its USS (T-0014) |
+| `void` | the world behind the board: the Arena and Lobby cameras' background | `#0b0b0e` (= `ink`) | — | camera clear colour, not USS | built (Arena, T-0013; the Lobby's `.lobby-root` in `--mimas-ink` under the lineage washes, T-0014) |
 | `band` | the round card and results: a band across the middle, ink at 86% fading to nothing over the outer 22% each side, 300 tall | ink at 86% | — | `--mimas-band` | built (T-0013): `Ramps.BothEnds` tinted by the token |
 | `fg` | all primary type | `#efe9dc` (bone) | `#16151a` | `--mimas-fg` | built |
 | `fg-2` | secondary type, captions | bone at 74% | ink at 76% | `--mimas-fg-2` | built |
@@ -185,6 +185,15 @@ cursor tag); `--mimas-scrim` (the draft's 80%), `--mimas-floor` / `--mimas-floor
 tints for `Ramps.Vertical`); the 56 size (`--mimas-text-56`, the room code's, used by T-0014); the tracking
 tokens above.
 
+### Tokens T-0014 added (built)
+
+The lobby's values from `docs/ui/lobby.md`, declared once: `--mimas-you-07` (a selected lineage row), `--mimas-bone-22`
+(a plain button's edge), `--mimas-bone-30` (the server line), `--mimas-ink-25` (a plain button's ground, an unselected
+lineage row), `--mimas-tracking-title` (0.60em, "MIMAS") and `--mimas-tracking-code` (0.50em, the room code and the
+code field), both em × 100 as above. **Translucent tokens draw brighter than the canvas** (measured by T-0014): the
+project is linear, so `you` at 14% over ink comes out half as bright again as a browser draws it. The lobby's wash
+is mixed in gamma values instead (`Ramps.LobbyWash`); the tokens are unchanged and the difference is a follow-up.
+
 ## 7. Data and asset gaps this page creates
 
 | Gap | Kind | Where it lands |
@@ -202,4 +211,6 @@ tokens above.
 - 2026-09-23 · built by T-0013: the HUD session's rows (void, band, cost dots, closed eye, button, track, card,
   edge) and the new alpha and tracking tokens; the paper block and the serif faces gone from `Theme.uss` and the
   three Cormorant assets from the build; the letter-spacing unit and the kerning flag found and fixed (§2).
+- 2026-09-24 · built by T-0014: the lobby's tokens (above) and the Lobby's void; the translucent-token difference
+  measured and noted.
 - 2026-09-23 · HUD session (canvas page "HUD", rounds 1–3, Rohan): one surface, ink — paper and the serif retired; `void`, `band`, the 56 size for the room code; `glyph.cost` placed, `glyph.unseen-by-them` (closed eye, because the struck eye already means "no sight needed"); the action-bar states; where the hover panel opens; button, track, card and edge sizes. Screens: `docs/ui/hud.md`, `docs/ui/between-rounds.md`, `docs/ui/lobby.md`.
