@@ -3,7 +3,7 @@ id: F-examine-panel
 title: The examine panel — what am I fighting, what have I become
 project: mimas
 milestone: M4
-status: approved
+status: done               # 24 Sep 2026: T-0011 closed on Rohan's "pass" after the verification round
 lane: full
 design_anchor: docs/design/index.html#examine
 created: 2026-09-23
@@ -33,7 +33,7 @@ later screen (action bar, draft cards, banner, lobby) is a re-use rather than a 
 ## What the player sees
 
 `docs/ui/examine.md` §1–§4, and the right-hand plate in the pinned render. In one breath: a manuscript
-plate slides in from the right; the painting in the lineage's hue with the name in serif over it; heart 17 / 24
+plate appears on the right, a layer over the HUD (no slide — Rohan, 23 Sep; since T-0013 it is ink, not paper, ADR-040); the painting in the lineage's hue with the name in serif over it; heart 17 / 24
 with a bar, bolt 1 / 4 with eggs, height 1; six stats as "28 −4", "3 +1"; boons in the order they came;
 four items with icon tiles under each, violet-edged when a boon changed or added them; on the enemy, dashed
 `?` tiles, `?` boon rows, grey `?` after the lane stats. Hover anything for the panel with the numbers.

@@ -5,7 +5,7 @@ project: mimas
 feature:
 milestone: M2
 lane: full
-status: verify
+status: done
 owner: builder
 model: opus
 worktree:

@@ -5,7 +5,7 @@ project: mimas
 feature: F-examine-panel
 milestone: M4
 lane: full
-status: verify
+status: done
 owner: builder
 model: opus
 worktree:
@@ -47,7 +47,10 @@ done_when:
   - "The examine plate is the manuscript of docs/ui/examine.md: every §3 id is a UXML name, no literal colour or font outside Theme.uss, no hairline or bordered section, no boon name under an item, boons oldest to latest, no seen-on text (spec §7, §14)"
   - "Actions are icon tiles with names only; changed and added tiles carry the violet edge and mark; unseen enemy actions are dashed ?; the one hover panel opens to the left with the numbers, the sentence, the damage line, the changes and the conditions (spec §7.7, §7.10)"
   - "Stats show base then net in green or red, ? on the enemy's lane stats while a boon is unrevealed and never on health or AP; standing height sits in the vitals (spec §7.4, §7.5)"
-  - "A click anywhere off the plate closes it and selects nothing; Escape and ✕ close it; it stays open across a turn; End Turn still works with it open (spec §7.11, §13)"
+  # Amended 24 Sep 2026 on Rohan's word ("T-0011: pass") to his own 23 Sep rework, the verifier's only fail item. Was:
+  # "A click anywhere off the plate closes it and selects nothing; Escape and ✕ close it; it stays open across a turn;
+  # End Turn still works with it open (spec §7.11, §13)".
+  - "The plate is a layer over the HUD (End Turn and Resign under it); a board click only closes it; a HUD click closes it and still acts; Escape and ✕ close it; it stays open across a turn (docs/ui/examine.md §2, Rohan 23 Sep)"
   - "Screenshots of the five states of spec §14, at 1920×1080 and 1280×720, in artifacts/ and named in the run report, against docs/ui/mockups/examine-manuscript-r3.png"
   - "Web build ≤ 13 MB with fonts; smoke green on three engines; console clean; EditMode and Core tests up by the spec's counts, none softened"
   - "Docs: design page #examine points at the UI book; docs/ui statuses flipped; architecture, data, ADR-037, STATE, run report"

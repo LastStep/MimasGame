@@ -102,7 +102,7 @@ T-0013 (the HUD), T-0012 (the camera), T-0002 (the online slice — **M2-4 and M
 **FAIL:** T-0007 — **the deploy rollback deletes the build it should restore** (never run; do not run it until
 fixed); T-0008 — a stale room after a lost match when the socket was down; T-0014 — the lobby's last-result line drops
 "resigned" when the resigner was behind; T-0006 — the second looks-open sight case; T-0011 and T-0001 — paper only,
-each waiting on an answer from Rohan. **T-0010** got its captures from a builder beside the round and a ninth verifier
+**closed by Rohan the same day** ("pass"; both now `done`). **T-0010** got its captures from a builder beside the round and a ninth verifier
 re-checked it: four of the five missing things are now seen, but the captures exposed **six practice-mode defects in
 T-0010's own code** — practice rounds 2 and 3 open with no round band, and a fresh practice series plays round 1 on an
 empty board (no units, no action bar). No hidden-information leak, no weakened test, the ledger touched only by the
@@ -128,13 +128,9 @@ lines, are "A builder, small" in **`studio/runs/R-2026-09-24-verify-round.md`**.
 Then fresh verifiers re-check T-0007, T-0008, T-0014, T-0006 and T-0010. No task files exist yet — Rohan says go, or the
 producer writes them.
 
-1. **Rohan: the round's questions** (each is minutes; several turn a fail into a pass on paper alone):
-   - **T-0011 passes** when done-when #5 in `studio/tasks/T-0011-examine-panel.md` says what you decided on 23 Sep
-     (plate over the HUD, a HUD click closes it and acts, a board click only closes, Escape and ✕, stays across turns).
-   - **T-0001**: did you approve `F-online-slice` on 17 Sep? Was dropping `CLAUDE.md` rule 11's "flip `data-impl`"
-     sentence and the changelog duty intended?
-   - Accept M1-1…M1-3 having been seeded `passes: true` by a builder; reword M2-2 (room codes are decided); say
-     whether a builder may widen its own `allows_assets` after a guard refusal.
+1. **Rohan: what is left of the round's questions** (T-0011 and T-0001 he closed on 24 Sep): accept M1-1…M1-3 having
+   been seeded `passes: true` by a builder; reword M2-2 (room codes are decided); say whether a builder may widen its
+   own `allows_assets` after a guard refusal.
 2. **Do not run `deploy.sh --rollback`** until the fix lands. A plain deploy is fine.
 3. **The M2 playtest, which only Rohan can do:** send the link to one person who is not Rohan, on another
    network, and play them — now a best-of-3 with a draft. That one evening is M2-1, the last evidence for
@@ -186,8 +182,8 @@ Verdicts of 24 Sep are in `R-2026-09-24-verify-round.md`; each task's reasons ar
 | **T-0008** | Finish M2 in the browser | **verify — FAIL 24 Sep**: stale room after a lost match with the socket down. Its ladder at its own commit is green (323 / 47) | builder, small |
 | **T-0014** | The lobby and the room in ink | **verify — FAIL 24 Sep**, one item: the last-result line drops "resigned" when the loser resigned while behind | builder, small |
 | T-0006 | Refused shots show the blocker | **verify — FAIL on evidence 24 Sep**: a second case that looks open; a rule-or-picture line per case | builder, small |
-| **T-0011** | The examine plate | **verify — FAIL on evidence 24 Sep, paper only**: done-when #5 predates Rohan's 23 Sep rework | Rohan amends it |
-| T-0001 | Install the studio | **verify — FAIL 24 Sep, paper only**: F-online-slice marked approved without a record; rule 11's lost sentence | Rohan answers |
+| T-0011 | The examine plate | **done 24 Sep** — Rohan: "pass"; done-when #5 amended to his 23 Sep rework (the verifier's only item) | — |
+| T-0001 | Install the studio | **done 24 Sep** — Rohan: "pass and ignore, probably redundant now" | — |
 | T-0003 | The Web build, in a browser | **blocked** — waiting on Rohan's `?perf=1` reading since 18 Sep | Rohan |
 
 ## Blocked
@@ -199,7 +195,7 @@ Nothing, except what waits on Rohan below.
 | What | Why | Since |
 |---|---|---|
 | **Look at the lobby and the room** (T-0014) and the HUD (T-0013) built; then say whether translucent fills should match the canvas exactly | Every `you at N%` fill draws ~60% brighter than the canvas (linear colour space); matching it is a change to every screen | 24 Sep 2026 |
-| **The verification round's questions** — T-0011's done-when #5 to your 23 Sep decision; T-0001: did you approve `F-online-slice`, and was rule 11's `data-impl` sentence dropped on purpose; M1-1…3 seeded by a builder; M2-2's wording; may a builder widen its own `allows_assets` | Two fails become passes on paper alone; the rest are ledger and process calls only you can make. Details: `R-2026-09-24-verify-round.md` "Rohan" | 24 Sep 2026 |
+| **The verification round's remaining questions** — M1-1…3 seeded by a builder; M2-2's wording; M3-5 and M3-6's wording; may a builder widen its own `allows_assets` | Ledger and process calls only you can make (T-0011 and T-0001 closed 24 Sep). Details: `R-2026-09-24-verify-round.md` "Rohan" | 24 Sep 2026 |
 | **Do not run `deploy.sh --rollback`** | It deletes the previous build and reports success (T-0007). A builder fix is first in the queue | 24 Sep 2026 |
 | **Deploy** (`bash tools/deploy/deploy.sh`) | The live site predates boons. Its client cannot start a match against a post-boons server, because `room.loadout` now needs a lineage; an old tab must reload. `/health`'s content hash changes | 22 Sep 2026 |
 | **One best-of-3 against a friend on another network**, recorded as a playtest file | It is M2-1, the last evidence M2-7 needs, and M2-8 with a human opponent. It is also the only thing that will say whether the draft reads in three seconds | 21 Sep 2026 |
